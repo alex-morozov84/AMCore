@@ -1,7 +1,9 @@
+import { SERVED_LOCALES } from '@amcore/shared'
 import { expect } from '@playwright/test'
 
 import { test } from '../shared/auth-test'
 import { expectNoAxeViolations } from '../shared/axe'
+import { messages, messagesForLocale, productPath } from '../shared/product-settings'
 
 /**
  * Automated WCAG A/AA scans (Track 7 FINAL PLAN §5) on the public pages
@@ -11,7 +13,7 @@ import { expectNoAxeViolations } from '../shared/axe'
  */
 
 test('login page has no axe violations', async ({ page }) => {
-  await page.goto('/en/login')
+  await page.goto(productPath('/login'))
   await expectNoAxeViolations(page)
 })
 
@@ -24,22 +26,24 @@ test('login page has no axe violations in its API-error state', async ({ page })
     })
   )
 
-  await page.goto('/en/login')
-  await page.getByRole('textbox', { name: /email/i }).fill('spike-e2e@example.com')
-  await page.getByLabel(/^password$/i).fill('correct-horse-battery')
-  await page.getByRole('button', { name: /sign in/i }).click()
+  await page.goto(productPath('/login'))
+  await page
+    .getByRole('textbox', { name: messages.auth.email, exact: true })
+    .fill('spike-e2e@example.com')
+  await page.getByLabel(messages.auth.password, { exact: true }).fill('correct-horse-battery')
+  await page.getByRole('button', { name: messages.auth.login, exact: true }).click()
   await page.locator('[data-slot="alert"]').waitFor()
 
   await expectNoAxeViolations(page)
 })
 
 test('register page has no axe violations', async ({ page }) => {
-  await page.goto('/en/register')
+  await page.goto(productPath('/register'))
   await expectNoAxeViolations(page)
 })
 
 test('reset password form has no axe violations', async ({ page }) => {
-  await page.goto(`/en/reset-password?token=${'a'.repeat(64)}`)
+  await page.goto(productPath(`/reset-password?token=${'a'.repeat(64)}`))
   await expectNoAxeViolations(page)
 })
 
@@ -53,10 +57,9 @@ const createdAccount = {
   correlationId: 'test-correlation-id',
 }
 
-for (const { locale, name, size } of [
-  { locale: 'en', name: 'Name', size: { width: 1280, height: 800 } },
-  { locale: 'ru', name: 'Имя', size: { width: 360, height: 780 } },
-] as const) {
+for (const locale of SERVED_LOCALES) {
+  const auth = messagesForLocale(locale).auth
+  const size = locale === 'ru' ? { width: 360, height: 780 } : { width: 1280, height: 800 }
   test(`register page keeps one focused notice and has no axe violations after a created account (${locale}, ${size.width}px)`, async ({
     page,
   }) => {
@@ -70,10 +73,15 @@ for (const { locale, name, size } of [
       })
     })
     await page.setViewportSize(size)
-    await page.goto(`/${locale}/register`)
-    await page.getByLabel(name, { exact: true }).fill('Jane Doe')
-    await page.getByRole('textbox', { name: /email/i }).fill('jane@example.com')
-    await page.locator('input[name="password"]').fill('Correct1Horse')
+    await page.goto(productPath('/register', locale))
+    await page.getByLabel(auth.name, { exact: true }).fill('Jane Doe')
+    await page.getByRole('textbox', { name: auth.email, exact: true }).fill('jane@example.com')
+    const password = page.locator('input[name="password"]')
+    await page
+      .getByRole('button', { name: messagesForLocale(locale).common.showPassword, exact: true })
+      .click()
+    await expect(password).toHaveAttribute('type', 'text')
+    await password.fill('Correct1Horse')
     await page.locator('form button[type="submit"]').click()
 
     // Scoped to our own `data-slot="alert"`: Next's route announcer is also a `role="alert"`.

@@ -1,30 +1,11 @@
 import { expect, test } from '@playwright/test'
 
+import { waitForAnimationsToFinish } from '../shared/axe'
+import { isProductHome, messages, productPath } from '../shared/product-settings'
+
 import { registerViaUi, uniqueEmail } from './helpers'
 
-/**
- * Track 3 (`ai/models-talk.md` FINAL PLAN §3) — nonce-based CSP against the
- * real production-mode standalone server (`docker-compose.yml`'s
- * `local-infra` profile), not `next dev`. Since PR4, this build runs
- * **enforcing** CSP by default (`getCspMode()`'s environment-aware
- * default) — a violation here means the browser actually blocked
- * something, not merely reported it, so "zero violations" is a
- * meaningfully stronger guarantee than it was under PR2/PR3's Report-Only
- * default.
- *
- * This lane exists specifically because `next dev`/Turbopack's own HMR
- * machinery injects ~130 inline `<style>` tags for CSS hot-reload — a real,
- * observed `style-src-elem` violation storm that is 100% dev-tooling
- * noise, absent from the production build (confirmed by running the same
- * check against both during PR2's implementation: 132 vs 0; also why `next
- * dev` keeps defaulting to Report-Only even after PR4's flip — see
- * `csp-mode.ts`). Asserting "zero CSP violations" against `next dev` would
- * be a false negative either way — noisy-red on a correct policy, or
- * silently passing if the assertion were loosened to tolerate it, hiding a
- * real future regression. `ai/STATUS.md` working rule 1 ("verify against
- * the artefact that ships") is exactly why this check lives here instead.
- */
-
+/** Check enforcing CSP against the production standalone server, including real navigation. */
 test('production build: no CSP violations during normal navigation', async ({ page }) => {
   const violations: string[] = []
   await page.exposeFunction('__reportCspViolation', (detail: string) => violations.push(detail))
@@ -35,7 +16,7 @@ test('production build: no CSP violations during normal navigation', async ({ pa
     })
   })
 
-  await page.goto('/en/login')
+  await page.goto(productPath('/login'))
   await page.waitForLoadState('networkidle')
 
   expect(violations, `unexpected CSP violations: ${violations.join(', ')}`).toHaveLength(0)
@@ -44,7 +25,7 @@ test('production build: no CSP violations during normal navigation', async ({ pa
 test('production build: every inline <script> the server returns carries the CSP nonce', async ({
   request,
 }) => {
-  const response = await request.get('/en/login')
+  const response = await request.get(productPath('/login'))
   const csp =
     response.headers()['content-security-policy-report-only'] ??
     response.headers()['content-security-policy']
@@ -69,7 +50,7 @@ test('production build: theme still applies before paint under the real CSP, no 
 }) => {
   await page.addInitScript(() => window.localStorage.setItem('amcore-theme', 'dark'))
 
-  await page.goto('/en/login')
+  await page.goto(productPath('/login'))
 
   const isDark = await page.evaluate(() => document.documentElement.classList.contains('dark'))
   expect(isDark).toBe(true)
@@ -78,11 +59,7 @@ test('production build: theme still applies before paint under the real CSP, no 
 test('production build: the authenticated dashboard (sidebar style= attributes included) produces no CSP violations', async ({
   page,
 }) => {
-  // `shared/ui/sidebar.tsx` renders three deliberate `style={...}` CSS
-  // custom-property attributes in SSR'd dashboard HTML (ai/models-talk.md
-  // §6.5) — the reason `style-src-attr` stays `'unsafe-inline'` rather than
-  // nonce-based. This is the one real-stack check that actually exercises
-  // that HTML, which `/en/login` (no sidebar) cannot.
+  // The authenticated shell exercises sidebar markup absent from the public login page.
   const violations: string[] = []
   await page.exposeFunction('__reportCspViolation', (detail: string) => violations.push(detail))
   await page.addInitScript(() => {
@@ -93,14 +70,15 @@ test('production build: the authenticated dashboard (sidebar style= attributes i
   })
 
   await registerViaUi(page, uniqueEmail('csp-dashboard'), { name: 'E2E Test' })
-  await expect(page).toHaveURL(/\/en\/?$/)
+  await expect(page).toHaveURL(isProductHome)
   await page.waitForLoadState('networkidle')
 
   // Also exercises the mobile Sheet variant (a second, structurally
   // different sidebar render) while we have a real authenticated session.
   await page.setViewportSize({ width: 375, height: 812 })
-  await page.getByRole('button', { name: /toggle sidebar/i }).click()
-  await page.waitForTimeout(200)
+  await page.getByRole('button', { name: messages.nav.toggleSidebar, exact: true }).click()
+  await expect(page.locator('[data-slot="sidebar"][data-mobile="true"]')).toBeVisible()
+  await waitForAnimationsToFinish(page, '[data-slot="sidebar"][data-mobile="true"]')
 
   expect(
     violations,

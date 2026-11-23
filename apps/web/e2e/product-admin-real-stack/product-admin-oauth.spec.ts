@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 import { logoutViaApi, registerViaUi, uniqueEmail } from '../real-stack/helpers'
+import { messages, productPath } from '../shared/product-settings'
 import { activeTarget } from '../support/managed-target.mjs'
 
 import { appleBrowserFixture } from './apple-browser-fixture'
@@ -48,7 +49,7 @@ for (const automatic of [true, false]) {
           const url = new URL(request.url())
           if (url.origin !== staff) return
           if (
-            url.pathname === '/en/auth/callback' ||
+            url.pathname === productPath('/auth/callback') ||
             url.pathname === '/api/product-admin/auth/oauth/complete'
           )
             observations.push(
@@ -67,34 +68,39 @@ for (const automatic of [true, false]) {
         activePage.on('response', (response) => {
           const url = new URL(response.url())
           if (url.origin !== staff) return
-          if (url.pathname === '/en/auth/callback')
+          if (url.pathname === productPath('/auth/callback'))
             documentPolicy = response.headers()['referrer-policy']
           if (url.pathname === '/api/product-admin/auth/oauth/complete')
             completionStatus = response.status()
         })
-        await activePage.goto(`${staff}/en/organizations?view=list`)
-        await activePage.getByRole('link', { name: /continue with apple/i }).click()
+        await activePage.goto(`${staff}${productPath('/organizations?view=list')}`)
+        await activePage
+          .getByRole('link', { name: messages.auth.continueWithApple, exact: true })
+          .click()
         if (!automatic) {
           await activePage
             .getByRole('link', { name: 'Continue to fixture provider', exact: true })
             .click()
           await activePage.getByRole('button', { name: 'Authorize fixture', exact: true }).click()
           await expect(
-            activePage.getByRole('heading', { name: 'Completing sign-in…' })
+            activePage.getByRole('heading', { name: messages.auth.oauthCompletion.title })
           ).toBeVisible()
-          await activePage.getByRole('button', { name: 'Continue', exact: true }).click()
+          await activePage
+            .getByRole('button', { name: messages.auth.oauthCompletion.continue, exact: true })
+            .click()
         }
         try {
           await activePage.waitForURL(
             (url) =>
               url.origin === staff &&
-              (url.pathname === '/en/organizations' || url.searchParams.has('oauthError')),
+              (url.pathname === productPath('/organizations') ||
+                url.searchParams.has('oauthError')),
             { timeout: 15000 }
           )
         } catch {
           throw new Error('Selected Apple completion did not reach a terminal destination')
         }
-        expect(new URL(activePage.url()).pathname).toBe('/en/organizations')
+        expect(new URL(activePage.url()).pathname).toBe(productPath('/organizations'))
         await Promise.all(observations)
         expect(authorizationSeen()).toBe(true)
         // Assert only safe metadata, never transient cookie values or ticket URLs.

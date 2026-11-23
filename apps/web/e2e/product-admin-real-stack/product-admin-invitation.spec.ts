@@ -1,10 +1,8 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
-
 import { DEFAULT_LOCALE } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { acceptAdministrator } from '../organization-provisioning/recipient'
+import { messages, productPath } from '../shared/product-settings'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 import { proveSetupMailbox, SETUP_PASSWORD, setupCommand } from '../support/organization-setup'
 
@@ -18,9 +16,6 @@ test('closed signup still admits invited registration and real email proof befor
   const { product, staff } = target.origins
   if (!staff || target.fixtureProfile !== 'product-admin-closed-signup')
     throw new Error('Closed staff fixture required')
-  const messages = JSON.parse(
-    readFileSync(join(target.snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`), 'utf8')
-  )
   const operator = 'staff-owner@e2e.amcore.test'
   const recipient = 'staff-invited@e2e.amcore.test'
   const prepared = setupCommand('prepare-account', { email: operator, locale: DEFAULT_LOCALE })
@@ -39,9 +34,9 @@ test('closed signup still admits invited registration and real email proof befor
         adminUserId: prepared.userId,
       }).status
     ).toBe('created')
-    await page.goto(`${product}/en/register`)
+    await page.goto(`${product}${productPath('/register')}`)
     await expect(page.getByText(messages.auth.publicSignupClosed, { exact: true })).toBeVisible()
-    await page.goto(`${staff}/en/login`)
+    await page.goto(`${staff}${productPath('/login')}`)
     await page.getByLabel(messages.auth.email, { exact: true }).fill(operator)
     await page.getByLabel(messages.auth.password, { exact: true }).fill(SETUP_PASSWORD)
     await page.getByRole('button', { name: messages.auth.login, exact: true }).click()
@@ -49,7 +44,7 @@ test('closed signup still admits invited registration and real email proof befor
     const org = guardedSql(
       "SELECT id FROM core.organizations WHERE slug='staff-invitation-proof';"
     ).trim()
-    await page.goto(`${staff}/en/organizations/${org}/invites`)
+    await page.goto(`${staff}${productPath(`/organizations/${org}/invites`)}`)
     await page
       .getByRole('button', { name: messages.organizationInvitations.invite, exact: true })
       .click()

@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test'
 
 import { appleBrowserFixture } from '../product-admin-real-stack/apple-browser-fixture'
 import { getBrowserFixture } from '../product-admin-real-stack/get-browser-fixture'
+import { productPath } from '../shared/product-settings'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
 import { logoutViaApi, registerViaUi, uniqueEmail } from './helpers'
@@ -35,7 +36,8 @@ for (const provider of ['apple', 'google', 'github'] as const) {
       try {
         await page.waitForURL(
           (url) =>
-            url.origin === product && url.pathname === `/en${productAdminPath('/organizations')}`,
+            url.origin === product &&
+            url.pathname === productPath(productAdminPath('/organizations')),
           { timeout: 15000 }
         )
       } catch {
@@ -86,7 +88,7 @@ test('google path administration started during a Redis stall waits for Redis, t
     await page.goto(start, { timeout: STALL_MS + 15_000 })
     await page.waitForURL(
       (url) =>
-        url.origin === product && url.pathname === `/en${productAdminPath('/organizations')}`,
+        url.origin === product && url.pathname === productPath(productAdminPath('/organizations')),
       { timeout: STALL_MS + 15_000 }
     )
     expect(performance.now() - started).toBeLessThan(STALL_MS + 15_000)
@@ -142,7 +144,7 @@ test('google path administration callback during a Redis stall is refused, creat
     await page.goto(start)
     await page.waitForURL(
       (url) =>
-        url.origin === product && url.pathname === `/en${productAdminPath('/organizations')}`,
+        url.origin === product && url.pathname === productPath(productAdminPath('/organizations')),
       { timeout: 15_000 }
     )
     expect((await context.request.get(`${product}/api/auth/me`)).status()).toBe(200)

@@ -18,6 +18,7 @@ test('unknown and cross-area files cannot disappear when broad lists overlap spe
     'ui',
     'web',
     'api',
+    'apiE2e',
     'common',
     'infra',
     'monitoring',

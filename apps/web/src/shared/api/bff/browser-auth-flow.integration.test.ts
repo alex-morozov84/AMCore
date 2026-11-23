@@ -11,6 +11,11 @@ import {
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.hoisted(async () => {
+  const { redisFixtureSite } = await import('./redis-integration-origins.testkit')
+  vi.stubEnv('WEB_TRUSTED_ORIGINS', redisFixtureSite)
+})
+
 const browser = vi.hoisted(() => ({
   cookies: {} as Record<string, string>,
   source: null as Headers | null,
@@ -46,14 +51,15 @@ import { productContextDeps } from './product-context-deps'
 import { resolveProductWebContext } from './product-web-context.server'
 import { productWebRoute } from './product-web-route'
 import { getWebRedisClient } from './redis-client'
+import { redisFixtureSite, redisFixtureStaff } from './redis-integration-origins.testkit'
 
 let container: StartedRedisContainer
 beforeAll(async () => {
   container = await new RedisContainer('redis:7-alpine').start()
   vi.stubEnv('REDIS_URL', container.getConnectionUrl())
-  vi.stubEnv('FRONTEND_URL', 'http://localhost:3002')
-  vi.stubEnv('PRODUCT_ADMIN_ORIGIN', '')
-  vi.stubEnv('WEB_INVITATION_LOCAL_HTTP_ORIGIN', 'http://localhost:3002')
+  vi.stubEnv('FRONTEND_URL', redisFixtureSite)
+  vi.stubEnv('PRODUCT_ADMIN_ORIGIN', redisFixtureStaff)
+  vi.stubEnv('WEB_INVITATION_LOCAL_HTTP_ORIGIN', redisFixtureStaff ? '' : redisFixtureSite)
   vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-browser-flow-private-key-at-least-32>')
 }, 60000)
 afterAll(async () => {
@@ -82,15 +88,15 @@ const user: UserResponse = {
 }
 function request(path: string, body?: unknown) {
   const source = new Headers({
-    host: 'localhost:3002',
-    origin: 'http://localhost:3002',
+    host: new URL(redisFixtureSite).host,
+    origin: redisFixtureSite,
     'content-type': 'application/json',
     cookie: Object.entries(browser.cookies)
       .map(([key, value]) => `${key}=${value}`)
       .join(';'),
   })
   browser.source = source
-  return new Request(`http://localhost:3002${path}`, {
+  return new Request(`${redisFixtureSite}${path}`, {
     method: body === undefined ? 'GET' : 'POST',
     headers: source,
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -111,7 +117,7 @@ function upstream(
   protectedAccount = false,
   loseCredentialResponse = false,
   loseAckResponse = false,
-  registrationCommitted?: () => Promise<void>,
+  registrationCommitted?: (headers: Headers) => Promise<void>,
   initialSetup: boolean | 'recovery_ticket' = false
 ) {
   const enrollment = Boolean(initialSetup)
@@ -209,7 +215,7 @@ function upstream(
       expect(retained?.record.id).toBe(operationId)
       generation += 1
       phase = 'pending'
-      await registrationCommitted?.()
+      await registrationCommitted?.(headers)
       return Response.json(
         {
           user,
@@ -578,7 +584,8 @@ describe('Browser password/MFA publication with actual Redis', () => {
   )
   it('preserves confirmed creation when real Redis refuses publication after account commit', async () => {
     const redis = await getWebRedisClient()
-    const backend = upstream(false, false, false, async () => {
+    const backend = upstream(false, false, false, async (headers) => {
+      expect(headers.get('accept-language')).toBe('ru')
       const used = Number(/used_memory:(\d+)/.exec(await redis.info('memory'))![1])
       await redis.configSet('maxmemory-policy', 'noeviction')
       await redis.configSet('maxmemory', String(used))
@@ -594,6 +601,7 @@ describe('Browser password/MFA publication with actual Redis', () => {
       password: '<fake-register-password-Long123!>',
     })
     input.headers.set('x-amcore-login-attempt', ready.attemptId)
+    input.headers.set('accept-language', 'ru')
     try {
       const response = await handleCredentialAuth(input, {
         context: context(),
@@ -626,7 +634,7 @@ describe('Browser password/MFA publication with actual Redis', () => {
           expiresAt: new Date(now + 900000).toISOString(),
           intent: { expectedInviteId: 'prior-invite', expectedGeneration: 1 },
         },
-        'en',
+        DEFAULT_LOCALE,
         null,
         now
       )
@@ -726,7 +734,7 @@ describe('Browser password/MFA publication with actual Redis', () => {
           expiresAt: new Date(now + 900000).toISOString(),
           intent: { expectedInviteId: 'invite-A', expectedGeneration: 1 },
         },
-        'en',
+        DEFAULT_LOCALE,
         null,
         now
       )

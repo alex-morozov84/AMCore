@@ -27,11 +27,14 @@ async function clickCommand(page: Page, control: Locator): Promise<MfaBrowserRes
 export async function completeMfaSignIn(page: Page, email: string): Promise<void> {
   process.env.PLAYWRIGHT_NO_COPY_PROMPT = '1'
   const target = activeTarget()
-  const t = JSON.parse(
-    readFileSync(join(target.snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`), 'utf8')
-  ).accountMfa as Messages['accountMfa']
   try {
     await page.waitForURL((url) => url.pathname.endsWith('/mfa') && url.searchParams.has('flow'))
+    const locale = coerceSupportedLocale(
+      new URL(page.url()).pathname.split('/')[1] ?? DEFAULT_LOCALE
+    )
+    const t = JSON.parse(
+      readFileSync(join(target.snapshot, `apps/web/messages/${locale}.json`), 'utf8')
+    ).accountMfa as Messages['accountMfa']
     const connect = page.getByRole('button', { name: t.connectApp, exact: true })
     const appCode = page.getByLabel(t.appCode, { exact: true })
     await expect(connect.or(appCode)).toBeVisible()

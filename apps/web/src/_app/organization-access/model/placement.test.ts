@@ -1,14 +1,17 @@
+import { PRODUCT_ADMIN_CONFIG } from '@amcore/shared'
 import { describe, expect, it } from 'vitest'
 
 import { organizationAccessHrefs, organizationAccessPlacement } from './placement'
 
+const prefix = PRODUCT_ADMIN_CONFIG.mode === 'path' ? `/${PRODUCT_ADMIN_CONFIG.alias}` : ''
+
 describe('ordinary organization placement', () => {
   it('uses canonical admin defaults and explicit list escape', () => {
     const hrefs = organizationAccessHrefs(organizationAccessPlacement)
-    expect(hrefs.menuHref).toBe('/manage/organizations')
-    expect(hrefs.listHref).toBe('/manage/organizations?view=list')
-    expect(hrefs.homeHref).toBe('/manage')
-    expect(hrefs.contextHref('org_1')).toBe('/manage/organizations/org_1')
+    expect(hrefs.menuHref).toBe(`${prefix}/organizations`)
+    expect(hrefs.listHref).toBe(`${prefix}/organizations?view=list`)
+    expect(hrefs.homeHref).toBe(prefix || '/')
+    expect(hrefs.contextHref('org_1')).toBe(`${prefix}/organizations/org_1`)
   })
   it('derives every destination from a normalized custom path', () => {
     const hrefs = organizationAccessHrefs({

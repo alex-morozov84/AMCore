@@ -435,6 +435,9 @@ sufficient boundary. Removing or moving a test requires a retained witness, a
 relevant controlled fault and explicit lost coverage; a passing test alone is not
 a reason to keep it. Preserve the first failure and distinguish prerequisites from verdicts.
 
+For browser tests that use the product's language, addresses or sign-in, follow
+[Write a browser test for the product settings](docs/frontend/testing.md#write-a-browser-test-for-the-product-settings).
+
 API E2E policy and measurement triggers are defined in
 [CI security](docs/operations/ci-security.md#api-e2e-budget-policy).
 Use the accepted layout and absolute budgets; do not recreate a historical hardware

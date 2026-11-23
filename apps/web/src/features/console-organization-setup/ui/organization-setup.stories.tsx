@@ -3,6 +3,8 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { http, HttpResponse } from 'msw'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 
+import { getConsolePublicApiPath } from '@/shared/lib/console-public-api-path'
+
 import messages from '../../../../messages/en.json'
 import russian from '../../../../messages/ru.json'
 
@@ -10,7 +12,7 @@ import { OrganizationSetup } from './organization-setup'
 
 const t = messages.console.organizationSetup
 const binding = 'a'.repeat(64)
-const root = '/api/console/organization-establishment'
+const root = `/api${getConsolePublicApiPath('/organization-establishment')}`
 const ids = {
   organizationId: 'company',
   userId: 'recipient',

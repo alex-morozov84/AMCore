@@ -295,6 +295,8 @@ with no recorded end. GeoIP is turned off in a stand. Repeated preview keeps the
 
 For isolated Overview source-failure and chart-navigation checks, run
 `pnpm stand e2e --lane real-stack --fixture console-summary -- admin-overview.spec.ts -g 'summary fixture'`.
+The fixture requires an enabled Console. Its source copy uses path mode for the
+Console and product admin and keeps the configured locales and aliases.
 This E2E-only fixture retains real authorization, stores a prepared failed delivery,
 and provides controlled source responses through an internal proxy. Its local,
 pinned Grafana has an offline dashboard with no metrics. The test proves navigation

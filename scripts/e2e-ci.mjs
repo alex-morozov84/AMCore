@@ -1,3 +1,10 @@
+import { sourceSettings } from './stand/settings-policy.mjs'
+import { isDeepStrictEqual } from 'node:util'
+import {
+  configuredBrowserCases,
+  configuredConsoleFixtureDigest,
+  requireConfiguredBaseCases,
+} from './lib/configured-browser-cases.mjs'
 import { laneJobMinutes } from './lib/lighthouse-deadlines.mjs'
 import { publishPlan } from './lighthouse/ci-plan.mjs'
 import { productAdminE2ePlans } from './product-admin-e2e-plan.mjs'
@@ -8,12 +15,61 @@ import { runIdentity } from './lighthouse/identity.mjs'
 import { auditEnvironment, laneEpoch } from './lib/lighthouse-command.mjs'
 import { readFile, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { ciLanes } from './e2e-ci-plan.mjs'
+import { ciLanes, configuredArguments, consoleFixture, consoleFixtureLane } from './e2e-ci-plan.mjs'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
-const lanes = ciLanes(root)
 const requested = process.argv[2]
-const plan = requested === '--matrix' ? auditScope(root) : auditPlan(root, runIdentity(root))
+const upstream = process.env.AMCORE_CI_ROLE === 'upstream-starter'
+const nativeEvidence = process.env.AMCORE_E2E_INVENTORY === 'configured'
+const configured =
+  nativeEvidence || requested === '--configured-matrix' || requested?.startsWith('configured-')
+const lanes = ciLanes(root, { configured, upstream })
+const matrix = ['--matrix', '--configured-matrix'].includes(requested)
+const identity = matrix ? undefined : runIdentity(root)
+async function plannedCases() {
+  const selection = JSON.parse(process.env.CI_PLAN)
+  if (
+    selection.source.checkout !== identity.source ||
+    selection.run !== identity.run ||
+    selection.attempt !== identity.attempt
+  )
+    throw new Error('Browser collection belongs to a different CI attempt')
+  const collection = JSON.parse(await readFile(process.env.AMCORE_CONFIGURED_COLLECTION, 'utf8'))
+  if (!isDeepStrictEqual(collection.settings, await sourceSettings(root)))
+    throw new Error('Browser collection differs from checkout settings')
+  const cases = configuredBrowserCases(root, identity, collection)
+  const fixture = selection.proposed?.web === 'runtime' ? consoleFixture(root) : undefined
+  if (selection.event === 'pull_request') {
+    const base = JSON.parse(await readFile(process.env.AMCORE_CONFIGURED_BASE_COLLECTION, 'utf8'))
+    requireConfiguredBaseCases(
+      { ...identity, source: selection.source.base },
+      base,
+      collection,
+      fixture
+    )
+  }
+  if (fixture) {
+    const fixtureDigest = configuredConsoleFixtureDigest(root, collection)
+    if (fixtureDigest) cases[consoleFixtureLane] = fixtureDigest
+  }
+  return cases
+}
+const configuredCases =
+  nativeEvidence && requested === '--plan-ci' ? await plannedCases() : undefined
+const plan = matrix
+  ? auditScope(root, { configured, upstream })
+  : auditPlan(root, identity, {
+      configured,
+      upstream,
+      configuredCases,
+    })
+if (
+  process.env.AMCORE_EXPECTED_AUDIT_PLAN &&
+  JSON.parse(process.env.AMCORE_EXPECTED_AUDIT_PLAN).digest !== plan.digest
+)
+  throw new Error('Unexpected Web E2E plan')
+if (nativeEvidence && !matrix && !plan.configuredCases)
+  throw new Error('Missing configured browser evidence plan')
 const auditDirectory = (lane) =>
   join(root, '.amcore/lighthouse-results', plan.run, plan.attempt, lane)
 
@@ -38,9 +94,14 @@ async function browserLane(lane, epoch) {
   if (lane === 'host') args.splice(5, 1, 'console-real-stack')
   if (lane === 'setup-console')
     args.splice(5, 1, 'console-real-stack', '--fixture', 'organization-setup')
+  if (lane.startsWith('configured-'))
+    args.splice(4, args.length - 4, ...configuredArguments(root, lane))
+  const fixture = lane === consoleFixtureLane ? consoleFixture(root) : undefined
+  if (fixture) args.splice(5, 1, fixture.project, '--fixture', fixture.name, '--', ...fixture.args)
   const staffPlan = productAdminE2ePlans[lane]
   if (staffPlan)
     args.splice(5, 1, staffPlan.lane, '--fixture', staffPlan.fixture, '--', ...staffPlan.files)
+  const mocked = args[5] === 'mocked'
   let status = 0
   let termination = 'passed'
   try {
@@ -48,6 +109,22 @@ async function browserLane(lane, epoch) {
       cwd: root,
       env: cleanEnvironment({
         CI: 'true',
+        ...(lane === 'configured-mocked' && process.env.AMCORE_MOCK_TLS_DIR
+          ? { AMCORE_MOCK_TLS_DIR: process.env.AMCORE_MOCK_TLS_DIR }
+          : {}),
+        ...(plan.browserCases?.[lane]
+          ? {
+              AMCORE_BROWSER_EVIDENCE: JSON.stringify({
+                source: plan.source,
+                run: plan.run,
+                attempt: plan.attempt,
+                lane,
+                plan: plan.digest,
+                expected: plan.browserCases[lane],
+                ...(nativeEvidence ? { configured: true } : {}),
+              }),
+            }
+          : {}),
         ...(process.env.GITHUB_ACTIONS === 'true' ? { AMCORE_E2E_EPOCH: String(epoch) } : {}),
         ...(plan.assignments[lane].length
           ? auditEnvironment(plan, lane, epoch, join(auditDirectory(lane), 'bundle'))
@@ -62,7 +139,7 @@ async function browserLane(lane, epoch) {
   } finally {
     try {
       await stopChildren()
-      if (lane === 'mocked') await closeMockedRunner(operation.standId)
+      if (mocked) await closeMockedRunner(operation.standId)
     } catch {
       termination = 'failed'
       status ||= 1
@@ -85,14 +162,15 @@ async function browserLane(lane, epoch) {
       setup: m?.testOutcome ? 'passed' : 'failed',
       test: m?.testOutcome ?? 'failed',
       termination,
-      cleanup: lane === 'mocked' || m?.state === 'purged' ? 'passed' : 'failed',
+      browserEvidence: m?.browserEvidence,
+      cleanup: mocked || m?.state === 'purged' ? 'passed' : 'failed',
     }),
     { mode: 0o600 }
   )
   return status
 }
 
-if (requested === '--matrix')
+if (matrix)
   console.log(
     JSON.stringify({
       include: lanes.map((lane) => ({
@@ -104,9 +182,11 @@ if (requested === '--matrix')
 else if (requested === '--audit-plan') console.log(JSON.stringify(plan))
 else if (requested === '--plan-ci') publishPlan(plan)
 else {
-  if (requested !== '--all' && !lanes.includes(requested)) throw new Error('Unknown E2E CI lane')
+  const plannedLanes = Object.keys(plan.assignments)
+  if (requested !== '--all' && !plannedLanes.includes(requested))
+    throw new Error('Unknown E2E CI lane')
   const results = []
-  for (const lane of requested === '--all' ? lanes : [requested]) {
+  for (const lane of requested === '--all' ? plannedLanes : [requested]) {
     const began = Date.now()
     const epoch = laneEpoch(process.env.AMCORE_CI_EPOCH, began)
     const status =

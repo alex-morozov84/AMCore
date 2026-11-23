@@ -2,6 +2,8 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { http, HttpResponse } from 'msw'
 import { expect, userEvent, within } from 'storybook/test'
 
+import { getConsolePublicApiPath } from '@/shared/lib/console-public-api-path'
+
 import { StorageProbeIntervalEditor } from './StorageProbeIntervalEditor'
 
 const baseline = {
@@ -16,7 +18,7 @@ const baseline = {
     nextScheduledAt: null,
   },
 }
-const route = '/api/console/runtime-settings/storage-probe'
+const route = `/api${getConsolePublicApiPath('/runtime-settings/storage-probe')}`
 const meta = {
   title: 'features/console-storage-setting/Overview interval editor',
   component: StorageProbeIntervalEditor,

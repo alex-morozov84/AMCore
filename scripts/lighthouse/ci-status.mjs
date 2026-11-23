@@ -7,7 +7,10 @@ import { resultSummary } from '../lib/lighthouse-view-summary.mjs'
 import { artifactUrl } from '../lib/lighthouse-view-model.mjs'
 
 const root = process.cwd()
-const plan = auditPlan(root, runIdentity(root))
+const plan = auditPlan(root, runIdentity(root), {
+  configured: process.env.AMCORE_E2E_INVENTORY === 'configured',
+  upstream: process.env.AMCORE_CI_ROLE === 'upstream-starter',
+})
 invariant(
   JSON.parse(process.env.AMCORE_EXPECTED_AUDIT_PLAN).digest === plan.digest,
   'unexpected-ci-plan'
@@ -79,6 +82,7 @@ const status = {
   expected,
   observed: bundle?.manifest.results.map((r) => r.id) ?? [],
   outcomes,
+  browserEvidence: lifecycle.browserEvidence,
   ...(view ? { viewHash: view.indexHash } : {}),
   ...(bundle && process.env.AUDIT_ARTIFACT_ID
     ? {

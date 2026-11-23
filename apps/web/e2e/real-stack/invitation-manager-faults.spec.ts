@@ -1,14 +1,21 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { createInvitationOperationId, localizedFrontendUrl, SERVED_LOCALES } from '@amcore/shared'
+import { createInvitationOperationId, SERVED_LOCALES } from '@amcore/shared'
 import { expect, type Route, test } from '@playwright/test'
 
 import { activeTarget } from '../support/managed-target.mjs'
 import { resetBrowserProbeDomainBudget } from '../support/mfa-domain-fixture.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
+import {
+  browserCredentialRequest,
+  ensureAdministrationSession,
+  productAdministrationOrigin,
+  TEST_PASSWORD,
+  uniqueEmail,
+} from './helpers'
+import { organizationUi } from './organization-context.helpers'
 
 for (const locale of SERVED_LOCALES)
   test(`manager ${locale}: primary faults, dirty generation, unknown recovery and completed late response after session denial`, async ({
@@ -32,12 +39,8 @@ for (const locale of SERVED_LOCALES)
       readFileSync(join(target.snapshot, `apps/web/messages/${locale}.json`), 'utf8')
     ).organizationInvitations
     const email = uniqueEmail('manager-dirty')
-    const href = localizedFrontendUrl(
-      target.origins.product,
-      locale,
-      `organizations/${org.id}/invites`
-    )
-    await page.goto(href)
+    await ensureAdministrationSession(context, ownerEmail)
+    await page.goto(organizationUi(locale).url(`/${org.id}/invites`))
     const invite = page.getByRole('button', { name: t.invite, exact: true, includeHidden: true })
     await expect(invite).toBeEnabled()
     await invite.click()
@@ -94,11 +97,14 @@ for (const locale of SERVED_LOCALES)
       (request) => request.method() === 'GET' && primaryRoute(new URL(request.url()))
     )
     const replacementConflict = page.waitForResponse(
-      (response) => response.url().endsWith('/reissue') && response.status() === 409
+      (response) => response.url().endsWith('/reissue') && response.request().method() === 'POST',
+      { timeout: 15_000 }
     )
     await dialog.getByRole('checkbox', { name: t.reissueConfirmation, exact: true }).check()
     await dialog.getByRole('button', { name: t.resend, exact: true }).click()
-    expect(await (await replacementConflict).json()).toMatchObject({
+    const replacementResponse = await replacementConflict
+    expect(replacementResponse.status()).toBe(409)
+    expect(await replacementResponse.json()).toMatchObject({
       errorCode: 'INVITE_GENERATION_CONFLICT',
     })
     await firstRead
@@ -139,11 +145,13 @@ for (const locale of SERVED_LOCALES)
     const revokeConflict = page.waitForResponse(
       (response) =>
         response.request().method() === 'DELETE' &&
-        new URL(response.url()).pathname.includes(`/organizations/${org.id}/invites/`) &&
-        response.status() === 409
+        new URL(response.url()).pathname.includes(`/organizations/${org.id}/invites/`),
+      { timeout: 15_000 }
     )
     await page.getByRole('alertdialog').getByRole('button', { name: t.revoke, exact: true }).click()
-    expect(await (await revokeConflict).json()).toMatchObject({
+    const revokeResponse = await revokeConflict
+    expect(revokeResponse.status()).toBe(409)
+    expect(await revokeResponse.json()).toMatchObject({
       errorCode: 'INVITE_GENERATION_CONFLICT',
     })
     await secondRead
@@ -236,6 +244,18 @@ for (const locale of SERVED_LOCALES)
         })
       ).status()
     ).toBe(201)
+    const staffOrigin = productAdministrationOrigin()
+    if (staffOrigin !== target.origins.product) {
+      const replaced = await browserCredentialRequest(
+        context.request,
+        '/api/product-admin/auth/login',
+        {
+          headers: { origin: staffOrigin },
+          data: { email: replacement, password: TEST_PASSWORD },
+        }
+      )
+      expect(replaced.status()).toBe(200)
+    }
     await page.evaluate(() => window.dispatchEvent(new Event('focus')))
     await expect(page.getByText(t.denied, { exact: true })).toBeVisible()
     finish()

@@ -1,15 +1,22 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { DEFAULT_LOCALE, localizedFrontendUrl } from '@amcore/shared'
+import { DEFAULT_LOCALE, productAdminPath } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
 import { closeCredentialPage } from '../shared/credential-artifacts'
+import { productPath } from '../shared/product-settings'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
+import {
+  browserCredentialRequest,
+  ensureAdministrationSession,
+  productAdministrationOrigin,
+  TEST_PASSWORD,
+  uniqueEmail,
+} from './helpers'
 
 test.use({ trace: 'off', screenshot: 'off', video: 'off' })
 test.afterEach(({ page }, info) => closeCredentialPage(page, info))
@@ -44,9 +51,9 @@ test('personal navigation, full-list filters, details, URL history and independe
     VALUES ('c'||substr(md5(:'user'||'beta'),1,24),'Inventory 24',:'user'||'beta','not-an-authenticating-verifier','fixture',ARRAY['read:Organization'],:'user',:'second',NULL);`,
     { user: login.user.id, first: first.id, second: second.id }
   )
-  const path = new URL(
-    localizedFrontendUrl(target.origins.product, DEFAULT_LOCALE, 'settings/api-keys')
-  ).pathname
+  const adminOrigin = productAdministrationOrigin()
+  await ensureAdministrationSession(context, email)
+  const path = new URL(productPath(productAdminPath('/settings/api-keys')), adminOrigin).href
   await page.goto(path)
   await page.bringToFront()
   await expect(page.getByRole('table')).toBeVisible()

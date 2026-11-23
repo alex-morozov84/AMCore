@@ -1,12 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { DEFAULT_LOCALE } from '@amcore/shared'
+import { DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
-import { registerViaUi, uniqueEmail } from '../real-stack/helpers'
+import { loginViaUi, registerViaUi, uniqueEmail } from '../real-stack/helpers'
 import { expectNoAxeViolations } from '../shared/axe'
-import { completeMfaSignIn } from '../shared/mfa-login'
+import { isProductHome, messages, messagesForLocale, productPath } from '../shared/product-settings'
 import { activeTarget } from '../support/managed-target.mjs'
 
 import { setSystemRole } from './helpers'
@@ -34,7 +34,7 @@ test('host-mode Overview panel renders real readiness, version and process role,
   const productPage = await product.newPage()
   await registerViaUi(productPage, email)
   await expect(productPage).toHaveURL(
-    new RegExp('^' + escapeOrigin(standTarget.origins.product) + '/en/?$')
+    (url) => url.origin === standTarget.origins.product && isProductHome(url)
   )
   setSystemRole(email, 'SUPER_ADMIN')
 
@@ -43,13 +43,9 @@ test('host-mode Overview panel renders real readiness, version and process role,
     ignoreHTTPSErrors: true,
   })
   const consolePage = await console.newPage()
-  await consolePage.goto('/en/login')
-  await consolePage.getByLabel(/email/i).fill(email)
-  await consolePage.getByLabel(/^password$/i).fill('Test1234Secure')
-  await consolePage.getByRole('button', { name: /sign in/i }).click()
-  await completeMfaSignIn(consolePage, email)
+  await loginViaUi(consolePage, email, { mfa: 'required', surface: 'console' })
   await expect(consolePage).toHaveURL(
-    new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
+    (url) => url.origin === standTarget.origins.console && isProductHome(url)
   )
 
   const requestsWithAuthHeader: string[] = []
@@ -111,7 +107,7 @@ test('host-mode Overview panel denies a demoted session with a live re-check, no
   const productPage = await product.newPage()
   await registerViaUi(productPage, email)
   await expect(productPage).toHaveURL(
-    new RegExp('^' + escapeOrigin(standTarget.origins.product) + '/en/?$')
+    (url) => url.origin === standTarget.origins.product && isProductHome(url)
   )
   setSystemRole(email, 'SUPER_ADMIN')
 
@@ -120,17 +116,13 @@ test('host-mode Overview panel denies a demoted session with a live re-check, no
     ignoreHTTPSErrors: true,
   })
   const consolePage = await console.newPage()
-  await consolePage.goto('/en/login')
-  await consolePage.getByLabel(/email/i).fill(email)
-  await consolePage.getByLabel(/^password$/i).fill('Test1234Secure')
-  await consolePage.getByRole('button', { name: /sign in/i }).click()
-  await completeMfaSignIn(consolePage, email)
+  await loginViaUi(consolePage, email, { mfa: 'required', surface: 'console' })
   await expect(consolePage).toHaveURL(
-    new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
+    (url) => url.origin === standTarget.origins.console && isProductHome(url)
   )
 
   setSystemRole(email, 'USER')
-  const response = await consolePage.goto('/en')
+  const response = await consolePage.goto(productPath())
   expect(response?.status()).toBe(404)
 
   await product.close()
@@ -148,7 +140,7 @@ test('host-mode Overview locale switcher stays on the console host and switches 
   const productPage = await product.newPage()
   await registerViaUi(productPage, email)
   await expect(productPage).toHaveURL(
-    new RegExp('^' + escapeOrigin(standTarget.origins.product) + '/en/?$')
+    (url) => url.origin === standTarget.origins.product && isProductHome(url)
   )
   setSystemRole(email, 'SUPER_ADMIN')
 
@@ -161,29 +153,37 @@ test('host-mode Overview locale switcher stays on the console host and switches 
   consolePage.on('request', (request) => {
     if (new URL(request.url()).pathname === '/api/auth/me') profileRequests.push(request.method())
   })
-  await consolePage.goto('/en/login')
-  await consolePage.getByLabel(/email/i).fill(email)
-  await consolePage.getByLabel(/^password$/i).fill('Test1234Secure')
-  await consolePage.getByRole('button', { name: /sign in/i }).click()
-  await completeMfaSignIn(consolePage, email)
+  await loginViaUi(consolePage, email, { mfa: 'required', surface: 'console' })
   await expect(consolePage).toHaveURL(
-    new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
+    (url) => url.origin === standTarget.origins.console && isProductHome(url)
   )
 
   await expectNoAxeViolations(consolePage)
   expect(profileRequests).toEqual([])
-  await consolePage.getByRole('combobox', { name: /language/i }).selectOption('ru')
-  await expect(consolePage).toHaveURL(
-    new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/ru/?$')
-  )
-  await expect(consolePage.getByRole('heading', { name: 'Операционная консоль' })).toBeVisible()
+  const second = SERVED_LOCALES.find((locale) => locale !== DEFAULT_LOCALE)
+  if (second) {
+    await consolePage
+      .getByRole('combobox', { name: messages.locale.label, exact: true })
+      .selectOption(second)
+    await expect(consolePage).toHaveURL(
+      (url) => url.origin === standTarget.origins.console && isProductHome(url, second)
+    )
+    await expect(
+      consolePage.getByRole('heading', { name: messagesForLocale(second).console.title })
+    ).toBeVisible()
+  } else {
+    await expect(
+      consolePage.getByRole('combobox', { name: messages.locale.label, exact: true })
+    ).toHaveCount(0)
+    await consolePage.reload()
+    await expect(consolePage.locator('html')).toHaveAttribute('lang', DEFAULT_LOCALE)
+    await expect(consolePage).toHaveURL(
+      (url) => url.origin === standTarget.origins.console && isProductHome(url)
+    )
+  }
   await expectNoAxeViolations(consolePage)
   expect(profileRequests).toEqual([])
 
   await product.close()
   await console.close()
 })
-
-function escapeOrigin(origin: string): string {
-  return origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}

@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+import { isProductHome, productPath } from '../shared/product-settings'
+
 import { directApi, proveOwnedRefresh, rawWebRequest } from './credential-containment.helpers'
 import { loginViaUi, registerViaUi, signOutViaUi, TEST_PASSWORD, uniqueEmail } from './helpers'
 
@@ -97,9 +99,9 @@ test('user-only auth, authenticated denial, internal refresh and direct org API 
     const registration = await pendingRegistration
     expect(registration.status()).toBe(201)
     const registered = await safeJson(registration)
-    await expect(page).toHaveURL(/\/en\/?$/)
+    await expect(page).toHaveURL(isProductHome)
     await signOutViaUi(page)
-    await expect(page).toHaveURL(/\/en\/login/)
+    await expect(page).toHaveURL((url) => url.pathname === productPath('/login'))
     const pendingLogin = page.waitForResponse(
       (r) => r.url().endsWith('/api/auth/login') && r.request().method() === 'POST'
     )
@@ -108,7 +110,7 @@ test('user-only auth, authenticated denial, internal refresh and direct org API 
     expect(login.status()).toBe(200)
     const { user } = (await safeJson(login)) as { user: { id: string; email: string } }
     expect((registered.user as { id: string }).id).toBe(user.id)
-    await expect(page).toHaveURL(/\/en\/?$/)
+    await expect(page).toHaveURL(isProductHome)
     await page.close() // No background browser requests during the owned vault CAS.
     const cookie = (await context.cookies()).find(
       (c) => c.name === 'amcore_session' && c.domain === new URL(baseURL).hostname && c.path === '/'

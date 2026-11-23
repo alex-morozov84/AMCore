@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+import { productPath } from '../shared/product-settings'
+
 /**
  * Track 3 PR1 (`ai/models-talk.md` FINAL PLAN §3) — static browser
  * security-header baseline from `next.config.ts`'s `headers()`. These
@@ -31,7 +33,7 @@ const EXPECTED_STATIC_HEADERS = {
 } as const
 
 test('a page route response carries the static security headers', async ({ page }) => {
-  const response = await page.goto('/en/login')
+  const response = await page.goto(productPath('/login'))
   expect(response).not.toBeNull()
 
   const headers = response!.headers()

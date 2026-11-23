@@ -4,8 +4,9 @@ import { createRequire } from 'node:module'
 import { join } from 'node:path'
 
 import { DEFAULT_LOCALE, localizedFrontendUrl } from '@amcore/shared'
-import { expect, request, test } from '@playwright/test'
+import { type APIRequestContext, expect, request, test } from '@playwright/test'
 
+import { getFixtureCallback } from '../product-admin-real-stack/get-browser-fixture'
 import { browserCredentialRequest } from '../real-stack/helpers'
 import {
   logoutViaApi,
@@ -16,6 +17,28 @@ import {
 import { inviteRecipient, membershipCount } from '../real-stack/invitation-recipient.helpers'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
+test.skip(
+  activeTarget().fixtureProfile !== 'console-closed-signup-oauth',
+  'requires:closed-signup-oauth'
+)
+
+async function googleCallback(oauth: APIRequestContext, email: string) {
+  const target = activeTarget()
+  const start = new URL('/api/v1/auth/oauth/google', target.origins.api)
+  const authorize = await oauth.get(start.href, { maxRedirects: 0 })
+  expect(authorize.status()).toBe(302)
+  const location = new URL(authorize.headers().location!)
+  expect(location.origin).toBe('https://accounts.google.com')
+  const callback = getFixtureCallback(
+    location,
+    email,
+    new URL('/api/auth/oauth/google/callback', target.origins.product).href
+  )
+  const backend = new URL(start.href + '/callback')
+  backend.search = callback.search
+  return oauth.get(backend.href, { maxRedirects: 0 })
+}
+
 test('deployed closed signup: reject new email/OAuth, allow existing login and invited registration', async ({
   page,
   context,
@@ -25,11 +48,7 @@ test('deployed closed signup: reject new email/OAuth, allow existing login and i
     new URL('/api/v1/auth/signup-policy', target.origins.api).href
   )
   expect(policy.ok()).toBe(true)
-  const data = await policy.json()
-  test.skip(
-    data.publicSignupEnabled !== false,
-    'Requires isolated closed-policy production fixture; ordinary stands keep signup enabled.'
-  )
+  expect((await policy.json()).publicSignupEnabled).toBe(false)
   const c = JSON.parse(
     readFileSync(join(target.snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`), 'utf8')
   )
@@ -67,17 +86,7 @@ test('deployed closed signup: reject new email/OAuth, allow existing login and i
     ignoreHTTPSErrors: true,
   })
   try {
-    const authorize = await oauth.get(
-      new URL('/api/v1/auth/oauth/google', target.origins.api).href,
-      { maxRedirects: 0 }
-    )
-    expect(authorize.status()).toBe(302)
-    const state = new URL(authorize.headers().location!).searchParams.get('state')
-    const rejected = await oauth.get(
-      new URL(`/api/v1/auth/oauth/google/callback?state=${state}&code=new`, target.origins.api)
-        .href,
-      { maxRedirects: 0 }
-    )
+    const rejected = await googleCallback(oauth, 'closed-oauth-new@e2e.amcore.test')
     expect(rejected.status()).toBe(403)
     expect((await rejected.json()).errorCode).toBe('PUBLIC_SIGNUP_DISABLED')
     expect(
@@ -85,17 +94,7 @@ test('deployed closed signup: reject new email/OAuth, allow existing login and i
         `SELECT count(*) FROM core.users WHERE "emailCanonical"='closed-oauth-new@e2e.amcore.test';`
       ).trim()
     ).toBe('0')
-    const again = await oauth.get(new URL('/api/v1/auth/oauth/google', target.origins.api).href, {
-      maxRedirects: 0,
-    })
-    const existingState = new URL(again.headers().location!).searchParams.get('state')
-    const existing = await oauth.get(
-      new URL(
-        `/api/v1/auth/oauth/google/callback?state=${existingState}&code=existing`,
-        target.origins.api
-      ).href,
-      { maxRedirects: 0 }
-    )
+    const existing = await googleCallback(oauth, email)
     expect(existing.status()).toBe(302)
     expect(new URL(existing.headers().location!).pathname).toMatch(/auth\/callback$/)
     expect(new URL(existing.headers().location!).searchParams.has('ticket')).toBe(true)

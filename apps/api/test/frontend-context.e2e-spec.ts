@@ -2,21 +2,29 @@ import { createHash, randomBytes } from 'node:crypto'
 
 import request from 'supertest'
 
-import { frontendPlacementPayload, WEB_FRONTEND_HEADERS } from '@amcore/shared'
+import {
+  frontendPlacementPayload,
+  PRODUCT_ADMIN_CONFIG,
+  WEB_FRONTEND_HEADERS,
+} from '@amcore/shared'
 
 import { TokenManagerService } from '../src/core/auth/token-manager.service'
 
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
 
-const site = 'http://localhost:3002'
+const host = PRODUCT_ADMIN_CONFIG.mode === 'host'
+const site = host ? 'https://product.example.test' : 'http://localhost:3002'
+const adminOrigin = host ? 'https://staff.example.test' : site
 const key = randomBytes(32).toString('hex')
-const fingerprint = createHash('sha256').update(frontendPlacementPayload(site, site)).digest('hex')
+const fingerprint = createHash('sha256')
+  .update(frontendPlacementPayload(site, adminOrigin))
+  .digest('hex')
 const admin = { frontend: 'admin' as const, placementFingerprint: fingerprint }
 const proof = (frontend: 'site' | 'admin') => ({
   [WEB_FRONTEND_HEADERS.frontend]: frontend,
   [WEB_FRONTEND_HEADERS.placement]: fingerprint,
   [WEB_FRONTEND_HEADERS.key]: key,
-  origin: site,
+  origin: frontend === 'admin' ? adminOrigin : site,
 })
 
 describe('frontend proof and email-token destinations (e2e)', () => {
@@ -25,7 +33,7 @@ describe('frontend proof and email-token destinations (e2e)', () => {
   beforeAll(async () => {
     for (const [name, value] of Object.entries({
       FRONTEND_URL: site,
-      PRODUCT_ADMIN_ORIGIN: '',
+      PRODUCT_ADMIN_ORIGIN: adminOrigin,
       WEB_FRONTEND_CONTEXT_KEY: key,
       EMAIL_PROVIDER: 'mock',
       AUTH_PUBLIC_SIGNUP_ENABLED: 'true',

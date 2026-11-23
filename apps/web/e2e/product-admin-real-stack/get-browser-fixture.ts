@@ -1,5 +1,26 @@
 import type { BrowserContext } from '@playwright/test'
 
+export function getFixtureCallback(authorization: URL, email: string, expectedCallback: string) {
+  const params = authorization.searchParams
+  const redirectUri = params.get('redirect_uri')
+  const state = params.get('state')
+  const challenge = params.get('code_challenge')
+  if (
+    redirectUri !== expectedCallback ||
+    !state ||
+    !challenge ||
+    params.get('code_challenge_method') !== 'S256'
+  )
+    throw new Error('Unexpected selected GET provider callback or PKCE')
+  const callback = new URL(redirectUri)
+  callback.searchParams.set('state', state)
+  callback.searchParams.set(
+    'code',
+    Buffer.from(JSON.stringify({ email, redirectUri, challenge })).toString('base64url')
+  )
+  return callback
+}
+
 /** Owned provider transport; API state, PKCE, profile and session handling remain real. */
 export async function getBrowserFixture(
   context: BrowserContext,
@@ -38,25 +59,13 @@ export async function getBrowserFixture(
   await context.route(
     (url) => url.origin === authorization.origin && url.pathname === authorization.pathname,
     async (route) => {
-      const params = new URL(route.request().url()).searchParams
-      const redirectUri = params.get('redirect_uri')
-      const state = params.get('state')
-      const challenge = params.get('code_challenge')
-      if (
-        redirectUri !== `${origin}${base}/${provider}/callback` ||
-        !state ||
-        !challenge ||
-        params.get('code_challenge_method') !== 'S256'
+      const target = getFixtureCallback(
+        new URL(route.request().url()),
+        email,
+        `${origin}${base}/${provider}/callback`
       )
-        throw new Error('Unexpected selected GET provider callback or PKCE')
       seen = true
       beforeProviderReturn?.() // the start leg is complete; the callback is the next request
-      const target = new URL(redirectUri)
-      target.searchParams.set('state', state)
-      target.searchParams.set(
-        'code',
-        Buffer.from(JSON.stringify({ email, redirectUri, challenge })).toString('base64url')
-      )
       await route.fulfill({
         contentType: 'text/html',
         body: `<!doctype html><html><body><script>location.assign(${JSON.stringify(target.href)})</script></body></html>`,

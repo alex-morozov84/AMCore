@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 
+import { isProductHome, messages, productPath } from '../shared/product-settings'
 import { activeTarget } from '../support/managed-target.mjs'
 
 import {
@@ -151,21 +152,23 @@ test('a protected page shows the temporary state during a stall, then the page a
   try {
     const cookie = await signedIn(context, origin)
     const page = await context.newPage()
-    await page.goto('/en')
-    await expect(page.getByText(/^Welcome/)).toBeVisible()
+    await page.goto(productPath())
+    await expect(page.getByText(messages.dashboard.welcome, { exact: true })).toBeVisible()
 
     pauseRedis(6000)
     // The navigation must complete: a failed navigation is not accepted as "not signed out".
-    await page.goto('/en', { timeout: 20_000 })
-    await expect(page).toHaveURL(/\/en\/?$/)
-    await expect(page.getByText(/usually temporary|temporarily unavailable/i).first()).toBeVisible()
-    await expect(page.getByText(/^Welcome/)).toHaveCount(0)
+    await page.goto(productPath(), { timeout: 20_000 })
+    await expect(page).toHaveURL(isProductHome)
+    await expect(page.getByText(messages.dashboard.unavailable, { exact: true })).toBeVisible()
+    await expect(page.getByText(messages.dashboard.welcome, { exact: true })).toHaveCount(0)
     expect((await context.cookies()).find((c) => c.name === 'amcore_session')?.value).toBe(cookie)
 
     await sleep(7000)
     await expect(async () => {
-      await page.goto('/en')
-      await expect(page.getByText(/^Welcome/)).toBeVisible({ timeout: 3000 })
+      await page.goto(productPath())
+      await expect(page.getByText(messages.dashboard.welcome, { exact: true })).toBeVisible({
+        timeout: 3000,
+      })
     }).toPass({ timeout: 40_000, intervals: [1000, 3000] })
     expect(await readEntry(cookie)).not.toBeNull()
   } finally {

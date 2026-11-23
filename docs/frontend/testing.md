@@ -78,8 +78,8 @@ node scripts/run-deployment-version-e2e.mjs
 
 Run this separate manual regression before delivery when changing reload recovery,
 version checking, Server Action version handling or service-worker recovery.
-Default unit/browser commands and current CI do not execute it. A cancelled build,
-timeout or transport failure is no production verdict.
+The CI selection plan assigns the same command when deployment recovery is in
+scope. A cancelled build, timeout or transport failure is no production verdict.
 
 This separate, infrastructure-free production lane builds A and B sequentially
 in temporary copies, adds different real Server Actions and a custom 500 ms
@@ -149,6 +149,13 @@ to one profile; missing declared files fail inventory checks. Signed path OAuth
 uses its dedicated fixture, outside ordinary path groups. These fixtures prove
 application transport and verified identity handling, not live provider registration.
 
+The configured runtime browser plan adds one Console fixture when Console is
+enabled. Path mode runs the summary fixture. Host mode runs the closed-signup
+OAuth fixture. A UI-only plan adds neither fixture. With Console disabled,
+the ordinary browser group checks that both the page and its API reject an
+authenticated operator with HTTP 404. The runtime plan requires a report
+matching the selected fixture cases before Web E2E can succeed.
+
 The separate `setup-cli` lane proves closed-registration installation with the
 compiled command and an actual captured recovery email. It always applies.
 
@@ -163,6 +170,49 @@ that stand. Full original `pnpm stand e2e --lane real-stack` remains available.
 Successful and failed GitHub lanes retain reports/test results/inventories for
 seven days; inspect retries separately from clean passes. The unchanged mandatory
 `Web E2E` result requires every applicable lane to succeed.
+
+### Write a browser test for the product settings
+
+Put a live product browser spec in `apps/web/e2e/real-stack/`. The ordinary
+PR workflow discovers new cases there and selects the browser family.
+For product URLs use `productPath` and match text with `messages` or
+`messagesForLocale(locale)`. For example, navigate to `productPath('/login')`
+and use `messages.auth.email` to find the email field.
+
+For example, add a case to a real-stack spec:
+
+```ts
+import { expect, test } from '@playwright/test'
+import { messages, productPath } from '../shared/product-settings'
+
+test('sign-in asks for the account email', async ({ page }) => {
+  await page.goto(productPath('/login'))
+  await expect(page.getByLabel(messages.auth.email, { exact: true })).toBeVisible()
+})
+```
+
+After opening a PR, inspect **CI selection** and **Web E2E plan** in its workflow run.
+Download `playwright-<run>-<attempt>-<lane>` from the run's artifacts.
+Open its Playwright report and find the test by file and title. **CI required** reports the final outcome.
+Share the case name and outcome in public discussion. Review and redact
+logs before sharing them, and keep raw traces and session state private.
+
+For a product administration page, use `productAdminPath`, `productPath`
+and `productAdministrationOrigin()`. After registration on the site,
+`ensureAdministrationSession(context, email)` signs in to a separate staff
+host when needed. Use `consolePath` for the path Console. A host Console uses
+its own origin and login. Keep checks for source-disabled Console under an
+authenticated operator on the product origin.
+
+Declare conditional applicability when Playwright collects tests. Use
+`requires:multiple-locales` for a test that needs a language switch.
+Use `requirePathConsole()` or `requireDisabledConsole()` from the shared
+Console applicability helper to declare the corresponding Console condition.
+The planner checks the prerequisite against product settings.
+A selected case must run and pass. Treat a missing prerequisite on an
+assigned stand as a failure. Add host Console tests under
+`apps/web/e2e/console-real-stack/`. For mocked projects and unsupported
+placements, see [CI selection modes](../operations/ci-security.md#selection-modes).
 
 ## Lighthouse audits
 

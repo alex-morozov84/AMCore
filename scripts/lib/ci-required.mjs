@@ -4,7 +4,8 @@ export const requiredCiJobs = Object.freeze([
   'lint',
   'typecheck',
   'build',
-  'test-unit-redis',
+  'test-unit',
+  'test-redis',
   'test-capability',
   'test-notification-ai',
   'test',
@@ -19,6 +20,8 @@ export const requiredCiJobs = Object.freeze([
   'promtool',
   'observability-contract-live',
   'storybook',
+  'test-email',
+  'deployment-version',
 ])
 
 /** Retained broad-inventory assertion for the original all-success contract. */
@@ -36,32 +39,42 @@ export function requireCompleteCi(results) {
     throw new Error(`Required CI jobs did not succeed: ${incomplete.join(', ')}`)
 }
 
-/** Only independent web changes may omit these server-side jobs in the first rollout. */
+/** Translate policy groups into the jobs that actually exist. */
 export function coarseExecution(inputs) {
   const proposed = selectCiGroups(inputs)
-  if (inputs.role !== 'upstream-starter' || !['normal', 'full'].includes(inputs.mode))
-    throw new Error('Coarse execution supports upstream normal/full only')
-  const areas = inputs.areas
-  const narrow =
-    inputs.mode === 'normal' &&
-    inputs.diffComplete &&
-    inputs.integration === false &&
-    (areas.ui === true || areas.web === true) &&
-    Object.entries(areas).every(([key, value]) => !value || ['ui', 'web'].includes(key))
-  const omitted = narrow
-    ? [
-        'test-capability',
-        'test-notification-ai',
-        'api-e2e-plan',
-        'api-e2e-shards',
-        'docker-image-smoke',
-        'observability-contract-live',
-      ]
-    : []
+  const web = proposed.web !== 'none'
+  const selected = {
+    lint: true,
+    typecheck: true,
+    promtool: true,
+    build: proposed.build,
+    'test-unit': proposed.unit,
+    'test-redis': proposed.redis,
+    'test-capability': proposed.capability,
+    'test-notification-ai': proposed.notification,
+    test:
+      proposed.unit ||
+      proposed.redis ||
+      proposed.capability ||
+      proposed.notification ||
+      proposed.api,
+    'api-e2e-plan': proposed.api,
+    'api-e2e-shards': proposed.api,
+    'api-e2e': proposed.api,
+    'script-contracts': proposed.scripts,
+    'docker-image-smoke': proposed.images,
+    'web-e2e-plan': web,
+    'web-e2e-lanes': web,
+    'web-e2e': web,
+    'observability-contract-live': proposed.monitoring === 'live',
+    storybook: proposed.storybook,
+    'test-email': proposed.email,
+    'deployment-version': proposed.deployment,
+  }
   return {
     proposed,
-    reason: narrow ? 'independent-web' : 'broad',
-    effective: requiredCiJobs.filter((job) => !omitted.includes(job)),
+    reason: inputs.mode,
+    effective: requiredCiJobs.filter((job) => selected[job]),
   }
 }
 
@@ -86,8 +99,8 @@ export function validateExecutionPlan(plan, identity) {
     Array.isArray(plan) ||
     Object.keys(plan).length !== keys.length ||
     keys.some((key) => !(key in plan)) ||
-    plan.version !== 2 ||
-    plan.phase !== 'coarse' ||
+    plan.version !== 3 ||
+    plan.phase !== 'selection' ||
     !/^[\w.-]+\/[\w.-]+$/.test(identity.repository ?? '') ||
     !/^\d+$/.test(identity.run ?? '') ||
     !/^[1-9]\d*$/.test(identity.attempt ?? '') ||
@@ -100,7 +113,7 @@ export function validateExecutionPlan(plan, identity) {
     !inputs ||
     Object.keys(inputs).sort().join() !==
       ['role', 'mode', 'areas', 'diffComplete', 'integration'].sort().join() ||
-    inputs.diffComplete !== identity.diffComplete ||
+    (inputs.diffComplete && !identity.diffComplete) ||
     inputs.integration !== identity.integration ||
     inputs.role !== identity.role ||
     inputs.mode !== identity.mode
@@ -118,7 +131,7 @@ export function requireSelectedCi(results, plan, identity, scope = 'all') {
   const execution = validateExecutionPlan(plan, identity)
   const scopes = {
     all: requiredCiJobs,
-    test: ['test-unit-redis', 'test-capability', 'test-notification-ai', 'api-e2e'],
+    test: ['test-unit', 'test-redis', 'test-capability', 'test-notification-ai', 'api-e2e'],
     api: ['api-e2e-plan', 'api-e2e-shards'],
   }
   const jobs = scopes[scope]

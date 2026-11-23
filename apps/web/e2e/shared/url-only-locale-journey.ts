@@ -1,14 +1,17 @@
+import { DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 import { expect, type Page, test } from '@playwright/test'
 
 import { saveContextDiagnostics } from '../support/context-read-diagnostics'
 
 import { expectNoAxeViolations } from './axe'
+import { messagesForLocale, productPath } from './product-settings'
 
 /** Counter spans the entire document, including ancestors and post-switch effects. */
 export async function verifyUrlOnlyLocale(
   page: Page,
   path: string,
-  ready: { en: string; ru: string; title: { en: string; ru: string } }
+  ready: { en: string; ru: string; title: { en: string; ru: string } },
+  origin = ''
 ) {
   let profileCalls = 0
   let profileTruncated = false
@@ -33,24 +36,39 @@ export async function verifyUrlOnlyLocale(
     }
   })
   try {
-    await page.goto(`/en${path}?tag=a&tag=b#locale`)
-    await expect(page.getByRole('main').getByText(ready.en, { exact: true })).toBeVisible()
+    const first = DEFAULT_LOCALE
+    const second = SERVED_LOCALES.find((locale) => locale !== first)
+    await page.goto(`${origin}${productPath(path, first)}?tag=a&tag=b#locale`)
+    await expect(page.getByRole('main').getByText(ready[first], { exact: true })).toBeVisible()
     await expect(page.locator('[aria-busy="true"]')).toHaveCount(0)
-    await capture('ready-ui-en', ready.title.en)
-    await expectDocumentTitle(page, ready.title.en)
-    await capture('before-axe-en', ready.title.en)
+    await expect(page.locator('html')).toHaveAttribute('lang', first)
+    await capture(`ready-ui-${first}`, ready.title[first])
+    await expectDocumentTitle(page, ready.title[first])
+    await capture(`before-axe-${first}`, ready.title[first])
     await expectNoAxeViolations(page)
     expect(profileCalls).toBe(0)
-    await page.getByRole('combobox', { name: 'Language', exact: true }).selectOption('ru')
-    await expect(page).toHaveURL(`${new URL(page.url()).origin}/ru${path}?tag=a&tag=b#locale`)
-    await expect(page.getByRole('main').getByText(ready.ru, { exact: true })).toBeVisible()
-    await expect(page.locator('[aria-busy="true"]')).toHaveCount(0)
-    await expect(page.getByRole('combobox', { name: 'Язык', exact: true })).toBeEnabled()
-    await capture('ready-ui-ru', ready.title.ru)
-    await expectDocumentTitle(page, ready.title.ru)
-    await capture('before-axe-ru', ready.title.ru)
-    await expectNoAxeViolations(page)
-    expect(profileCalls).toBe(0)
+    if (!second) {
+      await expect(page.getByRole('combobox')).toHaveCount(0)
+      await expect(page).toHaveURL(`${new URL(page.url()).origin}${path}?tag=a&tag=b#locale`)
+    } else {
+      await page
+        .getByRole('combobox', { name: messagesForLocale(first).locale.label, exact: true })
+        .selectOption(second)
+      await expect(page).toHaveURL(
+        `${new URL(page.url()).origin}${productPath(path, second)}?tag=a&tag=b#locale`
+      )
+      await expect(page.getByRole('main').getByText(ready[second], { exact: true })).toBeVisible()
+      await expect(page.locator('[aria-busy="true"]')).toHaveCount(0)
+      await expect(page.locator('html')).toHaveAttribute('lang', second)
+      await expect(
+        page.getByRole('combobox', { name: messagesForLocale(second).locale.label, exact: true })
+      ).toBeEnabled()
+      await capture(`ready-ui-${second}`, ready.title[second])
+      await expectDocumentTitle(page, ready.title[second])
+      await capture(`before-axe-${second}`, ready.title[second])
+      await expectNoAxeViolations(page)
+      expect(profileCalls).toBe(0)
+    }
   } catch (error) {
     primaryFailed = true
     primaryError = error

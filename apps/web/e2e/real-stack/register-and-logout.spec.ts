@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+import { isProductHome, messages, productPath } from '../shared/product-settings'
+
 import { loginViaUi, registerViaUi, signOutViaUi, uniqueEmail } from './helpers'
 
 /**
@@ -16,12 +18,12 @@ test('register creates an account, lands on the dashboard, logs out and authenti
   const email = uniqueEmail('register-logout')
   await registerViaUi(page, email)
 
-  await expect(page).toHaveURL(/\/en\/?$/)
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Welcome!')
+  await expect(page).toHaveURL(isProductHome)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(messages.dashboard.welcome)
 
   await signOutViaUi(page)
-  await expect(page).toHaveURL(/\/en\/login/)
+  await expect(page).toHaveURL((url) => url.pathname === productPath('/login'))
   await loginViaUi(page, email)
-  await expect(page).toHaveURL(/\/en\/?$/)
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Welcome!')
+  await expect(page).toHaveURL(isProductHome)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(messages.dashboard.welcome)
 })

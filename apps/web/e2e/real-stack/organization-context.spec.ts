@@ -2,12 +2,19 @@ import { SERVED_LOCALES } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
+import { messagesForLocale } from '../shared/product-settings'
 import { observeContextReads, saveContextDiagnostics } from '../support/context-read-diagnostics'
 import { activeTarget, guardedExec, guardedSql } from '../support/managed-target.mjs'
 import { resetBrowserProbeDomainBudget } from '../support/mfa-domain-fixture.mjs'
 
 import { directApi, proveOwnedRefresh } from './credential-containment.helpers'
-import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
+import {
+  browserCredentialRequest,
+  ensureAdministrationSession,
+  productAdministrationOrigin,
+  TEST_PASSWORD,
+  uniqueEmail,
+} from './helpers'
 import { organizationUi } from './organization-context.helpers'
 
 let phase = 'setup'
@@ -40,6 +47,9 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
   expect(registration.status()).toBe(201)
   const login = await directApi('auth/login', { email, password: TEST_PASSWORD })
   const actor = login.user
+  await ensureAdministrationSession(context, email)
+  const adminOrigin = productAdministrationOrigin()
+  const separate = adminOrigin !== origin
   const first = await directApi('organizations', { name: 'Company Alpha' }, login.accessToken)
   const calls: string[] = []
   page.on('request', (request) => {
@@ -50,7 +60,7 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
     }
   })
 
-  await page.goto(ui.path())
+  await page.goto(ui.url())
   await expect(page).toHaveURL(new RegExp(`${ui.path(`/${first.id}`)}$`))
   await expect(page.getByRole('heading', { name: 'Company Alpha', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: ui.text('access') })).toBeVisible()
@@ -76,7 +86,7 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
   await page.getByRole('link', { name: ui.open('Company Alpha') }).click()
   await expect(page.getByRole('heading', { name: 'Company Alpha', exact: true })).toBeVisible()
   const other = await context.newPage()
-  await other.goto(ui.path(`/${second.id}`))
+  await other.goto(ui.url(`/${second.id}`))
   await expect(other.getByRole('heading', { name: second.name, exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Company Alpha', exact: true })).toBeVisible()
   await other.close()
@@ -101,18 +111,25 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
       `/api/product-access/organizations/${first.id}/context`,
     ])
 
-  const cookie = (await context.cookies()).find((value) => value.name === 'amcore_session')!
-  await proveOwnedRefresh(cookie.value, actor, async () => {
-    const beforeRefresh = calls.length
-    await page.getByRole('button', { name: ui.text('refresh'), exact: true }).click()
-    await expect(page.locator('[aria-busy="false"]')).toBeVisible()
-    await expect
-      .poll(() => calls.slice(beforeRefresh))
-      .toEqual([
-        '/api/product-access/bootstrap',
-        `/api/product-access/organizations/${first.id}/context`,
-      ])
-  })
+  const cookieName = separate ? '__Host-amcore_staff_session' : 'amcore_session'
+  const cookie = (await context.cookies(adminOrigin)).find((value) => value.name === cookieName)!
+  const namespace = separate ? 'web:staff-session:v1' : 'web:session:v1'
+  await proveOwnedRefresh(
+    cookie.value,
+    actor,
+    async () => {
+      const beforeRefresh = calls.length
+      await page.getByRole('button', { name: ui.text('refresh'), exact: true }).click()
+      await expect(page.locator('[aria-busy="false"]')).toBeVisible()
+      await expect
+        .poll(() => calls.slice(beforeRefresh))
+        .toEqual([
+          '/api/product-access/bootstrap',
+          `/api/product-access/organizations/${first.id}/context`,
+        ])
+    },
+    namespace
+  )
 
   // Current authority changes without replacing this actor's session or selected URL.
   guardedSql(
@@ -137,7 +154,7 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
         resetBrowserProbeDomainBudget()
         await page.setViewportSize({ width, height: 900 })
         await page.emulateMedia({ colorScheme: dark ? 'dark' : 'light', reducedMotion: 'reduce' })
-        await page.goto(organizationUi(locale).path(`/${second.id}`))
+        await page.goto(organizationUi(locale).url(`/${second.id}`))
         await expect(page.getByRole('heading', { name: second.name, exact: true })).toBeVisible()
         await expect(page.locator('html')).toHaveClass(dark ? /dark/ : /^(?!.*\bdark\b).*$/)
         // The heading is server-rendered; scan only once the client has finished loading, when the
@@ -156,15 +173,16 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
       }
 
   resetBrowserProbeDomainBudget()
-  const lastUi = organizationUi(SERVED_LOCALES.at(-1)!)
+  const lastLocale = SERVED_LOCALES.at(-1)!
+  const lastUi = organizationUi(lastLocale)
   await page
-    .getByRole('button', { name: /sidebar|меню|панел/i })
+    .getByRole('button', { name: messagesForLocale(lastLocale).nav.toggleSidebar, exact: true })
     .first()
     .click()
   const mobile = page.locator('[data-slot="sidebar"][data-mobile="true"]')
   await expect(mobile).toBeVisible()
   await mobile.getByRole('link', { name: lastUi.text('title'), exact: true }).click()
-  await expect(page).toHaveURL(`${origin}${lastUi.path()}?view=list`)
+  await expect(page).toHaveURL(`${lastUi.url()}?view=list`)
   await expect(mobile).toHaveCount(0)
   await page.getByRole('link', { name: lastUi.open(second.name), exact: true }).click()
   await expect(page.getByRole('heading', { name: second.name, exact: true })).toBeVisible()
@@ -175,14 +193,18 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
   phase = 'credential-attempt'
   expect(
     (
-      await browserCredentialRequest(context.request, '/api/auth/login', {
-        headers: { origin },
-        data: { email, password: TEST_PASSWORD },
-      })
+      await browserCredentialRequest(
+        context.request,
+        separate ? '/api/product-admin/auth/login' : '/api/auth/login',
+        {
+          headers: { origin: adminOrigin },
+          data: { email, password: TEST_PASSWORD },
+        }
+      )
     ).status()
   ).toBe(200)
   phase = 'new-identity'
-  const newIdentity = await context.request.get(new URL('/api/auth/me', origin).href)
+  const newIdentity = await context.request.get(new URL('/api/auth/me', adminOrigin).href)
   expect(newIdentity.status()).toBe(200)
   expect((await newIdentity.json()).user.id).toBe(actor.id)
   phase = 'focus-after-publication'
@@ -197,7 +219,7 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
   expect(errors).toEqual([])
   // Vault capability checks above mutate only this cookie; never reset shared counters or limits.
   expect(
-    guardedExec('redis', 'redis-cli', 'EXISTS', `web:session:v1:${cookie.value}`).trim()
+    guardedExec('redis', 'redis-cli', 'EXISTS', `${namespace}:${cookie.value}`).trim()
   ).toMatch(/^[01]$/)
 })
 
@@ -216,7 +238,8 @@ test('empty discovery and pagination remain distinct from failed authority', asy
       })
     ).status()
   ).toBe(201)
-  await page.goto(ui.path())
+  await ensureAdministrationSession(context, email)
+  await page.goto(ui.url())
   await expect(page.getByRole('heading', { name: ui.text('emptyTitle') })).toBeVisible()
   await expectNoAxeViolations(page)
   const login = await directApi('auth/login', { email, password: TEST_PASSWORD })

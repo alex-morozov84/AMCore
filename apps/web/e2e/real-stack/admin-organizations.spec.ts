@@ -1,11 +1,17 @@
 import { expect, type Route, test } from '@playwright/test'
 
+import { requirePathConsole } from '../shared/console-applicability'
+import { messages } from '../shared/product-settings'
+import { consolePath, isProductHome } from '../shared/product-settings'
+
 import {
   createOrganization,
   createOrganizationsForPagination,
   setSystemRole,
 } from './admin-helpers'
 import { loginViaUi, registerViaUi, uniqueEmail } from './helpers'
+
+requirePathConsole()
 
 /**
  * Path mode (this checkout's configured topology -
@@ -29,11 +35,11 @@ test('path-mode Organizations panel renders real data via the reused product ses
 }) => {
   const email = uniqueEmail('admin-orgs')
   await registerViaUi(page, email)
-  await expect(page).toHaveURL(/\/en\/?$/)
+  await expect(page).toHaveURL(isProductHome)
   setSystemRole(email, 'SUPER_ADMIN')
   await page.context().clearCookies()
   await loginViaUi(page, email)
-  await expect(page).toHaveURL(/\/en\/?$/)
+  await expect(page).toHaveURL(isProductHome)
 
   const orgName = `Path E2E Org ${Date.now()}`
   const orgSlug = `path-e2e-org-${Date.now()}`
@@ -44,7 +50,7 @@ test('path-mode Organizations panel renders real data via the reused product ses
     if (request.headers().authorization) requestsWithAuthHeader.push(request.url())
   })
 
-  await page.goto('/en/admin/organizations')
+  await page.goto(consolePath('/organizations'))
   await expect(page.getByRole('cell', { name: orgName })).toBeVisible()
   await expect(page.getByRole('cell', { name: orgSlug })).toBeVisible()
 
@@ -61,15 +67,15 @@ test('path-mode Organizations panel denies a demoted session with a live re-chec
   setSystemRole(email, 'SUPER_ADMIN')
   await page.context().clearCookies()
   await loginViaUi(page, email)
-  await expect(page).toHaveURL(/\/en\/?$/)
+  await expect(page).toHaveURL(isProductHome)
 
-  await page.goto('/en/admin/organizations')
-  await expect(page.getByRole('heading', { name: /organizations/i })).toBeVisible()
+  await page.goto(consolePath('/organizations'))
+  await expect(page.getByRole('heading', { name: messages.console.organizations })).toBeVisible()
 
   // Demotion, unlike promotion above, takes effect on the *existing* token:
   // the guard's live current-DB-role read (not the JWT claim) catches it.
   setSystemRole(email, 'USER')
-  const response = await page.goto('/en/admin/organizations')
+  const response = await page.goto(consolePath('/organizations'))
   expect(response?.status()).toBe(404)
 })
 
@@ -91,18 +97,18 @@ test('client-side navigation back to Organizations re-checks a demotion that hap
   setSystemRole(email, 'SUPER_ADMIN')
   await page.context().clearCookies()
   await loginViaUi(page, email)
-  await expect(page).toHaveURL(/\/en\/?$/)
+  await expect(page).toHaveURL(isProductHome)
 
-  await page.goto('/en/admin/organizations')
-  await expect(page.getByRole('heading', { name: /organizations/i })).toBeVisible()
+  await page.goto(consolePath('/organizations'))
+  await expect(page.getByRole('heading', { name: messages.console.organizations })).toBeVisible()
 
-  await page.getByRole('link', { name: /overview/i }).click()
-  await expect(page).toHaveURL(/\/en\/admin\/?$/)
+  await page.getByRole('link', { name: messages.console.overview }).click()
+  await expect(page).toHaveURL((url) => url.pathname.replace(/\/$/, '') === consolePath())
 
   setSystemRole(email, 'USER')
-  await page.getByRole('link', { name: /organizations/i }).click()
-  await expect(page.getByRole('heading', { name: /404|not found/i })).toBeVisible()
-  await expect(page.getByRole('heading', { name: /organizations/i })).toHaveCount(0)
+  await page.getByRole('link', { name: messages.console.organizations }).click()
+  await expect(page.getByRole('heading', { name: '404', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: messages.console.organizations })).toHaveCount(0)
 })
 
 test('path-mode Organizations panel paginates real data with the Next/Previous links', async ({
@@ -124,7 +130,7 @@ test('path-mode Organizations panel paginates real data with the Next/Previous l
   createOrganizationsForPagination(marker)
 
   const isPage2 = (url: URL) =>
-    url.pathname === '/en/admin/organizations' && url.searchParams.get('page') === '2'
+    url.pathname === consolePath('/organizations') && url.searchParams.get('page') === '2'
   let releasePage2!: () => void
   let page2Entered!: () => void
   const heldResponse = new Promise<void>((resolve) => {
@@ -147,8 +153,8 @@ test('path-mode Organizations panel paginates real data with the Next/Previous l
   await page.clock.install()
   try {
     await page.route(isPage2, gatePage2)
-    await page.goto('/en/admin/organizations')
-    const search = page.getByLabel(/search organizations/i)
+    await page.goto(consolePath('/organizations'))
+    const search = page.getByLabel(messages.console.organizationsSearchLabel)
     await expect(search).toBeEnabled()
     await expect(page.getByRole('cell', { name: lastOrgName })).toHaveCount(0)
     // Pause after loaded controls; the conditional clear button below proves client handling.
@@ -156,13 +162,17 @@ test('path-mode Organizations panel paginates real data with the Next/Previous l
     const searches: string[] = []
     page.on('request', (request) => {
       const url = new URL(request.url())
-      if (url.pathname === '/en/admin/organizations' && url.searchParams.has('search'))
+      if (url.pathname === consolePath('/organizations') && url.searchParams.has('search'))
         searches.push(request.url())
     })
     await search.fill('uncommitted-page-draft')
-    await expect(page.getByRole('button', { name: /clear search/i })).toBeVisible()
+    await expect(
+      page.getByRole('button', { name: messages.console.organizationsSearchClear })
+    ).toBeVisible()
     // Hold the real Next response: a fast navigation must not cancel the bug for the test.
-    await page.getByRole('link', { name: /next/i }).click({ noWaitAfter: true })
+    await page
+      .getByRole('link', { name: messages.console.paginationNext })
+      .click({ noWaitAfter: true })
     await entered
     await page.clock.runFor(1000)
     expect(searches).toEqual([])
@@ -172,7 +182,7 @@ test('path-mode Organizations panel paginates real data with the Next/Previous l
     await expect(search).toHaveValue('')
     await expect(page.getByRole('cell', { name: lastOrgName })).toBeVisible()
 
-    await page.getByRole('link', { name: /previous/i }).click()
+    await page.getByRole('link', { name: messages.console.paginationPrevious }).click()
     // Page1 is the default and its parameter is omitted.
     await expect(page).not.toHaveURL(/[?&]page=/)
     await expect(page.getByRole('cell', { name: lastOrgName })).toHaveCount(0)

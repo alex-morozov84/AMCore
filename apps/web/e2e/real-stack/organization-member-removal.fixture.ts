@@ -2,13 +2,19 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { type CatalogueLocale, localizedFrontendUrl } from '@amcore/shared'
+import { type CatalogueLocale } from '@amcore/shared'
 import { type BrowserContext, expect, type Page } from '@playwright/test'
 
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
+import {
+  browserCredentialRequest,
+  ensureAdministrationSession,
+  TEST_PASSWORD,
+  uniqueEmail,
+} from './helpers'
+import { organizationUi } from './organization-context.helpers'
 
 /** Every caller owns a fresh organization and accounts; no serial cross-test state. */
 export async function removalFixture(page: Page, context: BrowserContext, colleagueAdmin = false) {
@@ -42,16 +48,13 @@ export async function removalFixture(page: Page, context: BrowserContext, collea
       link: `c${randomUUID().replaceAll('-', '').slice(0, 24)}`,
     }
   )
+  await ensureAdministrationSession(context, email)
   let catalogue: Record<string, Record<string, string>>
   const readCatalogue = (locale: CatalogueLocale): Record<string, Record<string, string>> =>
     JSON.parse(readFileSync(join(target.snapshot, `apps/web/messages/${locale}.json`), 'utf8'))
   const visit = async (locale: CatalogueLocale) => {
     catalogue = readCatalogue(locale)
-    await page.goto(
-      new URL(
-        localizedFrontendUrl(target.origins.product, locale, `organizations/${org.id}/members`)
-      ).pathname
-    )
+    await page.goto(organizationUi(locale).url(`/${org.id}/members`))
     await expect(
       page.getByRole('heading', { name: 'Removal browser proof', exact: true })
     ).toBeVisible()

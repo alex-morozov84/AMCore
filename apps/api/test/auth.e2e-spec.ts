@@ -4,7 +4,7 @@ import { JwtService } from '@nestjs/jwt'
 import type { Response } from 'supertest'
 import request from 'supertest'
 
-import { AuthErrorCode } from '@amcore/shared'
+import { AuthErrorCode, DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 
 import { ServiceUnavailableException } from '../src/common/exceptions'
 import { resolveTrustedWebPeers } from '../src/common/utils/trusted-web-peer'
@@ -297,13 +297,14 @@ describe('Auth (e2e)', () => {
     })
 
     it('seeds locale from Accept-Language when no explicit locale is given', async () => {
+      const locale = SERVED_LOCALES.find((value) => value !== DEFAULT_LOCALE) ?? DEFAULT_LOCALE
       const response = await request(app.getHttpServer())
         .post('/auth/register')
-        .set('Accept-Language', 'en-US,en;q=0.9')
+        .set('Accept-Language', locale)
         .send({ email: 'enheader@example.com', password: 'StrongP@ss123' })
         .expect(201)
 
-      expect(response.body.user.locale).toBe('en')
+      expect(response.body.user.locale).toBe(locale)
     })
 
     it('prefers an explicit body locale over Accept-Language', async () => {
@@ -323,7 +324,7 @@ describe('Auth (e2e)', () => {
         .send({ email: 'deheader@example.com', password: 'StrongP@ss123' })
         .expect(201)
 
-      expect(response.body.user.locale).toBe('en')
+      expect(response.body.user.locale).toBe(DEFAULT_LOCALE)
     })
 
     it('returns 400 for an unsupported body locale', async () => {
@@ -730,15 +731,16 @@ describe('Auth (e2e)', () => {
     })
 
     it('updates name, locale, and timezone and persists them', async () => {
+      const locale = SERVED_LOCALES.find((value) => value !== DEFAULT_LOCALE) ?? DEFAULT_LOCALE
       const response = await request(app.getHttpServer())
         .patch('/auth/me')
         .set('Authorization', `Bearer ${accessToken}`)
-        .send({ name: 'Updated Name', locale: 'en', timezone: 'America/New_York' })
+        .send({ name: 'Updated Name', locale, timezone: 'America/New_York' })
         .expect(200)
 
       expect(response.body.user).toMatchObject({
         name: 'Updated Name',
-        locale: 'en',
+        locale,
         timezone: 'America/New_York',
       })
 
@@ -747,7 +749,7 @@ describe('Auth (e2e)', () => {
       })
       expect(user).toMatchObject({
         name: 'Updated Name',
-        locale: 'en',
+        locale,
         timezone: 'America/New_York',
       })
     })
@@ -763,7 +765,7 @@ describe('Auth (e2e)', () => {
         where: { emailCanonical: 'profile@example.com' },
       })
       expect(user?.name).toBe('Only Name')
-      expect(user?.locale).toBe('en') // default preserved
+      expect(user?.locale).toBe(DEFAULT_LOCALE) // default preserved
       expect(user?.timezone).toBe('UTC') // default preserved
     })
 

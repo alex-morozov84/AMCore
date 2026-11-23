@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+import { productPath } from '../shared/product-settings'
+
 /**
  * Track 3 PR3 (`ai/models-talk.md` FINAL PLAN §3) — the minimal CSP
  * reporting endpoint's HTTP contract. The `mocked` lane runs `next dev`
@@ -19,7 +21,7 @@ test('accepts a well-formed legacy csp-report and responds 204, even with no Red
     headers: { 'Content-Type': 'application/csp-report' },
     data: JSON.stringify({
       'csp-report': {
-        'document-uri': 'http://localhost/en/login',
+        'document-uri': `http://localhost${productPath('/login')}`,
         'violated-directive': 'script-src',
       },
     }),
@@ -56,7 +58,7 @@ test('rejects a method other than POST', async ({ request }) => {
 test("the CSP header's report-to group resolves to this endpoint via Reporting-Endpoints", async ({
   request,
 }) => {
-  const response = await request.get('/en/login')
+  const response = await request.get(productPath('/login'))
   const reportingEndpoints = response.headers()['reporting-endpoints']
 
   expect(reportingEndpoints).toContain('csp-endpoint=')

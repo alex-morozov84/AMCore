@@ -1,14 +1,21 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { DEFAULT_LOCALE, localizedFrontendUrl } from '@amcore/shared'
+import { DEFAULT_LOCALE, productAdminPath } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { closeCredentialPage } from '../shared/credential-artifacts'
+import { productPath } from '../shared/product-settings'
 import { activeTarget } from '../support/managed-target.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
+import {
+  browserCredentialRequest,
+  ensureAdministrationSession,
+  productAdministrationOrigin,
+  TEST_PASSWORD,
+  uniqueEmail,
+} from './helpers'
 
 test.use({ trace: 'off', screenshot: 'off', video: 'off' })
 test.afterEach(({ page }, info) => closeCredentialPage(page, info))
@@ -34,9 +41,9 @@ for (const change of ['same-user-login', 'other-user-login'] as const) {
       { name: 'Session boundary proof' },
       login.accessToken
     )
-    const path = new URL(
-      localizedFrontendUrl(target.origins.product, DEFAULT_LOCALE, 'settings/api-keys')
-    ).pathname
+    const adminOrigin = productAdministrationOrigin()
+    await ensureAdministrationSession(context, email)
+    const path = new URL(productPath(productAdminPath('/settings/api-keys')), adminOrigin).href
     await page.goto(`${path}?organizationId=${organization.id}`)
     await page.getByRole('button', { name: t.create, exact: true }).click()
     const dialog = page.locator('[data-slot=dialog-content]')
@@ -70,19 +77,23 @@ for (const change of ['same-user-login', 'other-user-login'] as const) {
     })
     await dialog.getByRole('button', { name: t.create, exact: true }).click()
     await ready
-    if (change === 'same-user-login')
-      expect(
-        (await browserCredentialRequest(context.request, '/api/auth/login', auth)).status()
-      ).toBe(200)
-    else
-      expect(
-        (
-          await browserCredentialRequest(context.request, '/api/auth/register', {
-            ...auth,
-            data: { ...auth.data, email: uniqueEmail('new-owner') },
-          })
-        ).status()
-      ).toBe(201)
+    const separate = adminOrigin !== target.origins.product
+    const replacement = change === 'same-user-login' ? email : uniqueEmail('new-owner')
+    if (change === 'other-user-login') {
+      const registered = await browserCredentialRequest(context.request, '/api/auth/register', {
+        ...auth,
+        data: { ...auth.data, email: replacement },
+      })
+      expect(registered.status()).toBe(201)
+    }
+    if (separate || change === 'same-user-login') {
+      const loginPath = separate ? '/api/product-admin/auth/login' : '/api/auth/login'
+      const replaced = await browserCredentialRequest(context.request, loginPath, {
+        headers: { origin: adminOrigin },
+        data: { ...auth.data, email: replacement },
+      })
+      expect(replaced.status()).toBe(200)
+    }
     release()
     await expect(page.getByText(t.sessionChanged, { exact: true })).toBeVisible()
     expect(

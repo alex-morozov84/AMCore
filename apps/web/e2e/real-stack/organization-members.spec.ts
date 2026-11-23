@@ -1,14 +1,20 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { localizedFrontendUrl, SERVED_LOCALES } from '@amcore/shared'
+import { SERVED_LOCALES } from '@amcore/shared'
 import { expect, type Page, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
 import { activeTarget } from '../support/managed-target.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
+import {
+  browserCredentialRequest,
+  ensureAdministrationSession,
+  TEST_PASSWORD,
+  uniqueEmail,
+} from './helpers'
+import { organizationUi } from './organization-context.helpers'
 
 // The row actions live behind one menu trigger; the visible trigger belongs to the current layout.
 const rowMenu = (page: Page, t: Record<string, string>, email: string) =>
@@ -47,15 +53,12 @@ test('members: real BFF, complete draft, Enter filtering, self-warning, responsi
   )
   const failures: string[] = []
   page.on('pageerror', (error) => failures.push(error.name))
+  await ensureAdministrationSession(context, email)
   for (const locale of SERVED_LOCALES) {
     const t = JSON.parse(
       readFileSync(join(target.snapshot, `apps/web/messages/${locale}.json`), 'utf8')
     ).organizationMembers
-    await page.goto(
-      new URL(
-        localizedFrontendUrl(target.origins.product, locale, `organizations/${org.id}/members`)
-      ).pathname
-    )
+    await page.goto(organizationUi(locale).url(`/${org.id}/members`))
     await expect(
       page.getByRole('heading', { name: 'Member roles browser proof', exact: true })
     ).toBeVisible()

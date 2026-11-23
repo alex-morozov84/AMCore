@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations, waitForAnimationsToFinish } from '../shared/axe'
+import { isProductHome, messages, productPath } from '../shared/product-settings'
 
 import { loginViaUi, registerViaUi, uniqueEmail } from './helpers'
 import { waitForSessionTransitions } from './sessions-readability'
@@ -13,7 +14,7 @@ import { waitForSessionTransitions } from './sessions-readability'
 
 test('the authenticated dashboard has no axe violations', async ({ page }) => {
   await registerViaUi(page, uniqueEmail('axe-dashboard'), { name: 'E2E Test' })
-  await expect(page).toHaveURL(/\/en\/?$/)
+  await expect(page).toHaveURL(isProductHome)
 
   await expectNoAxeViolations(page)
 })
@@ -24,11 +25,13 @@ test('the sessions page has no axe violations, including with the row-actions me
 }) => {
   const email = uniqueEmail('axe-sessions')
   await registerViaUi(page, email, { name: 'E2E Test' })
-  await expect(page).toHaveURL(/\/en\/?$/)
+  await expect(page).toHaveURL(isProductHome)
 
-  await page.goto('/en/settings/sessions')
+  await page.goto(productPath('/settings/sessions'))
   await expect(page.getByRole('table').locator('tbody tr')).toHaveCount(1)
-  await expect(page.locator('tbody').getByText('This device', { exact: true })).toBeVisible()
+  await expect(
+    page.locator('tbody').getByText(messages.sessions.current, { exact: true })
+  ).toBeVisible()
   await expect(page.locator('[aria-busy]')).toHaveAttribute('aria-busy', 'false')
   await waitForSessionTransitions(page.locator('[aria-busy]'))
   await expectNoAxeViolations(page)
@@ -39,15 +42,17 @@ test('the sessions page has no axe violations, including with the row-actions me
   try {
     const otherPage = await otherContext.newPage()
     await loginViaUi(otherPage, email)
-    await expect(otherPage).toHaveURL(/\/en\/?$/)
+    await expect(otherPage).toHaveURL(isProductHome)
 
     await page.reload()
     await expect(page.getByRole('table').locator('tbody tr')).toHaveCount(2)
-    await expect(page.locator('tbody').getByText('This device', { exact: true })).toBeVisible()
+    await expect(
+      page.locator('tbody').getByText(messages.sessions.current, { exact: true })
+    ).toBeVisible()
     await expect(page.locator('[aria-busy]')).toHaveAttribute('aria-busy', 'false')
     await waitForSessionTransitions(page.locator('[aria-busy]'))
-    await page.getByRole('button', { name: /actions/i }).click()
-    await page.getByRole('menuitem', { name: /revoke/i }).waitFor()
+    await page.getByRole('button', { name: messages.sessions.actions, exact: true }).click()
+    await page.getByRole('menuitem', { name: messages.sessions.revoke, exact: true }).waitFor()
     await waitForAnimationsToFinish(page, '[data-slot="dropdown-menu-content"]')
     await waitForSessionTransitions(page.getByRole('menu'))
 

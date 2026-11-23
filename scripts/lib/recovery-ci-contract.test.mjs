@@ -11,7 +11,7 @@ test('Linux recovery regressions remain blocking whenever Docker is selected', (
   assert.equal(ci.on.pull_request.paths, undefined)
   const job = ci.jobs['docker-image-smoke']
   assert.equal(job['runs-on'], 'ubuntu-latest')
-  assert.equal(job.if, "${{ needs.ci-selection.outputs.server == 'true' }}")
+  assert.match(job.if, /effective, 'docker-image-smoke'/)
   assert.ok(job.needs.includes('ci-selection'))
   for (const areas of [{ infra: true }, { common: true }, { tools: true }]) {
     const execution = coarseExecution({

@@ -1,3 +1,4 @@
+import { assertSettings } from './settings-policy.mjs'
 import { isOrganizationMailFixture } from './organization-setup-fixture.mjs'
 import { initializeMarker } from './bootstrap-marker.mjs'
 import { readFile, writeFile } from 'node:fs/promises'
@@ -23,6 +24,7 @@ async function reportUnhealthyServices(m, services) {
 }
 
 export async function start(m) {
+  await assertSettings(m)
   // A changed source rebuild must not admit previous application image IDs.
   // Preserve only the already-owned volumes, then recreate the local services.
   if (!m.images && m.resources?.container?.length) await cleanup(m, false)

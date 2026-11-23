@@ -1,16 +1,20 @@
 import { type BrowserContext, expect, test } from '@playwright/test'
 
+import { requirePathConsole } from '../shared/console-applicability'
+import { consolePath, isProductHome, messages } from '../shared/product-settings'
 import { settingsProof } from '../support/runtime-settings-proof'
 
 import { setSystemRole } from './admin-helpers'
 import { loginViaUi, registerViaUi, uniqueEmail } from './helpers'
+
+requirePathConsole()
 
 // Console route under a stalled session vault: the temporary state is the only difference an
 // outsider may see, and only for a request that carries some session cookie. Operator identity,
 // queue data and the shell never render. Normal denial returns after recovery.
 test.describe.configure({ mode: 'serial' })
 
-const URL = '/en/admin/background-work'
+const URL = consolePath('/background-work')
 const STALL_MS = 40_000 // `pause-redis` pauses the stand's Redis for 40 s
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -39,7 +43,7 @@ test('Console vault stall preserves four isolated sessions and recovery', async 
     const operator = await createContext()
     const page = await user.newPage()
     await registerViaUi(page, uniqueEmail('console-outage-user'))
-    await expect(page).toHaveURL(/\/en\/?$/)
+    await expect(page).toHaveURL(isProductHome)
     await invented.addCookies([{ name: 'amcore_session', value: 'A'.repeat(43), url: baseURL! }])
     const operatorPage = await operator.newPage()
     const email = uniqueEmail('console-outage-operator')
@@ -58,7 +62,6 @@ test('Console vault stall preserves four isolated sessions and recovery', async 
     const started = performance.now()
     settingsProof('pause-redis')
     await test.step('outsiders see only the accepted temporary state during the stall', async () => {
-      const TEMPORARY = /usually temporary|temporarily unavailable/i
       const during: Record<string, { status: number; shown: boolean }> = {}
       for (const [name, ctx] of [
         ['anonymous', anonymous],
@@ -70,7 +73,11 @@ test('Console vault stall preserves four isolated sessions and recovery', async 
         const response = await page.goto(URL, { timeout: 15_000 })
         during[name] = {
           status: response!.status(),
-          shown: await page.getByText(TEMPORARY).first().isVisible(),
+          shown: await page
+            .getByText(messages.dashboard.unavailable, { exact: true })
+            .or(page.getByText(messages.common.temporarilyUnavailable, { exact: true }))
+            .first()
+            .isVisible(),
         }
         forbidden(await page.content())
         await page.close()
@@ -82,7 +89,7 @@ test('Console vault stall preserves four isolated sessions and recovery', async 
     await test.step('operator temporary response contains no shell, queue or identity', async () => {
       const response = await operatorPage.request.get(URL, { timeout: 10_000 })
       const body = await response.text()
-      expect(body).toMatch(/temporarily unavailable/i)
+      expect(body).toContain(messages.common.temporarilyUnavailable)
       forbidden(body)
       expect(body).not.toContain(email)
     })
@@ -102,7 +109,9 @@ test('Console vault stall preserves four isolated sessions and recovery', async 
     await test.step('operator board returns after recovery', async () => {
       await expect(async () => {
         await operatorPage.goto(URL)
-        await expect(operatorPage.getByRole('table', { name: 'Background queues' })).toBeVisible({
+        await expect(
+          operatorPage.getByRole('table', { name: messages.console.backgroundWork.tableLabel })
+        ).toBeVisible({
           timeout: 5000,
         })
       }).toPass({ timeout: 90_000, intervals: [2000, 5000] })

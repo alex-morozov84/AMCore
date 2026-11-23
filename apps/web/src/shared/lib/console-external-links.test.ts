@@ -85,6 +85,7 @@ describe('validateAdminConsoleStartupOrExit', () => {
   // A generated host-mode project also validates the three hostnames before the external links.
   beforeEach(() => {
     vi.stubEnv('FRONTEND_URL', 'https://shop.example.test:8443')
+    vi.stubEnv('PRODUCT_ADMIN_ORIGIN', 'https://staff.example.test:8443')
     vi.stubEnv('ADMIN_CONSOLE_HOSTNAME', 'console.example.test')
     vi.stubEnv('ADMIN_CONSOLE_ORIGIN', 'https://console.example.test:8443')
   })

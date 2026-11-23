@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+import { productPath } from '../shared/product-settings'
+
 /**
  * `requireSession()` (`shared/api/bff/dal.ts`) is the real auth gate — not
  * `(dashboard)/layout.tsx`, which doesn't re-render on client-side
@@ -10,13 +12,13 @@ import { expect, test } from '@playwright/test'
 test('an unauthenticated visitor is redirected to login from the dashboard root', async ({
   page,
 }) => {
-  await page.goto('/en')
-  await expect(page).toHaveURL(/\/en\/login/)
+  await page.goto(productPath())
+  await expect(page).toHaveURL((url) => url.pathname === productPath('/login'))
 })
 
 test('an unauthenticated visitor is redirected to login from the sessions page', async ({
   page,
 }) => {
-  await page.goto('/en/settings/sessions')
-  await expect(page).toHaveURL(/\/en\/login/)
+  await page.goto(productPath('/settings/sessions'))
+  await expect(page).toHaveURL((url) => url.pathname === productPath('/login'))
 })

@@ -8,13 +8,15 @@ vi.mock('@/shared/api/bff/browser-login-handler', () => ({ handleBrowserPassword
 
 import { handleBrowserPassword } from '@/shared/api/bff/browser-login-handler'
 import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
+import { stubProductOrigins } from '@/test/product-origins'
 
 import { handleConsoleLogin } from './auth-handler'
 import { consoleBrowserContext } from './browser-context'
 import { isTrustedConsoleOrigin } from './origin-guard'
 
-const config = ADMIN_CONSOLE_CONFIG as { mode: 'path' | 'host' }
+const config = ADMIN_CONSOLE_CONFIG as { enabled: boolean; mode: 'disabled' | 'path' | 'host' }
 const original = config.mode
+const originalEnabled = config.enabled
 function request(path = '/api/console/auth/login', host = 'console.example.test') {
   return new Request(`https://${host}${path}`, {
     method: 'POST',
@@ -23,11 +25,12 @@ function request(path = '/api/console/auth/login', host = 'console.example.test'
   })
 }
 beforeEach(() => {
+  stubProductOrigins('https://shop.example.test')
   vi.clearAllMocks()
+  config.enabled = true
   config.mode = 'host'
   vi.stubEnv('ADMIN_CONSOLE_HOSTNAME', 'console.example.test')
   vi.stubEnv('ADMIN_CONSOLE_ORIGIN', 'https://console.example.test')
-  vi.stubEnv('FRONTEND_URL', 'https://shop.example.test')
   vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-console-private-context-key-at-least-32>')
   vi.mocked(isTrustedConsoleOrigin).mockReturnValue(true)
   vi.mocked(handleBrowserPassword).mockResolvedValue(
@@ -38,6 +41,7 @@ beforeEach(() => {
   )
 })
 afterEach(() => {
+  config.enabled = originalEnabled
   config.mode = original
   vi.unstubAllEnvs()
 })

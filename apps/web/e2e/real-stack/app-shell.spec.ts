@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+import { isProductHome, messages, productPath } from '../shared/product-settings'
+
 import { registerViaUi, uniqueEmail } from './helpers'
 
 /**
@@ -19,44 +21,46 @@ test.describe('dashboard app shell', () => {
   test('mobile viewport opens the sidebar as a Sheet and navigates from it', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 })
     await registerViaUi(page, uniqueEmail('app-shell-mobile'), { name: 'E2E Test' })
-    await expect(page).toHaveURL(/\/en\/?$/)
+    await expect(page).toHaveURL(isProductHome)
 
     // Below `md` the desktop sidebar tree is `hidden md:block`, and the
     // mobile one only exists once the Sheet is open.
     await expect(page.locator('[data-slot="sidebar"][data-mobile="true"]')).toHaveCount(0)
 
-    await page.getByRole('button', { name: /toggle sidebar/i }).click()
+    await page.getByRole('button', { name: messages.nav.toggleSidebar, exact: true }).click()
 
     const mobileSidebar = page.locator('[data-slot="sidebar"][data-mobile="true"]')
     await expect(mobileSidebar).toBeVisible()
     // The sr-only heading comes from `Sidebar`'s required `mobileTitle`
     // prop — proof the caller-supplied translated label really reaches the
     // Sheet, rather than the English literal shadcn generated.
-    await expect(mobileSidebar.getByRole('heading', { name: 'Navigation' })).toBeAttached()
+    await expect(
+      mobileSidebar.getByRole('heading', { name: messages.nav.mobileTitle })
+    ).toBeAttached()
 
     // Navigating from inside the Sheet: `SidebarMenuButton render={<Link/>}`
     // composes Base UI's `render` prop with next-intl's locale-aware Link.
-    await mobileSidebar.getByRole('link', { name: 'Active sessions' }).click()
-    await expect(page).toHaveURL(/\/en\/settings\/sessions/)
+    await mobileSidebar.getByRole('link', { name: messages.sessions.title }).click()
+    await expect(page).toHaveURL((url) => url.pathname === productPath('/settings/sessions'))
 
     // The Sheet must close itself on navigate — shadcn's primitive does not
     // do this, so accepted navigation closes the product Sidebar provider. Without it the
     // menu stays open on top of the page the user just navigated to.
     await expect(mobileSidebar).toHaveCount(0)
-    await expect(page.getByRole('heading', { name: 'Active sessions' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: messages.sessions.title })).toBeVisible()
   })
 
   test('collapsed sidebar state survives a reload via the sidebar_state cookie', async ({
     page,
   }) => {
     await registerViaUi(page, uniqueEmail('app-shell-cookie'), { name: 'E2E Test' })
-    await expect(page).toHaveURL(/\/en\/?$/)
+    await expect(page).toHaveURL(isProductHome)
 
     const sidebar = page.locator('[data-slot="sidebar"]').first()
     await expect(sidebar).toHaveAttribute('data-state', 'expanded')
 
     await page
-      .getByRole('button', { name: /toggle sidebar/i })
+      .getByRole('button', { name: messages.nav.toggleSidebar, exact: true })
       .first()
       .click()
     await expect(sidebar).toHaveAttribute('data-state', 'collapsed')

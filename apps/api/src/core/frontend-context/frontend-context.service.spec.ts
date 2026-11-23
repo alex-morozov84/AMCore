@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto'
 
-import { frontendPlacementPayload, WEB_FRONTEND_HEADERS } from '@amcore/shared'
+import {
+  frontendPlacementPayload,
+  PRODUCT_ADMIN_CONFIG,
+  WEB_FRONTEND_HEADERS,
+} from '@amcore/shared'
 
 import type { EnvService } from '../../env/env.service'
 
@@ -9,12 +13,17 @@ import { canonicalFrontendOrigin, resolveFrontendPlacement } from './frontend-pl
 
 const key = '<fake-test-context-key-at-least-32-characters>'
 const site = 'https://site.example'
-const hash = createHash('sha256').update(frontendPlacementPayload(site, site)).digest('hex')
+const admin = PRODUCT_ADMIN_CONFIG.mode === 'host' ? 'https://office.example' : site
+const hash = createHash('sha256').update(frontendPlacementPayload(site, admin)).digest('hex')
 const environment = (values: Record<string, string | undefined>) =>
   ({
     get: (name: string) => values[name],
   }) as Pick<EnvService, 'get'>
-const env = environment({ FRONTEND_URL: site, WEB_FRONTEND_CONTEXT_KEY: key })
+const env = environment({
+  FRONTEND_URL: site,
+  PRODUCT_ADMIN_ORIGIN: admin,
+  WEB_FRONTEND_CONTEXT_KEY: key,
+})
 const valid = {
   [WEB_FRONTEND_HEADERS.frontend]: 'admin',
   [WEB_FRONTEND_HEADERS.placement]: hash,

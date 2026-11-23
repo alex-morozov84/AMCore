@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { localizedFrontendUrl, SERVED_LOCALES } from '@amcore/shared'
+import { localePathPrefix, localizedFrontendUrl, SERVED_LOCALES } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
@@ -53,7 +53,9 @@ for (const locale of SERVED_LOCALES) {
       await page.goto(
         localizedFrontendUrl(target.origins.product, locale, `invite/accept?token=${token}`)
       )
-      await expect(page).toHaveURL(new RegExp(`/${locale}/invite/flow/[A-Za-z0-9_-]{22}$`))
+      await expect(page).toHaveURL(
+        new RegExp(`${localePathPrefix(locale)}/invite/flow/[A-Za-z0-9_-]{22}$`)
+      )
       expect(page.url()).not.toContain(token)
       await expect(page.getByRole('heading', { name: t.signInTitle })).toBeVisible()
       expect(membershipCount(email, org.id)).toBe('0')

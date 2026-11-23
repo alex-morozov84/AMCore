@@ -1,3 +1,4 @@
+import { PRODUCT_ADMIN_CONFIG } from '@amcore/shared'
 import { render } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -41,11 +42,12 @@ describe('ready content client adapter', () => {
     expect(props.onReload).toBeTypeOf('function')
   })
   it('preserves default list admission, escape and shared login', () => {
+    const prefix = PRODUCT_ADMIN_CONFIG.mode === 'path' ? `/${PRODUCT_ADMIN_CONFIG.alias}` : ''
     render(<OrganizationAccessClientMount admission={admission} page={3} explicitList />)
     const props = page.mock.lastCall![0] as OrganizationAccessClientProps
     expect(props.input).toEqual({ kind: 'list', page: 3, locale: 'ru' })
     expect(props.explicitList).toBe(true)
-    expect(props.contextHref('org')).toBe('/manage/organizations/org')
-    expect(props.loginHref).toBe('/manage/login')
+    expect(props.contextHref('org')).toBe(`${prefix}/organizations/org`)
+    expect(props.loginHref).toBe(`${prefix}/login`)
   })
 })

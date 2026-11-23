@@ -2,6 +2,7 @@ import { expect, type Page } from '@playwright/test'
 
 import { expectNoAxeViolations } from './axe'
 import { QUEUES_ROUTE } from './background-work-journey'
+import { messages, translate } from './product-settings'
 
 /** Intercepted BFF answers prove the honest degraded states without stopping the stack's Redis. */
 export async function backgroundWorkDegradedJourney(page: Page, url: string): Promise<void> {
@@ -26,29 +27,37 @@ export async function backgroundWorkDegradedJourney(page: Page, url: string): Pr
   })
   await page.clock.install()
   await page.goto(url)
-  await expect(page.getByRole('heading', { level: 1, name: 'Background work' })).toBeVisible()
+  await expect(
+    page.getByRole('heading', { level: 1, name: messages.console.backgroundWork.title })
+  ).toBeVisible()
   await page.clock.runFor(31_000)
   await expect.poll(() => calls).toBe(1)
-  await expect(page.getByRole('status')).toContainText('Unavailable does not mean empty')
+  await expect(page.getByRole('status')).toContainText(
+    messages.console.backgroundWork.allUnavailable
+  )
   // Backoff: the next automatic read is not at +30 s but at +60 s after the first degraded result.
   await page.clock.runFor(31_000)
   await expect.poll(() => calls).toBe(2)
   // Wait for the page-wide read to settle before advancing its backoff clock.
-  await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled()
+  await expect(
+    page.getByRole('button', { name: messages.console.backgroundWork.refresh, exact: true })
+  ).toBeEnabled()
   await page.clock.runFor(40_000)
   expect(calls).toBe(2)
   await page.clock.runFor(30_000)
   await expect.poll(() => calls).toBe(3)
   await expect(
-    page.getByRole('table', { name: 'Background queues' }).getByRole('row', { name: /Email/ })
-  ).toContainText('Unavailable')
+    page
+      .getByRole('table', { name: messages.console.backgroundWork.tableLabel })
+      .getByRole('row', { name: messages.console.backgroundWork.queues.email.title })
+  ).toContainText(messages.console.backgroundWork.unavailable)
   await expect(
     page
-      .getByRole('table', { name: 'Background queues' })
-      .getByRole('row', { name: /Email/ })
+      .getByRole('table', { name: messages.console.backgroundWork.tableLabel })
+      .getByRole('row', { name: messages.console.backgroundWork.queues.email.title })
       .getByRole('cell')
       .nth(2)
-  ).toHaveText('—')
+  ).toHaveText(messages.console.apiKeys.notApplicable)
   await expectNoAxeViolations(page)
 }
 
@@ -70,12 +79,21 @@ export async function backgroundWorkRetryAfterJourney(page: Page, url: string): 
   })
   await page.clock.install()
   await page.goto(url)
-  await expect(page.getByRole('heading', { level: 1, name: 'Background work' })).toBeVisible()
+  await expect(
+    page.getByRole('heading', { level: 1, name: messages.console.backgroundWork.title })
+  ).toBeVisible()
   await page.clock.runFor(31_000)
   await expect.poll(() => calls).toBe(1)
-  const refresh = page.getByRole('button', { name: 'Refresh', exact: true })
+  const refresh = page.getByRole('button', {
+    name: messages.console.backgroundWork.refresh,
+    exact: true,
+  })
   await expect(refresh).toBeDisabled()
-  await expect(page.getByText(/Available in \d+ seconds?/)).toBeVisible()
+  await expect(
+    page
+      .getByText(translate('console.backgroundWork.availableIn', { seconds: 1 }))
+      .or(page.getByText(translate('console.backgroundWork.availableIn', { seconds: 2 })))
+  ).toBeVisible()
   await page.clock.runFor(2_500)
   await expect(refresh).toBeEnabled()
   expect(calls).toBe(1) // the 30 s automatic backoff has not ended
@@ -98,13 +116,19 @@ export async function backgroundWorkBoardStatesJourney(page: Page, url: string):
   await page.clock.install()
   // A bookmark of a failed open: the marker is a one-shot, the board is available at load.
   await page.goto(`${url}?board=unavailable`)
-  await expect(page.getByRole('heading', { level: 1, name: 'Background work' })).toBeVisible()
-  const open = page.getByRole('link', { name: /Open queue board/ })
-  const rowLinks = page.getByRole('table', { name: 'Background queues' }).getByRole('link', {
-    name: /Open in queue board/,
-  })
   await expect(
-    page.getByRole('status').filter({ has: page.getByText('Could not open the queue board') })
+    page.getByRole('heading', { level: 1, name: messages.console.backgroundWork.title })
+  ).toBeVisible()
+  const open = page.getByRole('link', { name: messages.console.backgroundWork.board.openLink })
+  const rowLinks = page
+    .getByRole('table', { name: messages.console.backgroundWork.tableLabel })
+    .getByRole('link', {
+      name: messages.console.backgroundWork.board.rowLink,
+    })
+  await expect(
+    page
+      .getByRole('status')
+      .filter({ has: page.getByText(messages.console.backgroundWork.board.unavailableTitle) })
   ).toBeVisible()
   await expect(open).toBeVisible()
   await expect(rowLinks).toHaveCount(4)
@@ -113,20 +137,22 @@ export async function backgroundWorkBoardStatesJourney(page: Page, url: string):
 
   // The API restarted without the flag: the fresh confirmation replaces the stale notice.
   await page.clock.runFor(31_000)
-  await expect(page.getByText('Queue board is not enabled')).toBeVisible()
-  await expect(page.getByText('Could not open the queue board')).toHaveCount(0)
+  await expect(page.getByText(messages.console.backgroundWork.board.disabledTitle)).toBeVisible()
+  await expect(page.getByText(messages.console.backgroundWork.board.unavailableTitle)).toHaveCount(
+    0
+  )
   await expect(open).toHaveCount(0)
   await expect(rowLinks).toHaveCount(0)
   const disabled = page
-    .getByText('Queue board is not enabled')
+    .getByText(messages.console.backgroundWork.board.disabledTitle)
     .locator('xpath=ancestor::*[@data-slot="alert"]')
   await expect(disabled).toContainText('ENABLE_BULL_BOARD=true')
-  await expect(disabled).toContainText('restart the API')
-  await expect(disabled).toContainText('it stays view-only')
-  await expect(disabled.getByRole('link', { name: /Queue board guide/ })).toHaveAttribute(
-    'target',
-    '_blank'
+  await expect(disabled).toContainText(
+    translate.markup('console.backgroundWork.board.disabledBody', { code: (text) => text })
   )
+  await expect(
+    disabled.getByRole('link', { name: messages.console.backgroundWork.board.disabledGuideLink })
+  ).toHaveAttribute('target', '_blank')
   await expectNoAxeViolations(page)
 
   // And again with the flag: the entry returns, and the old failed-open notice does not.
@@ -134,16 +160,16 @@ export async function backgroundWorkBoardStatesJourney(page: Page, url: string):
   await page.clock.runFor(31_000)
   await expect(open).toBeVisible()
   await expect(rowLinks).toHaveCount(4)
-  await expect(page.getByText('Queue board is not enabled')).toHaveCount(0)
-  await expect(page.getByText('Could not open the queue board')).toHaveCount(0)
+  await expect(page.getByText(messages.console.backgroundWork.board.disabledTitle)).toHaveCount(0)
+  await expect(page.getByText(messages.console.backgroundWork.board.unavailableTitle)).toHaveCount(
+    0
+  )
   await expect(page.getByText('ENABLE_BULL_BOARD')).toHaveCount(0)
 
   // The page says in its description that the board is view-only, and the help icon beside the
   // button carries the full explanation; on a phone the actions wrap instead of overflowing.
-  await expect(
-    page.getByText('Bull Board provides a separate technical, view-only queue dashboard.')
-  ).toBeVisible()
-  await expect(page.getByLabel(/Retrying or deleting jobs and managing queues/)).toBeVisible()
+  await expect(page.getByText(messages.console.backgroundWork.boardPointer)).toBeVisible()
+  await expect(page.getByLabel(messages.console.backgroundWork.board.noteBody)).toBeVisible()
   await page.setViewportSize({ width: 320, height: 800 })
   const box = await open.boundingBox()
   expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(320)

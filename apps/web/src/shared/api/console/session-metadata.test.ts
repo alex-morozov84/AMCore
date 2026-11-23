@@ -4,7 +4,7 @@ import { cookies, headers } from 'next/headers'
 import { AMCORE_CLIENT_IP_HEADER, type BrowserAudience } from '@amcore/shared'
 import { afterEach, expect, it, vi } from 'vitest'
 
-import { fakeVaultEntry } from '@/shared/api/bff/dal.test-helpers'
+import { fakeVaultEntry } from '@/shared/api/bff/dal.testkit'
 
 import { getConsoleSessionEntry } from './session'
 

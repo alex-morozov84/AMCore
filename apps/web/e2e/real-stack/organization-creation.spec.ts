@@ -7,7 +7,12 @@ import { expect, test } from '@playwright/test'
 import { expectNoAxeViolations } from '../shared/axe'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
-import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
+import {
+  browserCredentialRequest,
+  ensureAdministrationSession,
+  TEST_PASSWORD,
+  uniqueEmail,
+} from './helpers'
 import { organizationUi } from './organization-context.helpers'
 
 for (const locale of SERVED_LOCALES) {
@@ -35,7 +40,8 @@ for (const locale of SERVED_LOCALES) {
       data: { name: 'Original company', slug, operationId: crypto.randomUUID() },
     })
     expect(initial.status()).toBe(201)
-    await page.goto(`${ui.path()}?view=list`)
+    await ensureAdministrationSession(context, email)
+    await page.goto(`${ui.url()}?view=list`)
     await page.getByRole('button', { name: text.create, exact: true }).click()
     await page.getByLabel(text.name, { exact: true }).fill('Second company')
     await page.getByLabel(text.slug, { exact: true }).fill(slug)
@@ -79,7 +85,8 @@ for (const locale of SERVED_LOCALES) {
       data: { email, password: TEST_PASSWORD },
     })
     expect(registration.status()).toBe(201)
-    await page.goto(ui.path())
+    await ensureAdministrationSession(context, email)
+    await page.goto(ui.url())
     await page.setViewportSize({ width: 375, height: 900 })
     await page.getByRole('button', { name: text.create, exact: true }).click()
     await expect(page.getByLabel(text.name, { exact: true })).toBeFocused()

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import * as route from '@/app/api/[...path]/route'
 import { ensureFreshSession } from '@/shared/api/bff/ensure-fresh-session'
+import { stubProductOrigins } from '@/test/product-origins'
 
 vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({ cookies: vi.fn() }))
@@ -20,7 +21,7 @@ describe('composed generic organization aliases close before authentication', ()
   it.each(['GET', 'HEAD', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE'] as const)(
     '%s cannot bypass the typed boundary',
     async (method) => {
-      vi.stubEnv('FRONTEND_URL', 'https://web.test')
+      stubProductOrigins('https://web.test')
       vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-context-key-at-least-32-characters>')
       const fetch = vi.fn()
       vi.stubGlobal('fetch', fetch)

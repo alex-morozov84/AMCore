@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
-import test from 'node:test'
+import test, { after, before } from 'node:test'
 
 import {
   exampleContext,
@@ -11,8 +11,32 @@ import {
   replaceOnce,
 } from '../fixtures/product-admin-example-context.mjs'
 
+import { snapshot } from '../stand/snapshot.mjs'
+import { readProductAdminPlacement } from './settings-files.mjs'
+
 const root = resolve(import.meta.dirname, '../..')
 const read = (path) => readFile(join(root, path), 'utf8')
+let exampleRoot = root
+before(async () => {
+  const settings = readProductAdminPlacement(root)
+  if (settings.mode === 'path') return
+  // These generators are the documented path-only recipes. Exercise them in the
+  // same source tree projected onto their supported placement.
+  exampleRoot = await mkdtemp(join(tmpdir(), 'amcore-path-examples-'))
+  await snapshot(root, exampleRoot)
+  const routes = join(exampleRoot, 'apps/web/src/app/[locale]/(product-admin)')
+  if (settings.alias !== 'manage')
+    await rename(join(routes, settings.alias), join(routes, 'manage'))
+  await writeFile(
+    join(exampleRoot, 'packages/shared/src/config/product-admin.json'),
+    JSON.stringify({ ...settings, mode: 'path', alias: 'manage' })
+  )
+  execFileSync('git', ['init', '--quiet', exampleRoot])
+})
+after(async () => {
+  if (exampleRoot !== root) await rm(exampleRoot, { recursive: true, force: true })
+})
+
 async function selectedSource() {
   const dir = await mkdtemp(join(tmpdir(), 'amcore-example-contract-'))
   const files = [
@@ -33,6 +57,8 @@ async function selectedSource() {
     // One served locale and no Console: the choices live in the settings files.
     if (path.endsWith('config/locales.json'))
       contents = `${JSON.stringify({ version: 1, enabled: ['ru'], default: 'ru' })}\n`
+    if (path.endsWith('config/product-admin.json'))
+      contents = JSON.stringify({ version: 1, mode: 'path', alias: 'manage' })
     if (path.endsWith('config/admin-console.json'))
       contents = `${JSON.stringify({ version: 1, mode: 'disabled', alias: 'admin' })}\n`
     await mkdir(dirname(join(dir, path)), { recursive: true })
@@ -87,7 +113,7 @@ test('the actual roles generator replaces the admitted mount and never adds a le
   const stdout = execFileSync(
     process.execPath,
     ['scripts/fixtures/organization-roles-headless.mjs'],
-    { cwd: root, encoding: 'utf8' }
+    { cwd: exampleRoot, encoding: 'utf8' }
   )
   const generated = stdout.match(/Prepared roles headless example: (.+)/)?.[1]
   assert.ok(generated)
@@ -113,7 +139,7 @@ test('shop replaces effective palette blocks and preserves fonts and charts', as
   const stdout = execFileSync(
     process.execPath,
     ['scripts/fixtures/organization-shop-headless.mjs'],
-    { cwd: root, encoding: 'utf8' }
+    { cwd: exampleRoot, encoding: 'utf8' }
   )
   const generated = stdout.match(/Prepared shop headless example: (.+)/)?.[1]
   assert.ok(generated)
@@ -160,7 +186,7 @@ test('shop replaces effective palette blocks and preserves fonts and charts', as
 test('members, roles and invitations compose without losing earlier mounts', async () => {
   const copies = []
   try {
-    let source = root
+    let source = exampleRoot
     for (const kind of ['members', 'roles', 'invitations']) {
       const stdout = execFileSync(
         process.execPath,

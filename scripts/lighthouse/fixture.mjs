@@ -83,7 +83,11 @@ export async function prepareFixture(context, m, scenario, alias) {
   })
   const measured = await session.newPage()
   measured.setDefaultTimeout(15_000)
-  await loginViaUi(measured, email)
+  await loginViaUi(
+    measured,
+    email,
+    fixture.consoleHost ? { mfa: 'required', surface: 'console' } : undefined
+  )
   await context.close()
   return {
     page: measured,

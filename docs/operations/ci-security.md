@@ -6,18 +6,18 @@ of workflow self-hardening to keep the example forkable.
 
 ## Current Gates
 
-| Workflow                | Trigger                                 | Tooling                                                                                             | CI behavior                          |
-| ----------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| `codeql.yml`            | `push`, `pull_request`, weekly schedule | CodeQL (`javascript-typescript`, `build-mode: none`)                                                | report-only, uploads SARIF           |
-| `dependency-review.yml` | `pull_request`                          | GitHub Dependency Review                                                                            | blocking on `high+`                  |
-| `security-scans.yml`    | `push`, `pull_request`, weekly schedule | gitleaks CLI, OSV-Scanner CLI                                                                       | gitleaks blocks; OSV is report-only  |
-| `ci.yml`                | `push`, `pull_request`                  | Route bundle budgets after the web build (`pnpm check:route-budgets`, Build job)                    | blocking                             |
-| `ci.yml`                | `push`, `pull_request`                  | Trivy CLI + boot-smoke                                                                              | Trivy report-only; boot-smoke blocks |
-| `ci.yml`                | `push`, `pull_request`                  | Observability contract — static (`scripts/observability-contract/`, folded into the `promtool` job) | blocking                             |
-| `ci.yml`                | `push`, `pull_request`                  | Observability contract — live (real Prometheus/Alertmanager/Grafana boot)                           | blocking                             |
-| `ci.yml`                | `push`, `pull_request`                  | Script contracts (`pnpm test:scripts`: tooling unit and contract tests, no Docker)                  | blocking                             |
-| `workflow-lint.yml`     | `push`, `pull_request`                  | actionlint, zizmor, action pin verifier                                                             | blocking                             |
-| `pr-title.yml`          | `pull_request`                          | Conventional-Commits PR-title lint                                                                  | blocking (squash title = commit msg) |
+| Workflow                | Trigger                                         | Tooling                                                                                             | CI behavior                          |
+| ----------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `codeql.yml`            | `push`, `pull_request`, weekly schedule, manual | CodeQL (`javascript-typescript`, `build-mode: none`)                                                | report-only, uploads SARIF           |
+| `dependency-review.yml` | `pull_request`                                  | GitHub Dependency Review                                                                            | blocking on `high+`                  |
+| `security-scans.yml`    | `push`, `pull_request`, weekly schedule         | gitleaks CLI, OSV-Scanner CLI                                                                       | gitleaks blocks; OSV is report-only  |
+| `ci.yml`                | `push`, `pull_request`                          | Route bundle budgets after the web build (`pnpm check:route-budgets`, Build job)                    | blocking                             |
+| `ci.yml`                | `push`, `pull_request`                          | Trivy CLI + boot-smoke                                                                              | Trivy report-only; boot-smoke blocks |
+| `ci.yml`                | `push`, `pull_request`                          | Observability contract — static (`scripts/observability-contract/`, folded into the `promtool` job) | blocking                             |
+| `ci.yml`                | `push`, `pull_request`                          | Observability contract — live (real Prometheus/Alertmanager/Grafana boot)                           | blocking                             |
+| `ci.yml`                | `push`, `pull_request`                          | Script contracts (`pnpm test:scripts`: tooling unit and contract tests, no Docker)                  | blocking                             |
+| `workflow-lint.yml`     | `push`, `pull_request`                          | actionlint, zizmor, action pin verifier                                                             | blocking                             |
+| `pr-title.yml`          | `pull_request`                                  | Conventional-Commits PR-title lint                                                                  | blocking (squash title = commit msg) |
 
 ## Aggregate CI gate
 
@@ -28,54 +28,67 @@ Every selected job must succeed. Every explicitly unselected leaf must report
 and an unjustified skip block the gate. Test and API E2E use the same admission
 logic. Selected API E2E still requires complete artifacts and natural exits.
 
-### Conservative web selection
+### Selection modes
 
-For upstream AMCore with the default build settings and `normal` policy, an
-independent web source or message change can omit API E2E, capability extensions,
-notification/AI extensions, Docker image smoke and live observability. The API
-aggregate reports validated non-applicability; it does not claim executed tests.
-Quality, build, unit tests, Redis, script contracts, static observability,
-Storybook and the complete browser inventory remain selected.
+The ordinary PR workflow reads the role from `PROJECT_CONTEXT.md` and the
+saved mode from `ci/product.json` (version 1). Missing policy means `normal`.
+A PR uses the base mode and validates the proposed mode. The proposed mode
+takes effect on the next push after merge. An ordinary PR cannot change the
+repository role.
 
-Mixed changes, web tooling or harness changes, root/shared/API/dependency changes,
-unknown paths, retained integration merges, incomplete history and `full` policy
-keep the full execution plan. Documentation-only changes also remain broad.
-The pinned path filter owns matching; the gate recomputes the permitted inventory
-from the admitted inputs. It does not accept an arbitrary list of exclusions.
-See `.github/ci-paths.yml` for path ownership and the **CI selection** job summary
-for the effective job list. Selection is automatic; do not skip jobs manually.
+- `normal` uses the complete Git diff and the pinned path filter. A change
+  limited to discovered API E2E specs runs the complete API E2E chain and
+  static gates. Adding production API code brings back the relevant runtime
+  checks. Unknown paths, shared mechanisms, source merges and incomplete
+  classification select the broad applicable set.
+- `full` selects every applicable job in the workflow. The starter retains
+  its extension and browser variant checks. Products use their settings
+  for the standard, disruptive and optional host Console browser groups.
 
-The selector still refuses downstream products, `heavy-off`, Console host/off,
-changed administrative placement and non-default served locales. These modes are
-not operational in this rollout. The supported settings are both repository
-catalogue locales with default `en`, Console `path` with alias `admin`, and product
-administration `path` with alias `manage`. Admission requires identical
-`packages/shared/src/constants/locales.ts` files in the source head, checkout and
-event base. Any difference, including comments or formatting, or an unavailable
-base stops admission. Restore a supported configuration to recover; do not bypass
-the gate or remove a required check.
+CI collects Playwright cases only when it selects browser checks. The
+checkout must match the PR event's merge parents. CI collects the base
+under the same product settings and retains every applicable base case.
+Real-stack tests and applicable host Console tests join the plan automatically.
+The mocked and server-mocked projects share the configured mocked job.
+It uses the source settings and prepares local HTTPS when a surface uses a
+separate host. A downstream PR that changes a spec without an assigned
+executor receives a diagnostic with the path.
+See [Writing a browser test for the product settings](../frontend/testing.md#write-a-browser-test-for-the-product-settings).
+Selected browser cases must yield successful results from the same run
+and attempt. Skips use a named prerequisite that the planner verifies against the settings.
+An applicable case from the base stays mandatory. Review applicability declarations independently when updating the starter.
+Use settings where old and new tests agree, or apply the declaration first
+to a reviewed experimental base. Then test the settings change. A base
+that still collects a case as mandatory cannot authorize its omission.
+API E2E retention checks suite files. Review changes to assertions inside a
+suite file as ordinary test changes.
 
-`ci/product.json` declares version 1 and the saved mode. A missing policy file
-means `normal`; malformed policy fails admission. Pull requests use the base
-policy and validate the head policy. Set the saved mode to `full` in a reviewed
-change to retain broad execution. Editing `ci/product.json` itself selects broad
-checks. The saved mode takes effect on the post-merge push; the PR uses its base
-policy. Manual full-once and operational heavy-off are
-not wired into this workflow yet.
+### Review changes to CI itself
 
-All existing required check names remain. Conditional leaves use job-level
-conditions; the workflow itself still runs on PR and main. `CI required` remains
-mandatory and the Test/API aggregates always run. GitHub's acceptance of a skipped
-leaf does not replace the gate's admission. Companion workflows keep their own
-checks and configured executions. Do not remove requirements to enable selection.
-PR and post-merge runs remain separate. Browser work can still dominate elapsed
-time; fewer machine minutes do not guarantee a shorter wait.
+The PR workflow evaluates scripts from the PR merge checkout. Reading the
+saved mode from the base does not make the workflow or its scripts trusted.
+Changes to workflows, actions, path filters or selector and result scripts
+require independent review against the exact protected base and PR head.
+Confirm the required status and merge enforcement in the repository settings
+before enabling this workflow. A green status from the proposed workflow is
+evidence for its candidate behavior. Independent enforcement requires a
+required check or review rule controlled outside the proposed PR. Keep
+workflow changes together with their plan and result checker on rollback.
 
-Read-only local action replay proves local matching, not GitHub scheduling,
-mergeability or fork permissions. Confirm the final broad PR/push and independent
-web PR results before accepting the rollout. For recovery, restore broad job
-execution and its matching gate together in a reviewed change; keep required
-checks and protection enabled.
+### PR, post-merge and release evidence
+
+Keep the post-merge policy and separate security workflows until their live
+enforcement and output are verified. The PR result tests the event's merge
+checkout. The main push can have a different commit identity, even if its
+tree matches. A release still needs the published API, migrator and web
+image digests, their build provenance and staging evidence on those digests.
+A green PR is not evidence for an image built later or a deployment operation.
+
+To roll back exclusions, switch the saved mode to `full` in a reviewed
+change.
+Return to `normal` in a reviewed change. If the selector or required gate
+itself cannot run, revert the workflow and its matching gate together.
+Keep the required checks and branch protection in place.
 
 ### Add the requirement to an existing repository
 
@@ -326,13 +339,13 @@ against arbitrary future workload growth. Reassess capacity when the application
     cannot erase an earlier failure. The same job runs blocking Linux tests for
     Caddy test-entry removal without changing database data and private model-file
     ownership for a non-root operator.
-- **Test** is the aggregate for unit+real-Redis, capability extension,
+- **Test** is the aggregate for unit tests, real-Redis integration, capability extension,
   notification/AI extension and **API E2E**.
   Independent hosted jobs install frozen dependencies and own their preparation.
-  The aggregate runs after dependency failure or skipping and accepts only its
-  exact nonempty dependency set with every result `success`. Missing, skipped,
-  cancelled or unknown outcomes fail; cleanup cannot turn failure into success.
-  The aggregate itself needs no checkout, installation or API receipt.
+  The aggregate checks out the source and verifies the selection plan against
+  the same attempt. Each selected dependency must succeed. Each dependency
+  excluded by the plan must report skipped. Missing or cancelled results
+  fail. The API E2E aggregate verifies the API reports separately.
   Standard API suites run once through full API coverage. The former focused and
   background-work CI job repeated the same source and per-suite supervision without
   a distinct application scenario. Controlled readiness and shutdown defects remain

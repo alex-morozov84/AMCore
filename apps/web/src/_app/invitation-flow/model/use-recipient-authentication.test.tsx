@@ -4,6 +4,7 @@ import {
   DEFAULT_LOCALE,
   invitationFlowAuthResponseSchema,
   invitationFlowPendingResponseSchema,
+  PRODUCT_ADMIN_CONFIG,
   type UserResponse,
 } from '@amcore/shared'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -118,7 +119,11 @@ describe('recipient pending authentication recovery', () => {
         expect.stringContaining(`/mfa?flow=${flowBinding}`)
       )
       const destination = navigation.replace.mock.calls.at(-1)?.[0] as string
-      expect(destination.startsWith('/mfa?')).toBe(actionBase === '/auth')
+      const mfaPath =
+        actionBase === '/auth' || PRODUCT_ADMIN_CONFIG.mode === 'host'
+          ? '/mfa'
+          : `/${PRODUCT_ADMIN_CONFIG.alias}/mfa`
+      expect(destination).toBe(`${mfaPath}?flow=${flowBinding}`)
       expect(context).not.toHaveBeenCalled()
     }
   )

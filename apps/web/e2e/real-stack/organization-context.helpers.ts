@@ -10,6 +10,8 @@ import {
 
 import { activeTarget } from '../support/managed-target.mjs'
 
+import { productAdministrationOrigin } from './helpers'
+
 /** Use the admitted generated checkout's actual catalogues and route topology. */
 export function organizationUi(locale: CatalogueLocale = DEFAULT_LOCALE) {
   const target = activeTarget()
@@ -17,17 +19,17 @@ export function organizationUi(locale: CatalogueLocale = DEFAULT_LOCALE) {
     readFileSync(join(target.snapshot, `apps/web/messages/${locale}.json`), 'utf8')
   )
   const messages = catalogues.organizationAccess as Record<string, string>
+  const url = (suffix = '') =>
+    localizedFrontendUrl(
+      productAdministrationOrigin(),
+      locale,
+      productAdminPath(`/organizations${suffix}`)
+    )
   return {
     text: (key: string) => messages[key]!,
     adminText: (key: string) => catalogues.productAdmin[key] as string,
     open: (name: string) => messages.openNamed!.replace('{name}', name),
-    path: (suffix = '') =>
-      new URL(
-        localizedFrontendUrl(
-          target.origins.product,
-          locale,
-          productAdminPath(`/organizations${suffix}`)
-        )
-      ).pathname,
+    url,
+    path: (suffix = '') => new URL(url(suffix)).pathname,
   }
 }

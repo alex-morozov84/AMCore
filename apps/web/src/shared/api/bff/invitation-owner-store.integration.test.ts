@@ -28,6 +28,7 @@ import {
 import type { InvitationOwnerRecord } from './invitation-vault-record'
 import { resolveProductWebContext } from './product-web-context.server'
 import { getWebRedisClient } from './redis-client'
+import { redisFixtureStaff } from './redis-integration-origins.testkit'
 import type { VaultRecord } from './session-vault.types'
 import { redisVaultStore } from './session-vault-store'
 
@@ -46,15 +47,18 @@ afterAll(async () => {
 describe('ordinary auth after placement change', () => {
   function context() {
     vi.stubEnv('FRONTEND_URL', 'https://app.example.test')
-    vi.stubEnv('PRODUCT_ADMIN_ORIGIN', '')
+    vi.stubEnv('PRODUCT_ADMIN_ORIGIN', redisFixtureStaff)
     vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-frontend-context-key-at-least-32>')
-    return resolveProductWebContext(new Headers({ host: 'app.example.test' }), 'admin-invite')
+    return resolveProductWebContext(
+      new Headers({ host: new URL(redisFixtureStaff || 'https://app.example.test').host }),
+      'admin-invite'
+    )
   }
 
   it('retires stale credentials atomically without renewing their expiry or admitting an old flow', async () => {
     const selected = context()
     const old = { ...selected, placementFingerprint: 'a'.repeat(64) }
-    const { hash, initial } = await stagedPublication()
+    const { hash, initial } = await stagedPublication(selected.origin)
     await invitationOwnerStore.create(hash, initial, old)
     const key = invitationOwnerKey(hash, old)
     const redis = await getWebRedisClient()
@@ -101,7 +105,7 @@ describe('ordinary auth after placement change', () => {
     await expect(
       invitationOwnerStore.retireStaleForOrdinaryAuth(hash, selected.origin, {
         ...selected,
-        audience: 'staff',
+        audience: selected.audience === 'staff' ? 'product' : 'staff',
       })
     ).rejects.toThrow()
     await invitationOwnerStore.retireStaleForOrdinaryAuth(hash, selected.origin)
@@ -123,10 +127,10 @@ function owner(): InvitationOwnerRecord {
   }
 }
 
-async function stagedPublication() {
+async function stagedPublication(origin = 'https://app.example.test') {
   const now = Date.now()
   const admitted = admitInvitationFlow(
-    newInvitationOwner('https://app.example.test', null, now),
+    newInvitationOwner(origin, null, now),
     {
       credential: 'c'.repeat(43),
       expiresAt: new Date(now + 1800000).toISOString(),

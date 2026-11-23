@@ -30,13 +30,28 @@ test('event identities, retained merges and unavailable history remain distinct'
   git('merge', '--no-ff', '-qm', 'source update', 'source')
   const head = git('rev-parse', 'HEAD')
   assert.equal(readSelectionSource(root, 'push', { before: base }, head).integration, true)
+  const tree = git('rev-parse', 'HEAD^{tree}')
+  const merge = git('commit-tree', tree, '-p', base, '-p', head, '-m', 'PR checkout')
+  git('checkout', '--detach', merge)
   const pr = readSelectionSource(
     root,
     'pull_request',
     { pull_request: { base: { sha: base }, head: { sha: head } } },
-    base
+    merge
   )
-  assert.deepEqual(pr.source, { base, head })
+  assert.deepEqual(pr.source, { base, head, checkout: merge })
+  assert.equal(pr.integration, true)
+  assert.throws(
+    () =>
+      readSelectionSource(
+        root,
+        'pull_request',
+        { pull_request: { base: { sha: head }, head: { sha: base } } },
+        merge
+      ),
+    /does not match the event/
+  )
+  git('checkout', 'main')
   assert.equal(pr.diffComplete, true)
   for (const before of ['0'.repeat(40), 'f'.repeat(40)])
     assert.equal(readSelectionSource(root, 'push', { before }, head).diffComplete, false)

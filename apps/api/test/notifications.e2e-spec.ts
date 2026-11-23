@@ -1,6 +1,8 @@
 import type { INestApplication } from '@nestjs/common'
 import request from 'supertest'
 
+import { DEFAULT_LOCALE } from '@amcore/shared'
+
 import { TokenManagerService } from '../src/core/auth/token-manager.service'
 import {
   NotificationCategory,
@@ -121,7 +123,12 @@ describe('Notifications (e2e)', () => {
     })
 
     it('returns server-rendered items in DESC order, scoped to the caller', async () => {
-      const user = await registerUser(app, { locale: 'en' })
+      const user = await registerUser(app, { locale: DEFAULT_LOCALE })
+      const title = DEFAULT_LOCALE === 'en' ? 'Profile updated' : 'Профиль обновлён'
+      const body = (count: number) =>
+        DEFAULT_LOCALE === 'en'
+          ? `You updated ${count} profile field(s).`
+          : `Вы изменили полей профиля: ${count}.`
       const foreign = await registerUser(app)
       await seed(user.userId, { updatedFields: ['name'] })
       await settle()
@@ -136,18 +143,18 @@ describe('Notifications (e2e)', () => {
       expect(res.body.data).toHaveLength(2)
       expect(res.body.hasMore).toBe(false)
       expect(res.body.nextCursor).toBeNull()
-      // Most recent first; locale=en → English render.
+      // Most recent first, rendered in the account locale.
       expect(res.body.data[0]).toMatchObject({
         type: 'account.profile_updated',
         category: NotificationCategory.ACCOUNT,
-        title: 'Profile updated',
-        body: 'You updated 2 profile field(s).',
+        title,
+        body: body(2),
         readAt: null,
         archivedAt: null,
       })
       expect(res.body.data[1]).toMatchObject({
-        title: 'Profile updated',
-        body: 'You updated 1 profile field(s).',
+        title,
+        body: body(1),
       })
     })
 

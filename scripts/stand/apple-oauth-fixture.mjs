@@ -2,15 +2,28 @@ import { generateKeyPairSync } from 'node:crypto'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-const oauthProfiles = ['product-admin-oauth', 'product-admin-oauth-path']
+export const closedSignupOAuthProfile = 'console-closed-signup-oauth'
+const oauthProfiles = ['product-admin-oauth', 'product-admin-oauth-path', closedSignupOAuthProfile]
+export const usesOAuthFixture = (m) => oauthProfiles.includes(m.fixtureProfile)
 function assertOAuthPurpose(m) {
+  if (m.fixtureProfile === closedSignupOAuthProfile) {
+    if (
+      m.purpose !== 'e2e' ||
+      m.mocked ||
+      m.topology !== 'host' ||
+      !m.consoleEnabled ||
+      m.consoleTopology !== 'host'
+    )
+      throw new Error('Closed signup OAuth fixture requires an owned host Console E2E stand')
+    return
+  }
   const expectedHost = m.fixtureProfile === 'product-admin-oauth'
   if (m.purpose !== 'e2e' || Boolean(m.productAdminHost) !== expectedHost)
     throw new Error('OAuth fixture requires its selected owned E2E topology')
 }
 
 export async function prepareAppleOAuthFixture(m) {
-  if (!oauthProfiles.includes(m.fixtureProfile)) return
+  if (!usesOAuthFixture(m)) return
   assertOAuthPurpose(m)
   const key = generateKeyPairSync('ec', { namedCurve: 'P-256' }).privateKey.export({
     type: 'pkcs8',
@@ -20,7 +33,7 @@ export async function prepareAppleOAuthFixture(m) {
 }
 
 export async function appleOAuthEnvironment(m) {
-  if (!oauthProfiles.includes(m.fixtureProfile)) return {}
+  if (!usesOAuthFixture(m)) return {}
   assertOAuthPurpose(m)
   return {
     GOOGLE_CLIENT_ID: 'fixture-google-client',
@@ -42,7 +55,7 @@ export async function appleOAuthEnvironment(m) {
 }
 
 export function assertAppleOAuthFixture(m) {
-  const enabled = oauthProfiles.includes(m.fixtureProfile)
+  const enabled = usesOAuthFixture(m)
   if (enabled) assertOAuthPurpose(m)
   for (const [name, service] of Object.entries(m.model.services)) {
     const mount = (service.volumes ?? []).filter(

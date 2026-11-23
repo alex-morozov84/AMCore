@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { localizedFrontendUrl, SERVED_LOCALES } from '@amcore/shared'
+import { SERVED_LOCALES } from '@amcore/shared'
 import { expect, type Page, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
@@ -9,7 +9,13 @@ import { activeTarget } from '../support/managed-target.mjs'
 import { resetBrowserProbeDomainBudget } from '../support/mfa-domain-fixture.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
+import {
+  browserCredentialRequest,
+  ensureAdministrationSession,
+  TEST_PASSWORD,
+  uniqueEmail,
+} from './helpers'
+import { organizationUi } from './organization-context.helpers'
 
 async function expectSettledAccessibility(page: Page) {
   // A disabled→enabled opacity transition must finish before measuring contrast.
@@ -52,14 +58,13 @@ test('invitations manager: complete roles,202, reissue,204, search and mobile EN
       contentType: 'application/json',
     })
   })
+  await ensureAdministrationSession(context, ownerEmail)
   for (const locale of SERVED_LOCALES) {
     resetBrowserProbeDomainBudget()
     const t = JSON.parse(
       readFileSync(join(target.snapshot, `apps/web/messages/${locale}.json`), 'utf8')
     ).organizationInvitations
-    await page.goto(
-      localizedFrontendUrl(target.origins.product, locale, `organizations/${org.id}/invites`)
-    )
+    await page.goto(organizationUi(locale).url(`/${org.id}/invites`))
     await expect(page.getByRole('heading', { name: org.name, exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: t.invite, exact: true })).toBeEnabled()
     await expect(page.getByText(t.empty, { exact: true })).toBeVisible()

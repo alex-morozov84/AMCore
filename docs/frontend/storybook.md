@@ -50,6 +50,10 @@ repo's Vitest builder and only the Vite framework gets first-class
   addon version. Re-check the addon's own README (`node_modules/msw-storybook-addon/README.md`)
   before assuming this is still current on a future upgrade.
 
+  For Console requests, prepend `/api` to `getConsolePublicApiPath()` in MSW
+  handlers. The helper uses the product settings to match the public path for
+  either Console placement.
+
 - A fresh `QueryClient` **per story render** (not the app's shared
   `getQueryClient()` singleton) so one story's cache never bleeds into the
   next in the same browser session; a manual `NextIntlClientProvider`

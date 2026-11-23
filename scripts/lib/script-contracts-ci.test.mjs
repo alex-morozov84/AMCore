@@ -13,7 +13,7 @@ const required = ruleset.rules
 test('the script contracts job runs the root test:scripts command', () => {
   const job = ci.jobs['script-contracts']
   assert.equal(job.name, 'Script contracts')
-  assert.deepEqual(job.needs, ['lint', 'typecheck'])
+  assert.deepEqual(job.needs, ['ci-selection', 'lint', 'typecheck'])
   const step = job.steps.find((item) => item.name === 'Run script contract tests')
   assert.equal(step.run, 'pnpm test:scripts')
   assert.equal(
@@ -57,23 +57,10 @@ test('selection preflight dominates preparation and exclusions have direct selec
   for (const [id, job] of Object.entries(jobs)) {
     if (id === 'ci-selection') continue
     assert.ok(reaches(id), `${id} must depend on preflight`)
-    const conditional = [
-      'test-capability',
-      'test-notification-ai',
-      'api-e2e-plan',
-      'api-e2e-shards',
-      'docker-image-smoke',
-      'observability-contract-live',
-    ].includes(id)
-    assert.equal(
-      job.if,
-      conditional
-        ? "${{ needs.ci-selection.outputs.server == 'true' }}"
-        : ['test', 'api-e2e', 'web-e2e', 'ci-required'].includes(id)
-          ? '${{ always() }}'
-          : undefined
-    )
-    if (conditional) assert.ok(job.needs.includes('ci-selection'))
+    if (!['ci-required', 'lint', 'typecheck', 'promtool'].includes(id)) {
+      assert.ok(job.needs.includes('ci-selection'))
+      assert.ok(job.if?.includes(`.effective, '${id}'`), id)
+    }
   }
   assert.equal(
     jobs['ci-required'].steps.find((step) => step.run).env.CI_PLAN,
@@ -84,7 +71,7 @@ test('selection preflight dominates preparation and exclusions have direct selec
 test('API aggregate admits applicability before evidence and keeps selected coverage validation', () => {
   const api = ci.jobs['api-e2e']
   assert.deepEqual(api.needs, ['ci-selection', 'api-e2e-plan', 'api-e2e-shards'])
-  assert.equal(api.if, '${{ always() }}')
+  assert.match(api.if, /always\(\).*'api-e2e'/)
   const admission = api.steps.findIndex((step) => step.id === 'admission')
   assert.equal(api.steps[admission].run, 'node scripts/ci-required.mjs api')
   assert.equal(api.steps[admission].env.CI_PLAN, '${{ needs.ci-selection.outputs.plan }}')
@@ -97,10 +84,21 @@ test('API aggregate admits applicability before evidence and keeps selected cove
     assert.equal(api.steps[index].if, "steps.admission.outputs.selected == 'true'")
   }
   assert.equal(api.steps.at(-1).run, 'node scripts/api-e2e/aggregate.mjs api-e2e-evidence')
-  assert.equal(ci.jobs['ci-selection'].outputs.server, '${{ steps.plan.outputs.server }}')
-  assert.equal(ci.jobs['api-e2e-shards'].if, "${{ needs.ci-selection.outputs.server == 'true' }}")
   assert.equal(
     ci.jobs['api-e2e-shards'].strategy.matrix,
     '${{ fromJSON(needs.api-e2e-plan.outputs.matrix) }}'
   )
+})
+
+test('heavy-off reaches Node observability checks without Docker preparation', () => {
+  const staticJob = ci.jobs.promtool
+  assert.ok(staticJob.needs.includes('ci-selection'))
+  assert.equal(
+    staticJob.steps.find((step) => step.run === 'pnpm test:observability-contract').if,
+    undefined
+  )
+  for (const step of staticJob.steps.filter((step) =>
+    /docker|fake scrape-token/i.test((step.run ?? '') + step.name)
+  ))
+    assert.match(step.if, /inputs.mode != 'heavy-off'/)
 })

@@ -303,15 +303,17 @@ describe('Platform organization administration (e2e)', () => {
       reason,
     }
     const original = context.prisma.$transaction.bind(context.prisma)
-    const fault = import.meta.jest
-      .spyOn(context.prisma, '$transaction')
-      .mockImplementationOnce((async (
-        work: (tx: Prisma.TransactionClient) => Promise<unknown>,
-        options?: object
-      ) => {
-        await original(work, options)
+    const fault = import.meta.jest.spyOn(context.prisma, '$transaction').mockImplementation((async (
+      work: (tx: Prisma.TransactionClient) => Promise<unknown>,
+      options?: object
+    ) => {
+      const result = await original(work, options)
+      // Other transactions may commit while this HTTP request is in flight.
+      const receipt = (result as { receipt?: { operationId?: string } } | null)?.receipt
+      if (receipt?.operationId === input.operationId)
         throw new Error('Controlled acknowledgment loss after COMMIT')
-      }) as never)
+      return result
+    }) as never)
     fixture.mail.clear()
     try {
       await post(id, 'administrator-invitations', input).expect(503)

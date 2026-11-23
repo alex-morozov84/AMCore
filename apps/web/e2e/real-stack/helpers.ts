@@ -1,6 +1,8 @@
-import { type APIRequestContext, expect, type Page } from '@playwright/test'
+import { PRODUCT_ADMIN_CONFIG } from '@amcore/shared'
+import { type APIRequestContext, type BrowserContext, expect, type Page } from '@playwright/test'
 
 import { completeMfaSignIn } from '../shared/mfa-login'
+import { isProductHome, messages, productPath } from '../shared/product-settings'
 import { activeTarget } from '../support/managed-target.mjs'
 import {
   resetBrowserProbeDomainBudget,
@@ -38,16 +40,16 @@ export async function registerViaUi(
 ): Promise<void> {
   resetMfaDomainSourceBudgets()
   resetBrowserProbeDomainBudget()
-  await page.goto('/en/register')
+  await page.goto(productPath('/register'))
   if (options.name) {
-    await page.getByLabel(/name/i).fill(options.name)
+    await page.getByLabel(messages.auth.name, { exact: true }).fill(options.name)
   }
-  await page.getByRole('textbox', { name: /email/i }).fill(email)
-  await page.getByLabel(/^password$/i).fill(TEST_PASSWORD)
+  await page.getByRole('textbox', { name: messages.auth.email, exact: true }).fill(email)
+  await page.getByLabel(messages.auth.password, { exact: true }).fill(TEST_PASSWORD)
   const registration = page.waitForResponse(
     (r) => new URL(r.url()).pathname.endsWith('/auth/register') && r.request().method() === 'POST'
   )
-  await page.getByRole('button', { name: /sign up/i }).click()
+  await page.getByRole('button', { name: messages.auth.register, exact: true }).click()
   const response = await registration
   if (response.status() !== 201) {
     const body = await response.json().catch(() => ({}))
@@ -57,29 +59,79 @@ export async function registerViaUi(
   }
   expect(response.status()).toBe(201)
   // Callers may immediately close this context or assign a role to the new account.
-  await page.waitForURL(/\/en\/?$/)
+  await page.waitForURL(isProductHome)
 }
 
 export async function loginViaUi(
   page: Page,
   email: string,
-  options: { mfa?: 'complete' | 'manual' } = {}
+  options: {
+    mfa?: 'complete' | 'manual' | 'required'
+    origin?: string
+    surface?: 'console'
+  } = {}
 ): Promise<void> {
-  await page.goto('/en/login')
-  await page.getByRole('textbox', { name: /email/i }).fill(email)
-  await page.getByLabel(/^password$/i).fill(TEST_PASSWORD)
-  const response = page.waitForResponse(
-    (r) => new URL(r.url()).pathname.endsWith('/auth/login') && r.request().method() === 'POST'
+  await page.goto(
+    options.origin ? new URL(productPath('/login'), options.origin).href : productPath('/login')
   )
-  await page.getByRole('button', { name: /sign in/i }).click()
-  if ((await response).status() === 202 && options.mfa !== 'manual')
-    await completeMfaSignIn(page, email)
+  const fields =
+    options.surface === 'console'
+      ? {
+          email: messages.console.loginEmail,
+          password: messages.console.loginPassword,
+          submit: messages.console.signIn,
+        }
+      : {
+          email: messages.auth.email,
+          password: messages.auth.password,
+          submit: messages.auth.login,
+        }
+  await page.getByRole('textbox', { name: fields.email, exact: true }).fill(email)
+  await page.getByLabel(fields.password, { exact: true }).fill(TEST_PASSWORD)
+  const response = page.waitForResponse(
+    (r) =>
+      (!options.origin || new URL(r.url()).origin === options.origin) &&
+      new URL(r.url()).pathname.endsWith('/auth/login') &&
+      r.request().method() === 'POST'
+  )
+  await page.getByRole('button', { name: fields.submit, exact: true }).click()
+  const status = (await response).status()
+  if (options.mfa === 'required') expect(status).toBe(202)
+  if (status === 202 && options.mfa !== 'manual') await completeMfaSignIn(page, email)
+}
+
+/** The source mode selects the admitted origin; missing staff transport is never a site fallback. */
+export function productAdministrationOrigin(): string {
+  const { product, staff } = activeTarget().origins
+  if (PRODUCT_ADMIN_CONFIG.mode === 'path') return product
+  if (!staff || staff === product)
+    throw new Error('Host administration requires its admitted origin')
+  return staff
+}
+
+/** Registration signs into the site; host administration must establish its own real session. */
+export async function ensureAdministrationSession(context: BrowserContext, email: string) {
+  if (PRODUCT_ADMIN_CONFIG.mode === 'path') return
+  const origin = productAdministrationOrigin()
+  const page = await context.newPage()
+  try {
+    await loginViaUi(page, email, { origin })
+    await page.waitForURL(
+      (url) =>
+        url.origin === origin && !url.pathname.endsWith('/login') && !url.pathname.endsWith('/mfa')
+    )
+  } catch (error) {
+    // Keep the admission failure primary; the owning context still has its teardown.
+    await page.close().catch(() => {})
+    throw error
+  }
+  await page.close()
 }
 
 /** Sign out through the product shell's account menu (header), the only logout control there. */
 export async function signOutViaUi(page: Page): Promise<void> {
-  await page.getByRole('button', { name: /account menu/i }).click()
-  await page.getByRole('menuitem', { name: /sign out/i }).click()
+  await page.getByRole('button', { name: new RegExp(messages.account.menuLabel) }).click()
+  await page.getByRole('menuitem', { name: messages.auth.logout, exact: true }).click()
 }
 
 /** Preserve the current-session fence when a fixture signs out without opening the menu. */
@@ -131,7 +183,11 @@ export async function browserCredentialRequest(
     resetMfaDomainSourceBudgets()
     resetBrowserProbeDomainBudget()
   }
-  const bootstrap = await request.post(new URL('/api/auth/browser-context', origin).href, {
+  const staffAuth = new URL(url, origin).pathname.startsWith('/api/product-admin/auth/')
+  const bootstrapPath = staffAuth
+    ? '/api/product-admin/auth/browser-context'
+    : '/api/auth/browser-context'
+  const bootstrap = await request.post(new URL(bootstrapPath, origin).href, {
     headers: { Origin: origin },
     data: {},
   })

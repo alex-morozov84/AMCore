@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test'
 
-import { registerViaUi, uniqueEmail } from '../real-stack/helpers'
+import { loginViaUi, registerViaUi, uniqueEmail } from '../real-stack/helpers'
 import { backgroundWorkBoardStatesJourney } from '../shared/background-work-intercepted-journeys'
 import { backgroundWorkJourney, queueBoardJourney } from '../shared/background-work-journey'
-import { completeMfaSignIn } from '../shared/mfa-login'
+import { isProductHome, messages, productPath } from '../shared/product-settings'
 import { activeTarget } from '../support/managed-target.mjs'
 
 import { setSystemRole } from './helpers'
@@ -25,15 +25,11 @@ async function operator(
   })
   const productPage = await product.newPage()
   await registerViaUi(productPage, email)
-  await expect(productPage).toHaveURL(/\/en\/?$/)
+  await expect(productPage).toHaveURL(isProductHome)
   setSystemRole(email, 'SUPER_ADMIN')
   const page = await consoleContext.newPage()
-  await page.goto('/en/login')
-  await page.getByLabel(/email/i).fill(email)
-  await page.getByLabel(/^password$/i).fill('Test1234Secure')
-  await page.getByRole('button', { name: /sign in/i }).click()
-  await completeMfaSignIn(page, email)
-  await expect(page).toHaveURL(/\/en\/?$/)
+  await loginViaUi(page, email, { mfa: 'required', surface: 'console' })
+  await expect(page).toHaveURL(isProductHome)
   return { page, close: () => Promise.all([product.close(), consoleContext.close()]) }
 }
 
@@ -43,7 +39,7 @@ test('host-mode Background work: snapshot, live refresh, containment, responsive
   test.setTimeout(180_000)
   const { page, close } = await operator(browser, 'console-background-work')
   try {
-    await backgroundWorkJourney(page, '/en/background-work')
+    await backgroundWorkJourney(page, productPath('/background-work'))
   } finally {
     await close()
   }
@@ -55,7 +51,10 @@ test('host-mode queue board: opens from the Console session, read-only, nothing 
   test.setTimeout(240_000)
   const { page, close } = await operator(browser, 'console-queue-board')
   try {
-    await queueBoardJourney(page, { pageUrl: '/en/background-work', boardPath: '/api/bull-board' })
+    await queueBoardJourney(page, {
+      pageUrl: productPath('/background-work'),
+      boardPath: '/api/bull-board',
+    })
   } finally {
     await close()
   }
@@ -67,7 +66,7 @@ test('host-mode queue board entry follows the live summary: failed open, disable
   test.setTimeout(180_000)
   const { page, close } = await operator(browser, 'console-queue-board-states')
   try {
-    await backgroundWorkBoardStatesJourney(page, '/en/background-work')
+    await backgroundWorkBoardStatesJourney(page, productPath('/background-work'))
   } finally {
     await close()
   }
@@ -83,8 +82,10 @@ test('host-mode Background work: protected pages fail closed before the Console 
   })
   try {
     const page = await context.newPage()
-    expect((await page.goto('/en/background-work'))?.status()).toBe(404)
-    await expect(page.getByRole('table', { name: 'Background queues' })).toHaveCount(0)
+    expect((await page.goto(productPath('/background-work')))?.status()).toBe(404)
+    await expect(
+      page.getByRole('table', { name: messages.console.backgroundWork.tableLabel })
+    ).toHaveCount(0)
   } finally {
     await context.close()
   }

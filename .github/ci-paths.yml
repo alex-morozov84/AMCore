@@ -14,6 +14,8 @@ ui:
   - '!apps/web/src/app/**'
 web:
   - 'apps/web/**'
+apiE2e:
+  - 'apps/api/test/**/*.e2e-spec.ts'
 api:
   - '{apps/api/**,docs/backend/recipes/**}'
 common:

@@ -14,7 +14,12 @@ import {
   usesResendMailFixture,
 } from './organization-setup-fixture.mjs'
 import { directory } from './state.mjs'
-import { appleOAuthEnvironment, assertAppleOAuthFixture } from './apple-oauth-fixture.mjs'
+import {
+  appleOAuthEnvironment,
+  assertAppleOAuthFixture,
+  closedSignupOAuthProfile,
+  usesOAuthFixture,
+} from './apple-oauth-fixture.mjs'
 
 export const label = 'org.amcore.stand'
 // Services whose images the stand builds itself. Only these carry ownership labels on
@@ -56,7 +61,10 @@ export async function configuration(m) {
     // The browser-facing API origin of this stand, so a public avatar URL resolves.
     ...(m.origins.api && { STORAGE_PUBLIC_BASE_URL: `${m.origins.api}/api/v1/storage/public` }),
     EMAIL_PROVIDER: 'mock',
-    AUTH_PUBLIC_SIGNUP_ENABLED: isOrganizationMailFixture(m) ? 'false' : 'true',
+    AUTH_PUBLIC_SIGNUP_ENABLED:
+      isOrganizationMailFixture(m) || m.fixtureProfile === closedSignupOAuthProfile
+        ? 'false'
+        : 'true',
     ORG_SELF_SERVICE_CREATION_ENABLED:
       isOrganizationMailFixture(m) || closedCreationProfiles.includes(m.fixtureProfile)
         ? 'false'
@@ -192,10 +200,7 @@ export async function configuration(m) {
     if (service === 'web' && m.fixtureProfile === 'client-ip' && m.clientIpPeer)
       yaml += `    networks:\n      default:\n        ipv4_address: ${m.clientIpPeer}\n`
     if (ports[service]) yaml += `    ports: ${overridden(ports[service])}\n`
-    if (
-      service === 'api' &&
-      ['product-admin-oauth', 'product-admin-oauth-path'].includes(m.fixtureProfile)
-    )
+    if (service === 'api' && usesOAuthFixture(m))
       yaml += `    volumes:\n      - ${JSON.stringify(`${m.snapshot}/docker/testing/apple-oidc.mjs:/app/fixtures/apple-oidc.mjs:ro`)}\n`
   }
   const base = parse(await readFile(join(m.snapshot, 'docker-compose.yml'), 'utf8'))
@@ -229,6 +234,12 @@ export async function configuration(m) {
 export function validateModel(m) {
   assertOrganizationSetupFixture(m)
   assertAppleOAuthFixture(m)
+  if (m.fixtureProfile === closedSignupOAuthProfile) {
+    for (const name of ['api', 'worker']) {
+      if (m.model.services[name].environment.AUTH_PUBLIC_SIGNUP_ENABLED !== 'false')
+        throw new Error('Closed signup OAuth fixture policy changed')
+    }
+  }
   for (const name of ['api', 'worker'])
     if (
       m.model.services[name]?.environment?.HEALTH_DISK_THRESHOLD_PERCENT !==

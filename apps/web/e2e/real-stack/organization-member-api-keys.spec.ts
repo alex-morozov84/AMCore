@@ -1,14 +1,20 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { DEFAULT_LOCALE, localizedFrontendUrl } from '@amcore/shared'
+import { DEFAULT_LOCALE } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
 import { activeTarget } from '../support/managed-target.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
+import {
+  browserCredentialRequest,
+  ensureAdministrationSession,
+  TEST_PASSWORD,
+  uniqueEmail,
+} from './helpers'
+import { organizationUi } from './organization-context.helpers'
 
 test('member keys: scoped list, confirmation, permanent revoke and unknown-result recovery', async ({
   page,
@@ -49,15 +55,8 @@ test('member keys: scoped list, confirmation, permanent revoke and unknown-resul
   )
   const failures: string[] = []
   page.on('pageerror', (error) => failures.push(error.message))
-  await page.goto(
-    new URL(
-      localizedFrontendUrl(
-        target.origins.product,
-        DEFAULT_LOCALE,
-        `organizations/${org.id}/members`
-      )
-    ).pathname
-  )
+  await ensureAdministrationSession(context, email)
+  await page.goto(organizationUi().url(`/${org.id}/members`))
   const open = async () => {
     await page
       .getByRole('button', {

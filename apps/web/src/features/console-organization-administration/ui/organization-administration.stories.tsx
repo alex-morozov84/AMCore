@@ -4,6 +4,8 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { http, HttpResponse, type HttpResponseResolver } from 'msw'
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
+import { getConsolePublicApiPath } from '@/shared/lib/console-public-api-path'
+
 import messages from '../../../../messages/en.json'
 import russianMessages from '../../../../messages/ru.json'
 
@@ -16,9 +18,10 @@ const invitationLanguage =
 const t = messages.console.organizationAdministration
 const binding = 'a'.repeat(64)
 const orgId = '11111111-1111-4111-8111-111111111111'
-const root = `/api/console/organizations/${orgId}/administration`
-const session = http.get('/api/console/organization-provisionings/session', () =>
-  HttpResponse.json({ binding, actor: { id: 'operator', email: 'operator@example.test' } })
+const root = `/api${getConsolePublicApiPath(`/organizations/${orgId}/administration`)}`
+const session = http.get(
+  `/api${getConsolePublicApiPath('/organization-provisionings/session')}`,
+  () => HttpResponse.json({ binding, actor: { id: 'operator', email: 'operator@example.test' } })
 )
 const summary: AdministratorSummary = {
   organizationId: orgId,
@@ -143,7 +146,7 @@ export const AllUnfinishedOrganizations: Story = {
     msw: {
       handlers: [
         session,
-        http.get('/api/console/organizations/attention', () =>
+        http.get(`/api${getConsolePublicApiPath('/organizations/attention')}`, () =>
           HttpResponse.json({
             binding,
             data: {

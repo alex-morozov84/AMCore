@@ -1,9 +1,13 @@
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations, scanAccessibility } from '../../shared/axe'
+import { requirePathConsole } from '../../shared/console-applicability'
+import { consolePath, isProductHome, messages, translate } from '../../shared/product-settings'
 import { setSystemRole } from '../admin-helpers'
 import { loginViaUi, registerViaUi, uniqueEmail } from '../helpers'
 import { holdSessionRefetch, waitForSessionTransitions } from '../sessions-readability'
+
+requirePathConsole()
 
 for (const theme of ['light', 'dark']) {
   for (const mobile of [false, true]) {
@@ -14,19 +18,27 @@ for (const theme of ['light', 'dark']) {
       await page.addInitScript((value) => localStorage.setItem('amcore-theme', value), theme)
       const email = uniqueEmail('contrast-admin')
       await registerViaUi(page, email, { name: email })
-      await expect(page).toHaveURL(/\/en\/?$/)
+      await expect(page).toHaveURL(isProductHome)
       setSystemRole(email, 'SUPER_ADMIN')
       await page.context().clearCookies()
       await loginViaUi(page, email)
-      await expect(page).toHaveURL(/\/en\/?$/)
-      await page.goto('/en/admin/users')
+      await expect(page).toHaveURL(isProductHome)
+      await page.goto(consolePath('/users'))
       await page.getByRole('link', { name: email }).click()
-      const card = page
-        .locator('[data-slot="card"]')
-        .filter({ has: page.getByRole('heading', { name: /sessions \(/i }) })
+      const card = page.locator('[data-slot="card"]').filter({
+        has: page.getByRole('heading', {
+          name: translate('console.userSessionsHeading', { count: 1 }),
+          exact: true,
+        }),
+      })
       const rows = card.locator('[aria-busy]:visible')
-      const refresh = card.getByRole('button', { name: 'Refresh', exact: true })
-      await expect(card.getByRole('heading', { name: 'Sessions (1 total)' })).toBeVisible()
+      const refresh = card.getByRole('button', {
+        name: messages.console.overviewRefresh,
+        exact: true,
+      })
+      await expect(
+        card.getByRole('heading', { name: translate('console.userSessionsHeading', { count: 1 }) })
+      ).toBeVisible()
       await expect(rows).toHaveAttribute('aria-busy', 'false')
       await expect(refresh).toBeEnabled()
       await waitForSessionTransitions(card)
@@ -47,7 +59,11 @@ for (const theme of ['light', 'dark']) {
         await expect(refresh).toBeDisabled()
         await expect(refresh.locator('.animate-spin')).toBeVisible()
         await expect(rows).toHaveText(retained, { useInnerText: true })
-        await expect(card.getByRole('heading', { name: 'Sessions (1 total)' })).toBeVisible()
+        await expect(
+          card.getByRole('heading', {
+            name: translate('console.userSessionsHeading', { count: 1 }),
+          })
+        ).toBeVisible()
         expect(held.released).toBe(false)
         await expectNoAxeViolations(page, { allowBusy: true })
         expect(held.released).toBe(false)

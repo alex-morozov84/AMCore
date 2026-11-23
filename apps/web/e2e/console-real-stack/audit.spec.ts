@@ -1,4 +1,5 @@
 import { completeMfaSignIn } from '../shared/mfa-login'
+import { consolePath, isProductHome, messages, productPath } from '../shared/product-settings'
 import { activeTarget } from '../support/managed-target.mjs'
 
 const standTarget = activeTarget()
@@ -19,7 +20,7 @@ test('host Audit uses the isolated console session and closes after demotion', a
   const productPage = await product.newPage()
   await registerViaUi(productPage, email)
   await expect(productPage).toHaveURL(
-    new RegExp('^' + escapeOrigin(standTarget.origins.product) + '/en/?$')
+    (url) => url.origin === standTarget.origins.product && isProductHome(url)
   )
   setSystemRole(email, 'SUPER_ADMIN')
 
@@ -28,40 +29,36 @@ test('host Audit uses the isolated console session and closes after demotion', a
     ignoreHTTPSErrors: true,
   })
   const page = await consoleContext.newPage()
-  await page.goto('/en/login')
-  await page.getByLabel(/email/i).fill(email)
-  await page.getByLabel(/^password$/i).fill('Test1234Secure')
+  await page.goto(productPath('/login'))
+  await page.getByLabel(messages.console.loginEmail, { exact: true }).fill(email)
+  await page.getByLabel(messages.console.loginPassword, { exact: true }).fill('Test1234Secure')
   const loginResponse = page.waitForResponse(
     (response) =>
       response.url().endsWith('/api/auth/login') && response.request().method() === 'POST'
   )
-  await page.getByRole('button', { name: /sign in/i }).click()
+  await page.getByRole('button', { name: messages.console.signIn, exact: true }).click()
   await completeMfaSignIn(page, email)
   expect((await loginResponse).status()).toBe(202)
   await expect(page).toHaveURL(
-    new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
+    (url) => url.origin === standTarget.origins.console && isProductHome(url)
   )
 
   const browserTokens: string[] = []
   page.on('request', (request) => {
     if (request.headers().authorization) browserTokens.push(request.url())
   })
-  await page.getByRole('link', { name: 'Audit', exact: true }).click()
-  await expect(page).toHaveURL(/\/en\/audit$/)
-  await expect(page.getByRole('heading', { name: 'Audit' })).toBeVisible()
+  await page.getByRole('link', { name: messages.console.auditTitle, exact: true }).click()
+  await expect(page).toHaveURL((url) => url.pathname === productPath('/audit'))
+  await expect(page.getByRole('heading', { name: messages.console.auditTitle })).toBeVisible()
   expect(browserTokens).toEqual([])
   expect(await page.content()).not.toContain('Bearer ')
 
   setSystemRole(email, 'USER')
-  const response = await page.goto('/en/audit')
+  const response = await page.goto(productPath('/audit'))
   expect(response?.status()).toBe(404)
-  const productResponse = await productPage.goto('/en/admin/audit')
+  const productResponse = await productPage.goto(consolePath('/audit'))
   expect(productResponse?.status()).toBe(404)
 
   await product.close()
   await consoleContext.close()
 })
-
-function escapeOrigin(origin: string): string {
-  return origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}

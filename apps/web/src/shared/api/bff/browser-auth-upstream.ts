@@ -82,6 +82,10 @@ export async function postBrowserAuth(
       headers: {
         ...context.apiHeaders,
         ...sessionMetadataHeaders(request.headers),
+        // Preserve registration negotiation, including the absence of a browser hint.
+        ...(path === '/auth/register'
+          ? { 'accept-language': request.headers.get('accept-language') ?? '' }
+          : {}),
         ...privateBrowserHeaders(context.audience),
         [BROWSER_AUTH_HEADERS.binding]: anchor,
         [BROWSER_AUTH_HEADERS.contextId]: record.browser.contextId,

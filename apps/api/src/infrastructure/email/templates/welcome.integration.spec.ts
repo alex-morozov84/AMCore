@@ -16,11 +16,12 @@ import WelcomeEmail from './welcome'
 declare const DOMParser: typeof import('happy-dom').DOMParser
 
 describe('WelcomeEmail Template (Integration)', () => {
-  it('should render in the base locale (English) by default', async () => {
+  it('should render in English when requested', async () => {
     const html = await render(
       WelcomeEmail({
         name: 'Alexander Morozov',
         email: 'alex@example.com',
+        locale: 'en',
       })
     )
 

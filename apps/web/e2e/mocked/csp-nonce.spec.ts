@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+import { productPath } from '../shared/product-settings'
+
 /**
  * Track 3 PR2 (`ai/models-talk.md` FINAL PLAN §3) — nonce-based CSP,
  * shipped `Report-Only`. Deliberately does NOT assert "zero CSP violations
@@ -22,7 +24,7 @@ import { expect, test } from '@playwright/test'
  */
 
 test('the CSP header is Report-Only by default and carries a fresh nonce', async ({ page }) => {
-  const response = await page.goto('/en/login')
+  const response = await page.goto(productPath('/login'))
   expect(response).not.toBeNull()
 
   const csp = response!.headers()['content-security-policy-report-only']
@@ -42,7 +44,7 @@ test('the CSP header is Report-Only by default and carries a fresh nonce', async
 test('every inline <script> the server returns carries the CSP nonce, none are bare', async ({
   request,
 }) => {
-  const response = await request.get('/en/login')
+  const response = await request.get(productPath('/login'))
   const csp = response.headers()['content-security-policy-report-only']
   const nonce = csp!.match(/'nonce-([^']+)'/)?.[1]
   expect(nonce).toBeTruthy()
@@ -62,14 +64,14 @@ test('the theme-init script carries the CSP nonce and still applies the theme be
   page,
   request,
 }) => {
-  const raw = await request.get('/en/login')
+  const raw = await request.get(productPath('/login'))
   const csp = raw.headers()['content-security-policy-report-only']
   const nonce = csp!.match(/'nonce-([^']+)'/)?.[1]
   const html = await raw.text()
   expect(html).toContain(`<script nonce="${nonce}">(function(){try{var k=`)
 
   await page.addInitScript(() => window.localStorage.setItem('amcore-theme', 'dark'))
-  await page.goto('/en/login')
+  await page.goto(productPath('/login'))
 
   const isDark = await page.evaluate(() => document.documentElement.classList.contains('dark'))
   expect(isDark).toBe(true)
@@ -90,7 +92,7 @@ test('a hostile inbound Content-Security-Policy request header cannot override t
   // `curl -H "Content-Security-Policy: script-src 'nonce-attacker'"` before
   // the fix (proxy.ts now deletes both header names before setting the
   // active one); this test pins that fix as a permanent regression guard.
-  const response = await request.get('/en/login', {
+  const response = await request.get(productPath('/login'), {
     headers: { 'Content-Security-Policy': "script-src 'nonce-attacker'" },
   })
 
@@ -111,7 +113,7 @@ test('a hostile inbound Content-Security-Policy-Report-Only request header canno
 }) => {
   // Same class of gap, the other header name — proves the fix clears both,
   // not just whichever one an earlier draft happened to test.
-  const response = await request.get('/en/login', {
+  const response = await request.get(productPath('/login'), {
     headers: { 'Content-Security-Policy-Report-Only': "script-src 'nonce-attacker2'" },
   })
 
@@ -145,7 +147,7 @@ test('a bare, unnoned inline script IS reported as a CSP violation — proves th
   // spec: an earlier version of this test used page.evaluate() +
   // appendChild and never triggered a violation, which proved the
   // injection method wrong, not the policy).
-  await page.route('**/en/login', async (route) => {
+  await page.route(`**${productPath('/login')}`, async (route) => {
     const response = await route.fetch()
     const body = await response.text()
     const injected = body.replace(
@@ -155,7 +157,7 @@ test('a bare, unnoned inline script IS reported as a CSP violation — proves th
     await route.fulfill({ response, body: injected })
   })
 
-  await page.goto('/en/login')
+  await page.goto(productPath('/login'))
   await page.waitForTimeout(300)
 
   expect(violations.some((v) => v.startsWith('script-src'))).toBe(true)

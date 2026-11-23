@@ -1,3 +1,4 @@
+import { caseDigest } from './browser-case-evidence.mjs'
 import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import { selectedFiles, specFiles } from '../e2e-ci-plan.mjs'
@@ -7,16 +8,25 @@ import { run } from './process.mjs'
 const flatten = (suites, directory = 'real-stack') =>
   suites.flatMap((suite) => [
     ...(suite.specs ?? []).flatMap((spec) =>
-      spec.tests.map((test) => ({
-        id: `${spec.id}:${test.projectName}`,
-        file: `e2e/${directory}/${spec.file}`,
-        title: spec.title,
-      }))
+      spec.tests.map((test) => {
+        const skip = test.annotations?.find(
+          ({ type, description }) => type === 'skip' && description?.trim()
+        )
+        return {
+          id: `${spec.id}:${test.projectName}`,
+          file: directory === 'mocked' ? `e2e/${spec.file}` : `e2e/${directory}/${spec.file}`,
+          title: spec.title,
+          caseId: spec.id,
+          ...(test.expectedStatus === 'skipped' && skip ? { skipReason: skip.description } : {}),
+          expectedStatus: test.expectedStatus,
+        }
+      })
     ),
     ...flatten(suite.suites ?? [], directory),
   ])
 
-async function collect(options, args = [], lane = 'real-stack') {
+export async function collect(options, args = [], lane = 'real-stack') {
+  const config = lane === 'mocked' ? 'playwright.config.ts' : `playwright.${lane}.config.ts`
   const report = JSON.parse(
     await run(
       'pnpm',
@@ -26,7 +36,7 @@ async function collect(options, args = [], lane = 'real-stack') {
         'exec',
         'playwright',
         'test',
-        `--config=playwright.${lane}.config.ts`,
+        `--config=${config}`,
         ...args,
         '--list',
         '--reporter=json',
@@ -35,10 +45,36 @@ async function collect(options, args = [], lane = 'real-stack') {
     )
   )
   assert.equal(report.errors?.length ?? 0, 0, 'Playwright inventory collection failed')
-  return flatten(report.suites, lane)
+  const tests = flatten(report.suites, lane)
+  if (
+    lane === 'mocked' ||
+    (lane === 'console-real-stack' && options.env.AMCORE_CONFIGURED_CASES && !args.length)
+  ) {
+    const folders = lane === 'mocked' ? ['mocked', 'server-mocked'] : [lane]
+    const files = folders.flatMap((folder) => specFiles(options.cwd, `apps/web/e2e/${folder}`))
+    assert.deepEqual([...new Set(tests.map(({ file }) => file))].sort(), files.sort())
+  }
+  return tests
 }
 
-export async function groupArguments(m, group, options) {
+function assertCollectedCases(tests, expected, configured) {
+  if (configured) tests = tests.filter((test) => test.expectedStatus !== 'skipped')
+  assert.ok(
+    tests.every((test) => test.expectedStatus === 'passed'),
+    'Unexpected S0 collection skip'
+  )
+  assert.equal(
+    caseDigest(tests.map((test) => test.caseId)),
+    expected,
+    'S0 collection differs from plan'
+  )
+}
+
+export async function configuredInventory(options, lane, expected, configured, args = []) {
+  assertCollectedCases(await collect(options, args, lane), expected, configured)
+}
+
+export async function groupArguments(m, group, options, caseSet, configured = false) {
   const tests = await collect(options)
   assert.equal(new Set(tests.map((test) => test.id)).size, tests.length, 'Duplicate test IDs')
   assert.deepEqual([...new Set(tests.map((test) => test.file))].sort(), specFiles(m.snapshot))
@@ -48,6 +84,7 @@ export async function groupArguments(m, group, options) {
   const expected = tests.filter((test) => files.includes(test.file))
   assert.ok(expected.length, 'No tests selected')
   assert.deepEqual(await collect(options, args), expected, 'E2E selection lost or duplicated tests')
+  if (caseSet) assertCollectedCases(expected, caseSet, configured)
   await writeFile(
     `${m.worktree}/.amcore/stands/${m.id}/inventory.json`,
     JSON.stringify(

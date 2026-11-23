@@ -47,7 +47,11 @@ export function createFixture() {
     path.join(root, 'packages/shared/src/constants/locales.ts')
   )
   write('apps/web/node_modules/next/package.json', { version: '16.4.2' })
-  write('packages/shared/src/config/product-admin.json', { alias: 'manage' })
+  write('packages/shared/src/config/product-admin.json', {
+    version: 1,
+    mode: 'path',
+    alias: 'manage',
+  })
   write('packages/shared/src/config/admin-console.json', {
     version: 1,
     mode: 'path',

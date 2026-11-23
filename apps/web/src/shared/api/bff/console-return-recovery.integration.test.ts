@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
+import { DEFAULT_LOCALE } from '@amcore/shared'
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 
@@ -10,13 +11,14 @@ import { handleBrowserBootstrap } from './browser-bootstrap-handler'
 import { anchorDigest, returnEntrySchema } from './console-return-entry'
 import { resolveProductWebContext } from './product-web-context.server'
 import { getWebRedisClient } from './redis-client'
+import { redisFixtureSite, redisFixtureStaff } from './redis-integration-origins.testkit'
 
 let container: StartedRedisContainer
 beforeAll(async () => {
   container = await new RedisContainer('redis:7-alpine').start()
   vi.stubEnv('REDIS_URL', container.getConnectionUrl())
-  vi.stubEnv('FRONTEND_URL', 'http://localhost:3002')
-  vi.stubEnv('PRODUCT_ADMIN_ORIGIN', '')
+  vi.stubEnv('FRONTEND_URL', redisFixtureSite)
+  vi.stubEnv('PRODUCT_ADMIN_ORIGIN', redisFixtureStaff)
   vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-console-return-context-key-at-least-32>')
 })
 beforeEach(async () => (await getWebRedisClient()).flushDb())
@@ -40,18 +42,18 @@ it.each([false, true])(
       expiresAt: new Date(Date.now() + 600000).toISOString(),
     }
     function request(returnEntryId?: string) {
-      return new Request('http://localhost:3002/api/auth/browser-context', {
+      return new Request(`${redisFixtureSite}/api/auth/browser-context`, {
         method: 'POST',
         headers: {
-          host: 'localhost:3002',
-          origin: 'http://localhost:3002',
+          host: new URL(redisFixtureSite).host,
+          origin: redisFixtureSite,
           'content-type': 'application/json',
           cookie: `amcore_browser_context=${anchor}`,
         },
         body: JSON.stringify({
           entryId: randomUUID(),
           entryKind: 'console',
-          locale: 'en',
+          locale: DEFAULT_LOCALE,
           ...(returnEntryId ? { returnEntryId } : {}),
         }),
       })
@@ -77,7 +79,7 @@ it.each([false, true])(
         audience: 'product',
       },
       destination: '/admin/profile',
-      locale: 'en',
+      locale: DEFAULT_LOCALE,
       expiresAt: Date.now() + 600000,
       phase: 'logout_dispatched',
       attemptId: randomUUID(),
@@ -113,7 +115,7 @@ it.each([false, true])(
     expect(attempt?.record).toMatchObject({
       state: 'ready',
       browser: { contextId: 'context-A', generation },
-      consoleEntry: { locale: 'en' },
+      consoleEntry: { locale: DEFAULT_LOCALE },
     })
     expect(attempt?.record.consoleEntry?.proof).toBeUndefined()
     expect(attempt?.record.id).not.toBe(entry.attemptId)

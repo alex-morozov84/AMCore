@@ -1,11 +1,12 @@
-import { SERVED_LOCALES } from '@amcore/shared'
+import { type CatalogueLocale, DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 import { expect, type Page } from '@playwright/test'
+
+import { productPath } from './product-settings'
 
 /** Run against production as well: development does not exercise Next's route cache. */
 export async function verifyLocaleUrl(page: Page) {
-  const first = SERVED_LOCALES[0]
-  const second = SERVED_LOCALES.at(-1)!
-  expect(first).not.toBe(second)
+  const first = DEFAULT_LOCALE
+  const second = SERVED_LOCALES.find((locale) => locale !== first)
   const query = '?tag=a&tag=b&encoded=%23value'
   const profileRequests: string[] = []
   page.on('request', (request) => {
@@ -13,14 +14,26 @@ export async function verifyLocaleUrl(page: Page) {
       profileRequests.push(request.method())
     }
   })
-  async function change(locale: string, hash: string) {
+  async function change(locale: CatalogueLocale, hash: string) {
     await page.getByRole('combobox').selectOption(locale)
-    await expect(page).toHaveURL(`${new URL(page.url()).origin}/${locale}/login${query}${hash}`)
+    await expect(page).toHaveURL(
+      `${new URL(page.url()).origin}${productPath('/login', locale)}${query}${hash}`
+    )
     await expect(page.locator('html')).toHaveAttribute('lang', locale)
     await expect(page.getByRole('combobox')).toHaveValue(locale)
     await expect(page.getByRole('combobox')).toBeEnabled()
   }
-  await page.goto(`/${first}/login${query}#first`)
+  await page.goto(`${productPath('/login', first)}${query}#first`)
+  if (!second) {
+    await expect(page).toHaveURL(`${new URL(page.url()).origin}/login${query}#first`)
+    await expect(page.locator('html')).toHaveAttribute('lang', first)
+    await expect(page.getByRole('combobox')).toHaveCount(0)
+    await page.reload()
+    await expect(page).toHaveURL(`${new URL(page.url()).origin}/login${query}#first`)
+    await expect(page.locator('html')).toHaveAttribute('lang', first)
+    expect(profileRequests).toEqual([])
+    return
+  }
   await change(second, '#first')
   await page.evaluate(() => window.history.replaceState(window.history.state, '', '#second#tail'))
   await change(first, '#second#tail')

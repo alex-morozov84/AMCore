@@ -55,7 +55,8 @@ return 1
 export async function proveOwnedRefresh(
   sessionCookie: string,
   user: TestUser,
-  read: () => Promise<void>
+  read: () => Promise<void>,
+  namespace: 'web:session:v1' | 'web:staff-session:v1' = 'web:session:v1'
 ) {
   if (!/^[A-Za-z0-9_-]{43}$/.test(sessionCookie) || !user.email.endsWith('@e2e.amcore.test')) {
     throw new Error('Not a test-created session')
@@ -69,7 +70,7 @@ export async function proveOwnedRefresh(
   client.on('error', () => {}) // No credentials or raw records in runner diagnostics.
   try {
     await client.connect()
-    const key = `web:session:v1:${sessionCookie}`
+    const key = `${namespace}:${sessionCookie}`
     const raw = await client.get(key)
     const before = ownedEntry(raw, user)
     const ttl = await client.pTTL(key)

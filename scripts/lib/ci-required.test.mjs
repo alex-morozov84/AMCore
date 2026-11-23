@@ -82,7 +82,7 @@ test('the actual gate command rejects malformed input and propagates the failure
   const identity = {
     repository: 'alex-morozov84/AMCore',
     event: 'push',
-    source: { head, base: head },
+    source: { head, base: head, checkout: head },
     run: '123',
     attempt: '1',
     role: 'upstream-starter',
@@ -103,8 +103,8 @@ test('the actual gate command rejects malformed input and propagates the failure
     source: identity.source,
     run: identity.run,
     attempt: identity.attempt,
-    version: 2,
-    phase: 'coarse',
+    version: 3,
+    phase: 'selection',
     inputs,
     ...coarseExecution(inputs),
   }
@@ -142,7 +142,7 @@ test('the actual gate command rejects malformed input and propagates the failure
   const narrow = { ...plan, inputs: narrowInputs, ...coarseExecution(narrowInputs) }
   const scopeJobs = {
     all: requiredCiJobs,
-    test: ['test-unit-redis', 'test-capability', 'test-notification-ai', 'api-e2e'],
+    test: ['test-unit', 'test-redis', 'test-capability', 'test-notification-ai', 'api-e2e'],
     api: ['api-e2e-plan', 'api-e2e-shards'],
   }
   for (const [scope, jobs] of Object.entries(scopeJobs)) {
@@ -219,49 +219,40 @@ test('the actual gate command rejects malformed input and propagates the failure
   }
 })
 
-test('coarse execution admits only complete independent UI/web and preserves browser and Redis', () => {
+test('ordinary web, isolated API suite and intentional heavy-off select different jobs', () => {
   const inputs = {
-    role: 'upstream-starter',
+    role: 'downstream-product',
     mode: 'normal',
-    areas: { ui: true },
+    areas: { web: true },
     diffComplete: true,
     integration: false,
   }
-  for (const areas of [{ ui: true }, { web: true }, { ui: true, web: true }]) {
-    const actual = coarseExecution({ ...inputs, areas })
-    assert.equal(actual.reason, 'independent-web')
-    assert.equal(actual.effective.length, 12)
-    for (const job of [
-      'test-unit-redis',
-      'test',
-      'api-e2e',
-      'web-e2e-plan',
-      'web-e2e-lanes',
-      'web-e2e',
-      'storybook',
-    ])
-      assert.ok(actual.effective.includes(job))
-  }
+  const web = coarseExecution(inputs).effective
+  for (const job of ['test-unit', 'test-redis', 'web-e2e', 'storybook'])
+    assert.ok(web.includes(job))
+  assert.ok(!web.includes('api-e2e'))
+  assert.deepEqual(coarseExecution({ ...inputs, areas: { apiE2e: true } }).effective, [
+    'lint',
+    'typecheck',
+    'test',
+    'api-e2e-plan',
+    'api-e2e-shards',
+    'api-e2e',
+    'promtool',
+  ])
+  const off = coarseExecution({ ...inputs, mode: 'heavy-off' }).effective
+  assert.deepEqual(off, ['lint', 'typecheck', 'test-unit', 'test', 'promtool'])
+  assert.throws(() => coarseExecution({ ...inputs, mode: 'heavy-off', role: 'upstream-starter' }))
   for (const extra of [
-    { mode: 'full' },
     { diffComplete: false },
     { integration: true },
-    { areas: {} },
-    ...[
-      'docs',
-      'api',
-      'common',
-      'infra',
-      'monitoring',
-      'tools',
-      'email',
-      'deployment',
-      'unknown',
-    ].map((area) => ({ areas: { ui: true, [area]: true } })),
+    { areas: { unknown: true } },
+    { mode: 'full' },
   ])
-    assert.deepEqual(coarseExecution({ ...inputs, ...extra }).effective, requiredCiJobs)
-  for (const extra of [{ role: 'downstream-product' }, { mode: 'heavy-off' }])
-    assert.throws(() => coarseExecution({ ...inputs, ...extra }))
+    assert.deepEqual(
+      coarseExecution({ ...inputs, role: 'upstream-starter', ...extra }).effective,
+      requiredCiJobs
+    )
 })
 
 test('all scopes reject lost selected work, unexpected execution and forged admission', () => {
@@ -286,14 +277,14 @@ test('all scopes reject lost selected work, unexpected execution and forged admi
     source: identity.source,
     run: identity.run,
     attempt: identity.attempt,
-    version: 2,
-    phase: 'coarse',
+    version: 3,
+    phase: 'selection',
     inputs,
     ...coarseExecution(inputs),
   }
   const scopes = {
     all: requiredCiJobs,
-    test: ['test-unit-redis', 'test-capability', 'test-notification-ai', 'api-e2e'],
+    test: ['test-unit', 'test-redis', 'test-capability', 'test-notification-ai', 'api-e2e'],
     api: ['api-e2e-plan', 'api-e2e-shards'],
   }
   for (const [scope, jobs] of Object.entries(scopes)) {
@@ -335,7 +326,7 @@ test('all scopes reject lost selected work, unexpected execution and forged admi
       { event: 'pull_request' },
       { source: { ...identity.source, head: 'c'.repeat(40) } },
       { source: { ...identity.source, base: 'c'.repeat(40) } },
-      ...['role', 'mode', 'diffComplete', 'integration'].map((key) => ({
+      ...['role', 'mode', 'integration'].map((key) => ({
         inputs: {
           ...inputs,
           [key]: key === 'role' ? 'downstream-product' : key === 'mode' ? 'full' : !inputs[key],
