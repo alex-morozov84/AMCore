@@ -46,10 +46,9 @@ async function redis() {
 /** Puts Redis at its limit: every write that needs memory is refused, reads keep working. */
 async function fillMemory() {
   const client = await redis()
-  const info = await client.info('memory')
-  const used = Number(/used_memory:(\d+)/.exec(info)![1])
   await client.configSet('maxmemory-policy', 'noeviction')
-  await client.configSet('maxmemory', String(used))
+  // Keep the limit below Redis's baseline even when its memory usage falls between commands.
+  await client.configSet('maxmemory', '1')
 }
 
 async function releaseMemory() {
