@@ -192,8 +192,10 @@ test('sign-in asks for the account email', async ({ page }) => {
 ```
 
 After opening a PR, inspect **CI selection** and **Web E2E plan** in its workflow run.
-Download `playwright-<run>-<attempt>-<lane>` from the run's artifacts.
-Open its Playwright report and find the test by file and title. **CI required** reports the final outcome.
+Open the assigned **Web E2E (<lane>)** job. Open its
+**Run isolated E2E lane** step and search for the test title. The live stand
+reports individual results in the log and keeps the HTML report disabled
+because it can retain one-time codes. **CI required** reports the final outcome.
 Share the case name and outcome in public discussion. Review and redact
 logs before sharing them, and keep raw traces and session state private.
 

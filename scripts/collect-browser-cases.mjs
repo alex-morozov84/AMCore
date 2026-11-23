@@ -4,6 +4,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { allocateControlSocket } from './stand/control-socket.mjs'
+import { fixedBrowserProfile } from './lib/fixed-browser-profiles.mjs'
 import { LOCALE_CATALOGUES } from './lib/settings-files.mjs'
 import { sourceSettings } from './stand/settings-policy.mjs'
 import { projectChoices } from './stand/project.mjs'
@@ -55,8 +56,18 @@ if (legacy) {
 }
 const choices = await projectChoices(worktree)
 const inventories = {}
+const fixed = {}
 for (const lane of lanes) {
   await collectLane(lane)
+}
+if (process.env.AMCORE_CI_ROLE === 'upstream-starter') {
+  const { productAdminE2ePlans } = await import(
+    pathToFileURL(join(worktree, 'scripts/product-admin-e2e-plan.mjs')).href
+  )
+  for (const lane of basePlanner.ciLanes(worktree)) {
+    const profile = fixedBrowserProfile(lane, productAdminE2ePlans)
+    if (profile) await collectLane(lane, profile)
+  }
 }
 await writeFile(
   process.argv[2],
@@ -64,17 +75,20 @@ await writeFile(
     ...runIdentity(worktree),
     settings,
     lanes: inventories,
+    ...(Object.keys(fixed).length ? { fixed } : {}),
   }),
   { flag: 'wx' }
 )
 
-async function collectLane(lane) {
+async function collectLane(lane, profile) {
   await mkdir(directory, { recursive: true })
-  const project = legacy
-    ? lane === 'configured-mocked'
-      ? 'mocked'
-      : 'real-stack'
-    : basePlanner.configuredProject(lane)
+  const project =
+    profile?.lane ??
+    (legacy
+      ? lane === 'configured-mocked'
+        ? 'mocked'
+        : 'real-stack'
+      : basePlanner.configuredProject(lane))
   try {
     const manifest = {
       id,
@@ -84,12 +98,17 @@ async function collectLane(lane) {
       ...choices,
       settingsPolicy: 'preserve',
       lane: project,
-      origins: {
-        product:
-          choices.topology === 'host' ? 'https://product.invalid:20000' : 'http://127.0.0.1:20000',
-        ...(choices.consoleTopology === 'host' ? { console: 'https://ops.invalid:20000' } : {}),
-        ...(choices.productAdminHost ? { staff: 'https://staff.invalid:20000' } : {}),
-      },
+      ...(profile ? fixedTarget(profile) : {}),
+      origins: profile
+        ? fixedOrigins(profile)
+        : {
+            product:
+              choices.topology === 'host'
+                ? 'https://product.invalid:20000'
+                : 'http://127.0.0.1:20000',
+            ...(choices.consoleTopology === 'host' ? { console: 'https://ops.invalid:20000' } : {}),
+            ...(choices.productAdminHost ? { staff: 'https://staff.invalid:20000' } : {}),
+          },
       ports: { web: 20000 },
       relay: 'http://127.0.0.1:20001',
       controlSocket: await allocateControlSocket(),
@@ -106,12 +125,22 @@ async function collectLane(lane) {
         env: {
           ...process.env,
           CI: 'true',
-          AMCORE_CONFIGURED_CASES: '1',
+          AMCORE_CONFIGURED_CASES: profile ? '' : '1',
           AMCORE_STAND_MANIFEST: manifestPath,
           AMCORE_STAND_TOKEN: token,
         },
       }
-      if (project !== 'real-stack') inventories[lane] = await collect(options, [], project)
+      if (profile) {
+        const cases = await collect(options, profile.files ?? [], project)
+        fixed[lane] =
+          profile.fixture === 'organization-setup'
+            ? cases.map((item) => ({
+                ...item,
+                file: item.file.replace(`e2e/${project}/`, 'e2e/organization-setup/'),
+              }))
+            : cases
+        assert.ok(fixed[lane].length, `Empty fixed browser group: ${lane}`)
+      } else if (project !== 'real-stack') inventories[lane] = await collect(options, [], project)
       else {
         const group = lane.slice('configured-'.length)
         if (legacy) {
@@ -146,4 +175,29 @@ function legacyRealStackCase(item) {
   assert.equal(item.skipReason, 'Requires owned fault/Grafana fixture')
   // The existing overview cases moved to the owned Console summary fixture.
   return { ...item, skipReason: 'requires:console-summary' }
+}
+
+function fixedTarget(profile) {
+  const staff = profile.lane === 'product-admin-real-stack'
+  const consoleHost =
+    profile.lane === 'console-real-stack' ||
+    ['product-admin-three-host', 'support-mail-host'].includes(profile.fixture)
+  return {
+    settingsPolicy: 'variant',
+    fixtureProfile: profile.fixture,
+    productAdminHost: staff,
+    consoleTopology: consoleHost ? 'host' : 'path',
+    consoleEnabled: true,
+    topology:
+      staff || consoleHost || profile.fixture === 'product-admin-oauth-path' ? 'host' : 'path',
+  }
+}
+
+function fixedOrigins(profile) {
+  const { topology, consoleTopology, productAdminHost } = fixedTarget(profile)
+  return {
+    product: topology === 'host' ? 'https://product.invalid:20000' : 'http://127.0.0.1:20000',
+    ...(consoleTopology === 'host' ? { console: 'https://ops.invalid:20000' } : {}),
+    ...(productAdminHost ? { staff: 'https://staff.invalid:20000' } : {}),
+  }
 }

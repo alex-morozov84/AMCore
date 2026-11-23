@@ -7,7 +7,7 @@ import {
 } from './lib/configured-browser-cases.mjs'
 import { laneJobMinutes } from './lib/lighthouse-deadlines.mjs'
 import { publishPlan } from './lighthouse/ci-plan.mjs'
-import { productAdminE2ePlans } from './product-admin-e2e-plan.mjs'
+import { fixedBrowserProfile } from './lib/fixed-browser-profiles.mjs'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { auditPlan, auditScope } from './lib/lighthouse-plan.mjs'
@@ -38,14 +38,18 @@ async function plannedCases() {
   if (!isDeepStrictEqual(collection.settings, await sourceSettings(root)))
     throw new Error('Browser collection differs from checkout settings')
   const cases = configuredBrowserCases(root, identity, collection)
-  const fixture = selection.proposed?.web === 'runtime' ? consoleFixture(root) : undefined
+  const fixture =
+    selection.event !== 'push' && selection.proposed?.web === 'runtime'
+      ? consoleFixture(root)
+      : undefined
   if (selection.event === 'pull_request') {
     const base = JSON.parse(await readFile(process.env.AMCORE_CONFIGURED_BASE_COLLECTION, 'utf8'))
     requireConfiguredBaseCases(
       { ...identity, source: selection.source.base },
       base,
       collection,
-      fixture
+      fixture,
+      upstream
     )
   }
   if (fixture) {
@@ -90,17 +94,15 @@ async function browserLane(lane, epoch) {
   const operation = await cancellation()
   const args = ['scripts/stand.mjs', 'e2e', '--id', operation.standId, '--lane', 'mocked']
   if (lane.startsWith('path-')) args.splice(5, 1, 'real-stack', '--ci-group', lane.slice(5))
-  if (lane === 'setup-cli') args.splice(5, 1, 'real-stack', '--fixture', 'organization-setup')
-  if (lane === 'host') args.splice(5, 1, 'console-real-stack')
-  if (lane === 'setup-console')
-    args.splice(5, 1, 'console-real-stack', '--fixture', 'organization-setup')
   if (lane.startsWith('configured-'))
     args.splice(4, args.length - 4, ...configuredArguments(root, lane))
   const fixture = lane === consoleFixtureLane ? consoleFixture(root) : undefined
   if (fixture) args.splice(5, 1, fixture.project, '--fixture', fixture.name, '--', ...fixture.args)
-  const staffPlan = productAdminE2ePlans[lane]
-  if (staffPlan)
-    args.splice(5, 1, staffPlan.lane, '--fixture', staffPlan.fixture, '--', ...staffPlan.files)
+  const fixed = fixedBrowserProfile(lane)
+  if (fixed) {
+    args.splice(5, 1, fixed.lane, ...(fixed.fixture ? ['--fixture', fixed.fixture] : []))
+    if (fixed.files) args.push('--', ...fixed.files)
+  }
   const mocked = args[5] === 'mocked'
   let status = 0
   let termination = 'passed'

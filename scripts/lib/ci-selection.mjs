@@ -100,3 +100,13 @@ export function selectCiGroups({ role, mode, areas, diffComplete, integration = 
     safety: heavy && (full || a('tools')),
   }
 }
+
+export function isIndependentWebChange({ mode, diffComplete, integration, areas }) {
+  return (
+    mode === 'normal' &&
+    diffComplete &&
+    !integration &&
+    (areas.ui === true || areas.web === true) &&
+    Object.entries(areas).every(([key, value]) => !value || ['ui', 'web'].includes(key))
+  )
+}

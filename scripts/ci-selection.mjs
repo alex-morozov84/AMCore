@@ -49,7 +49,7 @@ try {
     diffComplete,
     integration: acquired.integration,
   }
-  const execution = coarseExecution(inputs)
+  const execution = coarseExecution(inputs, policy.event)
   if (
     !/^\d+$/.test(process.env.GITHUB_RUN_ID ?? '') ||
     !/^[1-9]\d*$/.test(process.env.GITHUB_RUN_ATTEMPT ?? '')

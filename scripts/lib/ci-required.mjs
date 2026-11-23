@@ -1,4 +1,4 @@
-import { selectCiGroups } from './ci-selection.mjs'
+import { isIndependentWebChange, selectCiGroups } from './ci-selection.mjs'
 
 export const requiredCiJobs = Object.freeze([
   'lint',
@@ -40,8 +40,28 @@ export function requireCompleteCi(results) {
 }
 
 /** Translate policy groups into the jobs that actually exist. */
-export function coarseExecution(inputs) {
+export function coarseExecution(inputs, event) {
   const proposed = selectCiGroups(inputs)
+  if (event === 'push' && inputs.mode !== 'heavy-off') {
+    const narrow = isIndependentWebChange(inputs)
+    const omitted = narrow
+      ? [
+          'test-capability',
+          'test-notification-ai',
+          'api-e2e-plan',
+          'api-e2e-shards',
+          'docker-image-smoke',
+          'observability-contract-live',
+        ]
+      : []
+    return {
+      proposed: { ...proposed, web: 'runtime' },
+      reason: narrow ? 'independent-web' : 'broad',
+      effective: requiredCiJobs.filter(
+        (job) => !omitted.includes(job) && !['test-email', 'deployment-version'].includes(job)
+      ),
+    }
+  }
   const web = proposed.web !== 'none'
   const selected = {
     lint: true,
@@ -119,7 +139,7 @@ export function validateExecutionPlan(plan, identity) {
     inputs.mode !== identity.mode
   )
     throw new Error('CI execution admission inputs disagree')
-  const expected = coarseExecution(inputs)
+  const expected = coarseExecution(inputs, identity.event)
   for (const key of ['proposed', 'reason', 'effective'])
     if (JSON.stringify(plan[key]) !== JSON.stringify(expected[key]))
       throw new Error('CI execution plan differs from coarse policy')

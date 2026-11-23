@@ -106,7 +106,7 @@ test('the actual gate command rejects malformed input and propagates the failure
     version: 3,
     phase: 'selection',
     inputs,
-    ...coarseExecution(inputs),
+    ...coarseExecution(inputs, identity.event),
   }
   const env = {
     ...process.env,
@@ -118,7 +118,15 @@ test('the actual gate command rejects malformed input and propagates the failure
     GITHUB_RUN_ATTEMPT: identity.attempt,
     CI_PLAN: JSON.stringify(plan),
   }
-  const broad = () => ({ 'ci-selection': { result: 'success' }, ...successful() })
+  const broad = () => ({
+    'ci-selection': { result: 'success' },
+    ...Object.fromEntries(
+      requiredCiJobs.map((job) => [
+        job,
+        { result: plan.effective.includes(job) ? 'success' : 'skipped' },
+      ])
+    ),
+  })
   const missing = broad()
   delete missing.storybook
   for (const value of [
@@ -139,7 +147,7 @@ test('the actual gate command rejects malformed input and propagates the failure
   }
   // Exercise the real CLI for every aggregate, including the legitimate skip branch.
   const narrowInputs = { ...inputs, areas: { ui: true } }
-  const narrow = { ...plan, inputs: narrowInputs, ...coarseExecution(narrowInputs) }
+  const narrow = { ...plan, inputs: narrowInputs, ...coarseExecution(narrowInputs, identity.event) }
   const scopeJobs = {
     all: requiredCiJobs,
     test: ['test-unit', 'test-redis', 'test-capability', 'test-notification-ai', 'api-e2e'],
@@ -198,7 +206,11 @@ test('the actual gate command rejects malformed input and propagates the failure
     env: {
       ...env,
       CI_RESULTS: JSON.stringify(broad()),
-      CI_PLAN: JSON.stringify({ ...plan, inputs: incomplete, ...coarseExecution(incomplete) }),
+      CI_PLAN: JSON.stringify({
+        ...plan,
+        inputs: incomplete,
+        ...coarseExecution(incomplete, identity.event),
+      }),
     },
     encoding: 'utf8',
   })
@@ -213,7 +225,7 @@ test('the actual gate command rejects malformed input and propagates the failure
     () => requireSelectedCi({ ...broad(), 'ci-selection': { result: 'failure' } }, plan, identity),
     /selector/
   )
-  for (const job of requiredCiJobs) {
+  for (const job of plan.effective) {
     const failed = { ...broad(), [job]: { result: 'skipped' } }
     assert.throws(() => requireSelectedCi(failed, plan, identity), /disagree with execution plan/)
   }
@@ -280,7 +292,7 @@ test('all scopes reject lost selected work, unexpected execution and forged admi
     version: 3,
     phase: 'selection',
     inputs,
-    ...coarseExecution(inputs),
+    ...coarseExecution(inputs, identity.event),
   }
   const scopes = {
     all: requiredCiJobs,
@@ -335,4 +347,55 @@ test('all scopes reject lost selected work, unexpected execution and forged admi
     ])
       assert.throws(() => requireSelectedCi(results, { ...plan, ...mutation }, identity, scope))
   }
+})
+
+test('main pushes keep the old broad plan and the old independent Web exception', () => {
+  const inputs = {
+    role: 'upstream-starter',
+    mode: 'normal',
+    areas: { docs: true },
+    diffComplete: true,
+    integration: false,
+  }
+  const broad = coarseExecution(inputs, 'push')
+  const formerCombined = 'test-unit-redis'
+  const previousBroad = [
+    'lint',
+    'typecheck',
+    'build',
+    formerCombined,
+    'test-capability',
+    'test-notification-ai',
+    'test',
+    'api-e2e-plan',
+    'api-e2e-shards',
+    'api-e2e',
+    'script-contracts',
+    'docker-image-smoke',
+    'web-e2e-plan',
+    'web-e2e-lanes',
+    'web-e2e',
+    'promtool',
+    'observability-contract-live',
+    'storybook',
+  ]
+  const normalize = (jobs) =>
+    jobs
+      .filter((job) => job !== 'test-redis')
+      .map((job) => (job === 'test-unit' && jobs.includes('test-redis') ? formerCombined : job))
+      .sort()
+  assert.deepEqual(normalize(broad.effective), [...previousBroad].sort())
+  const omitted = [
+    'test-capability',
+    'test-notification-ai',
+    'api-e2e-plan',
+    'api-e2e-shards',
+    'docker-image-smoke',
+    'observability-contract-live',
+  ]
+  assert.deepEqual(
+    normalize(coarseExecution({ ...inputs, areas: { ui: true } }, 'push').effective),
+    previousBroad.filter((job) => !omitted.includes(job)).sort()
+  )
+  assert.equal(coarseExecution(inputs, 'pull_request').effective.includes('api-e2e-plan'), false)
 })

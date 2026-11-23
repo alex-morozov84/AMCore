@@ -21,7 +21,7 @@ function knownInapplicability(reason, settings, existingFixtureCase = false) {
 }
 
 export function configuredBrowserCases(root, identity, collection) {
-  const { lanes, settings, ...sourceIdentity } = collection
+  const { lanes, settings, fixed: _fixed, ...sourceIdentity } = collection
   assert.deepEqual(sourceIdentity, identity, 'Configured collection identity mismatch')
   const expected = configuredLanes(root)
   assert.deepEqual(Object.keys(lanes), expected, 'Configured collection lanes mismatch')
@@ -77,8 +77,14 @@ function isFixtureCase(item, fixture) {
 }
 
 /** Preserve every applicable base case under the settings used for the PR. */
-export function requireConfiguredBaseCases(identity, baseCollection, headCollection, fixture) {
-  const { lanes, settings, ...baseIdentity } = baseCollection
+export function requireConfiguredBaseCases(
+  identity,
+  baseCollection,
+  headCollection,
+  fixture,
+  upstream = false
+) {
+  const { lanes, settings, fixed, ...baseIdentity } = baseCollection
   assert.deepEqual(baseIdentity, identity, 'Configured base collection identity mismatch')
   assert.ok(settings && headCollection.settings, 'Missing projected browser settings')
   assert.deepEqual(
@@ -86,6 +92,7 @@ export function requireConfiguredBaseCases(identity, baseCollection, headCollect
     headCollection.settings,
     'Browser base projected under different settings'
   )
+  if (upstream) requireFixedCases(fixed, headCollection.fixed)
   assert.ok(lanes?.['configured-standard']?.length, 'Missing configured base cases')
   for (const lane of new Set([...Object.keys(lanes), ...Object.keys(headCollection.lanes)])) {
     const cases = lanes[lane] ?? []
@@ -126,5 +133,38 @@ export function configuredConsoleFixtureDigest(root, collection) {
     collection.lanes[lane]
       .filter((item) => isFixtureCase(item, fixture))
       .map(({ caseId }) => caseId)
+  )
+}
+
+function requireFixedCases(base, head) {
+  assert.ok(base?.host?.length && head?.host?.length, 'Missing fixed browser inventory')
+  for (const [lane, cases] of Object.entries(base)) {
+    assert.ok(cases.length && head[lane]?.length, `Missing fixed browser group: ${lane}`)
+    const current = new Map(head[lane].map((item) => [item.id, item]))
+    assert.equal(current.size, head[lane].length, `Duplicate fixed browser cases in ${lane}`)
+    const missing = cases.filter((item) => {
+      const retained = current.get(item.id)
+      return (
+        !retained ||
+        (item.expectedStatus === 'passed' &&
+          retained.expectedStatus !== 'passed' &&
+          !declaresPreviouslySkippedHostFixture(lane, retained))
+      )
+    })
+    assert.deepEqual(
+      missing.map(({ file, title }) => `${file} — ${title}`),
+      [],
+      `Missing mandatory fixed browser cases in ${lane}`
+    )
+  }
+}
+
+// The original host test discovered as passed but skipped after an API signup-policy check.
+function declaresPreviouslySkippedHostFixture(lane, item) {
+  return (
+    lane === 'host' &&
+    item.file === 'e2e/console-real-stack/invitation-closed-signup.spec.ts' &&
+    item.expectedStatus === 'skipped' &&
+    item.skipReason === 'requires:closed-signup-oauth'
   )
 }

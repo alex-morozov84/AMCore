@@ -184,3 +184,27 @@ test('a new fixture case requires its selected profile and owning file', () => {
   )
   assert.doesNotThrow(() => validate({ file: added.file, prerequisite: reason }))
 })
+
+test('fixed upstream lanes retain their cases independently of the configured lanes', () => {
+  const base = collection(baseIdentity, [current('retained')])
+  const head = collection(identity, [current('retained')])
+  const host = [
+    { ...current('isolated session'), id: 'isolated:host' },
+    { ...current('MFA reentry'), id: 'reentry:host' },
+  ]
+  const check = (fixed) =>
+    requireConfiguredBaseCases(
+      baseIdentity,
+      { ...base, fixed: { host } },
+      { ...head, fixed },
+      undefined,
+      true
+    )
+  assert.doesNotThrow(() => check({ host }))
+  assert.throws(() => check(undefined), /Missing fixed browser inventory/)
+  assert.throws(() => check({ host: [host[1]] }), /isolated session/)
+  assert.throws(
+    () => check({ host: [{ ...host[0], expectedStatus: 'skipped' }, host[1]] }),
+    /isolated session/
+  )
+})

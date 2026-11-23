@@ -32,7 +32,8 @@ logic. Selected API E2E still requires complete artifacts and natural exits.
 
 The ordinary PR workflow reads the role from `PROJECT_CONTEXT.md` and the
 saved mode from `ci/product.json` (version 1). Missing policy means `normal`.
-A PR uses the base mode and validates the proposed mode. The proposed mode
+A PR uses the base mode and validates the proposed mode. Main pushes keep
+the existing broad plan and its independent Web exception. The proposed mode
 takes effect on the next push after merge. An ordinary PR cannot change the
 repository role.
 
