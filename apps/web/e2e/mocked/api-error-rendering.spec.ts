@@ -1,6 +1,7 @@
 import { expect } from '@playwright/test'
 
 import { test } from '../shared/auth-test'
+import { messages, productPath } from '../shared/product-settings'
 
 /**
  * A real POST to `/api/auth/login` intercepted browser-side — proves the
@@ -19,15 +20,17 @@ test('an unrecognized API failure renders the localized fallback message', async
     })
   )
 
-  await page.goto('/en/login')
-  await page.getByRole('textbox', { name: /email/i }).fill('spike-e2e@example.com')
-  await page.getByLabel(/^password$/i).fill('correct-horse-battery')
-  await page.getByRole('button', { name: /sign in/i }).click()
+  await page.goto(productPath('/login'))
+  await page
+    .getByRole('textbox', { name: messages.auth.email, exact: true })
+    .fill('spike-e2e@example.com')
+  await page.getByLabel(messages.auth.password, { exact: true }).fill('correct-horse-battery')
+  await page.getByRole('button', { name: messages.auth.login, exact: true }).click()
 
   // Scoped to `data-slot="alert"` (`shared/ui/alert.tsx`) — a plain
   // `getByRole('alert')` also matches Next's own `role="alert"`
   // route-announcer live region, which isn't the element under test.
   const alert = page.locator('[data-slot="alert"]')
   await expect(alert).toBeVisible()
-  await expect(alert).toContainText('Something went wrong')
+  await expect(alert).toContainText(messages.errors.UNKNOWN_ERROR)
 })

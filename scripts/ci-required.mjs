@@ -32,7 +32,10 @@ try {
     scope
   )
   if (process.env.GITHUB_OUTPUT)
-    appendFileSync(process.env.GITHUB_OUTPUT, `selected=${execution.reason === 'broad'}\n`)
+    appendFileSync(
+      process.env.GITHUB_OUTPUT,
+      `selected=${execution.effective.includes('api-e2e')}\n`
+    )
   console.log(
     `CI ${scope} admission passed: ${execution.reason}; selected jobs succeeded, unselected jobs skipped`
   )

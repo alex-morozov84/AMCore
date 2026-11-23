@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import {
+  DEFAULT_LOCALE,
   invitationFlowAuthResponseSchema,
   invitationFlowContextResponseSchema,
   invitationFlowInspectResponseSchema,
@@ -35,7 +36,7 @@ const user = {
   name: null,
   avatarUrl: null,
   phone: null,
-  locale: 'en' as const,
+  locale: DEFAULT_LOCALE,
   timezone: 'UTC',
   createdAt: '2026-11-06T00:00:00.000Z',
   lastLoginAt: null,
@@ -58,7 +59,12 @@ it.each(['login', 'register', 'recover'] as const)(
       user: { ...user, id: 'A' },
       contextSession: 'a'.repeat(64),
     })
-    const oldKey = userKeys.sessions({ userId: 'A', contextSession: 'a'.repeat(64) }, 'en', 1, 10)
+    const oldKey = userKeys.sessions(
+      { userId: 'A', contextSession: 'a'.repeat(64) },
+      DEFAULT_LOCALE,
+      1,
+      10
+    )
     client.setQueryData(oldKey, ['old private data'])
     const wrapper = ({ children }: { children: React.ReactNode }) => (
       <QueryClientProvider client={client}>{children}</QueryClientProvider>

@@ -121,7 +121,7 @@ test('owner resolver keeps one exact audit assignment in all four topologies and
     for (const consoleMode of ['path', 'host']) {
       await writeFile(
         join(dir, 'packages/shared/src/config/product-admin.json'),
-        JSON.stringify({ mode: product, alias: 'workspace' })
+        JSON.stringify({ version: 1, mode: product, alias: 'workspace' })
       )
       await writeFile(
         join(dir, 'packages/shared/src/config/admin-console.json'),

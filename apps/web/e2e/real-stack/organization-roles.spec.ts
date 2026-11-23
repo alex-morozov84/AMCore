@@ -1,14 +1,20 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { DEFAULT_LOCALE, localizedFrontendUrl } from '@amcore/shared'
+import { DEFAULT_LOCALE } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
 import { activeTarget } from '../support/managed-target.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
+import {
+  browserCredentialRequest,
+  ensureAdministrationSession,
+  TEST_PASSWORD,
+  uniqueEmail,
+} from './helpers'
+import { organizationUi } from './organization-context.helpers'
 
 // Real BFF, real API, real browser: the ready roles list and role page end to end. Uses only the
 // active managed test stand and an account created by this test.
@@ -39,12 +45,10 @@ test('roles: create, edit, protect an unsaved draft, confirm full control and de
     if (request.headers()['authorization']) authorization.push(request.url())
   })
 
+  await ensureAdministrationSession(context, email)
+
   // List: built-in roles apart, an empty table with its own message.
-  await page.goto(
-    new URL(
-      localizedFrontendUrl(target.origins.product, DEFAULT_LOCALE, `organizations/${org.id}/roles`)
-    ).pathname
-  )
+  await page.goto(organizationUi(DEFAULT_LOCALE).url(`/${org.id}/roles`))
   await expect(page.getByRole('region', { name: t.builtinTitle })).toBeVisible()
   await expect(page.getByText(t.customEmpty)).toBeVisible()
   await expectNoAxeViolations(page)

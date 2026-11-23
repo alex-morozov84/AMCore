@@ -3,6 +3,8 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { http, HttpResponse } from 'msw'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 
+import { getConsolePublicApiPath } from '@/shared/lib/console-public-api-path'
+
 import messages from '../../../../messages/en.json'
 import russian from '../../../../messages/ru.json'
 
@@ -12,9 +14,9 @@ const invitationLanguage =
   SERVED_LOCALES.find((locale) => String(locale) === 'ru') ?? DEFAULT_LOCALE
 const t = messages.console.organizationProvisioning
 const binding = 'a'.repeat(64)
-const root = '/api/console/organization-provisionings'
+const root = `/api${getConsolePublicApiPath('/organization-provisionings')}`
 const orgId = 'north-shop'
-const progressPath = `/api/console/organizations/${orgId}/provisioning`
+const progressPath = `/api${getConsolePublicApiPath(`/organizations/${orgId}/provisioning`)}`
 const policy = { role: 'ADMIN', mailMode: 'mock', createAllowed: true }
 const data = {
   organizationId: orgId,

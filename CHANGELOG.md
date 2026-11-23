@@ -24,6 +24,11 @@ versions they name. For current source-update instructions, see
 
 ### Fixed
 
+- Preserve the browser language preference during account registration through the Web API.
+
+- Use product settings for CI test selection and browser fixtures. Discover new
+  applicable tests automatically and require their results in the same CI attempt.
+
 - Select a conservative CI subset for independent upstream web changes. Keep all
   browser and Redis checks, preserve required check names, and reject unexpected
   skips or execution through the aggregate gate. Shared, mixed and tooling changes

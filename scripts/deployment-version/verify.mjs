@@ -1,11 +1,10 @@
 /* global navigator, window, document, Event, caches */
 import assert from 'node:assert/strict'
 
-const route = '/en/deployment-probe'
 const count = (state, method, path) =>
   state.records.filter((r) => r.method === method && r.path === path).length
 
-async function open(browser, state, port, worker, poll = true) {
+async function open(browser, state, port, worker, route, poll = true) {
   state.target = port + 1
   state.mode = 'normal'
   const context = await browser.newContext({ serviceWorkers: worker })
@@ -28,7 +27,7 @@ async function open(browser, state, port, worker, poll = true) {
   return { context, page, errors, violations }
 }
 
-async function transition(tab, state, port, target, observe = 60_000) {
+async function transition(tab, state, port, target, route, observe = 60_000) {
   state.records = []
   state.target = port + (target === 'A' ? 1 : 2)
   const started = Date.now()
@@ -37,7 +36,11 @@ async function transition(tab, state, port, target, observe = 60_000) {
   const old = `version-test-${target === 'A' ? 'B' : 'A'}`
   const stale = state.records.filter((r) => r.method === 'POST' && r.id === old)
   assert.ok(stale.length <= 100)
-  assert.ok(stale.every((r) => r.status === 404))
+  assert.deepEqual(
+    stale.map(({ status, actionNotFound }) => ({ status, actionNotFound })),
+    stale.map(() => ({ status: 409, actionNotFound: '1' })),
+    'The new build must reject each obsolete Server Action'
+  )
   assert.equal(count(state, 'GET', route), 1)
   state.records = []
   await tab.page.waitForTimeout(observe)
@@ -56,9 +59,9 @@ async function transition(tab, state, port, target, observe = 60_000) {
   )
 }
 
-async function faults(browser, state, port) {
+async function faults(browser, state, port, route) {
   for (const mode of ['fail', 'invalid', 'hang', 'stale']) {
-    const tab = await open(browser, state, port, 'block', false)
+    const tab = await open(browser, state, port, 'block', route, false)
     state.target = port + 2
     state.mode = mode
     state.records = []
@@ -79,8 +82,8 @@ async function faults(browser, state, port) {
   }
 }
 
-async function guards(browser, state, port) {
-  const tab = await open(browser, state, port, 'block', false)
+async function guards(browser, state, port, route) {
+  const tab = await open(browser, state, port, 'block', route, false)
   state.target = port + 2
   state.mode = 'old-html'
   state.records = []
@@ -94,14 +97,14 @@ async function guards(browser, state, port) {
   console.log('Stale HTML: no replacement loop; manual recovery passed')
 }
 
-export async function verifyRecovery(browser, state, port) {
-  const plain = await open(browser, state, port, 'block')
-  await transition(plain, state, port, 'B')
+export async function verifyRecovery(browser, state, port, route) {
+  const plain = await open(browser, state, port, 'block', route)
+  await transition(plain, state, port, 'B', route)
   await plain.context.close()
-  const worker = await open(browser, state, port, 'allow')
-  await transition(worker, state, port, 'B')
-  await transition(worker, state, port, 'A')
-  await transition(worker, state, port, 'B', 1000)
+  const worker = await open(browser, state, port, 'allow', route)
+  await transition(worker, state, port, 'B', route)
+  await transition(worker, state, port, 'A', route)
+  await transition(worker, state, port, 'B', route, 1000)
   state.mode = 'alternate'
   state.records = []
   await worker.page.evaluate(() => window.dispatchEvent(new Event('focus')))
@@ -121,11 +124,11 @@ export async function verifyRecovery(browser, state, port) {
     cached.every((path) => ['/icons/icon-192x192.png', '/icons/icon-512x512.png'].includes(path))
   )
   await worker.context.close()
-  const idle = await open(browser, state, port, 'block', false)
+  const idle = await open(browser, state, port, 'block', route, false)
   state.records = []
   await idle.page.waitForTimeout(120_000)
   assert.ok(count(state, 'GET', '/api/deployment-version') <= 4)
   await idle.context.close()
-  await faults(browser, state, port)
-  await guards(browser, state, port)
+  await faults(browser, state, port, route)
+  await guards(browser, state, port, route)
 }

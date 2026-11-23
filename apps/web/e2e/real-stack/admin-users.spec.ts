@@ -2,6 +2,14 @@ import { expect, type Page, test } from '@playwright/test'
 
 import { inspectLoginDiagnostics } from '../console-real-stack/login-diagnostics'
 import { expectNoAxeViolations } from '../shared/axe'
+import { requirePathConsole } from '../shared/console-applicability'
+import {
+  consolePath,
+  isProductHome,
+  messages,
+  sortColumnPattern,
+  translate,
+} from '../shared/product-settings'
 
 import {
   createLoginDiagnosticTarget,
@@ -11,12 +19,14 @@ import {
 } from './admin-helpers'
 import { loginViaUi, registerViaUi, uniqueEmail } from './helpers'
 
+requirePathConsole()
+
 async function signInAsPathAdmin(page: Page, email: string) {
   await registerViaUi(page, email, { name: 'Path Inventory User' })
   setSystemRole(email, 'SUPER_ADMIN')
   await page.context().clearCookies()
   await loginViaUi(page, email)
-  await expect(page).toHaveURL(/\/en\/?$/)
+  await expect(page).toHaveURL(isProductHome)
 }
 
 test('path-mode user detail safely explains setup and opens precise security event views', async ({
@@ -25,7 +35,7 @@ test('path-mode user detail safely explains setup and opens precise security eve
   await signInAsPathAdmin(page, uniqueEmail('diagnostics-admin'))
   const email = uniqueEmail('diagnostics-target')
   const target = createLoginDiagnosticTarget(email)
-  await page.goto('/en/admin/users')
+  await page.goto(consolePath('/users'))
   await inspectLoginDiagnostics(page, target.id, email, target.canary)
 })
 
@@ -39,12 +49,15 @@ test('path-mode Users inventory renders real user data without exposing a token'
     if (request.headers().authorization) requestsWithAuthHeader.push(request.url())
   })
 
-  await page.goto('/en/admin/users')
+  await page.goto(consolePath('/users'))
 
-  await expect(page.getByRole('heading', { name: /users/i })).toBeVisible()
+  await expect(page.getByRole('heading', { name: messages.console.users })).toBeVisible()
   await expect(page.getByText(email)).toBeVisible()
   await expect(
-    page.getByRole('row').filter({ hasText: email }).getByRole('cell', { name: 'Super admin' })
+    page
+      .getByRole('row')
+      .filter({ hasText: email })
+      .getByRole('cell', { name: messages.console.superAdminRole })
   ).toBeVisible()
   expect(await page.content()).not.toContain('Bearer ')
   expect(requestsWithAuthHeader).toHaveLength(0)
@@ -53,16 +66,16 @@ test('path-mode Users inventory renders real user data without exposing a token'
 test('path-mode client navigation removes console chrome after a live denial', async ({ page }) => {
   const email = uniqueEmail('admin-users-denied')
   await signInAsPathAdmin(page, email)
-  await page.goto('/en/admin/users')
-  await expect(page.getByRole('heading', { name: /users/i })).toBeVisible()
+  await page.goto(consolePath('/users'))
+  await expect(page.getByRole('heading', { name: messages.console.users })).toBeVisible()
 
-  await page.getByRole('link', { name: 'Overview', exact: true }).click()
-  await expect(page).toHaveURL(/\/en\/admin\/?$/)
+  await page.getByRole('link', { name: messages.console.overview, exact: true }).click()
+  await expect(page).toHaveURL((url) => url.pathname.replace(/\/$/, '') === consolePath())
   setSystemRole(email, 'USER')
 
-  await page.getByRole('link', { name: 'Users', exact: true }).click()
-  await expect(page.getByRole('heading', { name: /404|not found/i })).toBeVisible()
-  await expect(page.getByRole('heading', { name: /users/i })).toHaveCount(0)
+  await page.getByRole('link', { name: messages.console.users, exact: true }).click()
+  await expect(page.getByRole('heading', { name: '404', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: messages.console.users })).toHaveCount(0)
   await expect(page.locator('[data-console-shell="title"]')).toHaveCount(0)
   await expect(page.getByText('Path Inventory User')).toHaveCount(0)
 })
@@ -70,17 +83,14 @@ test('path-mode client navigation removes console chrome after a live denial', a
 test('path-mode client navigation retains the collapsed sidebar preference', async ({ page }) => {
   const email = uniqueEmail('admin-users-sidebar')
   await signInAsPathAdmin(page, email)
-  await page.goto('/en/admin/users')
+  await page.goto(consolePath('/users'))
 
   const sidebar = page.locator('[data-slot="sidebar"]').first()
-  await page
-    .getByRole('button', { name: /toggle.*navigation/i })
-    .first()
-    .click()
+  await page.getByRole('button', { name: messages.console.toggleNavigation }).first().click()
   await expect(sidebar).toHaveAttribute('data-state', 'collapsed')
 
-  await page.getByRole('link', { name: 'Overview', exact: true }).click()
-  await expect(page).toHaveURL(/\/en\/admin\/?$/)
+  await page.getByRole('link', { name: messages.console.overview, exact: true }).click()
+  await expect(page).toHaveURL((url) => url.pathname.replace(/\/$/, '') === consolePath())
   await expect(page.locator('[data-slot="sidebar"]').first()).toHaveAttribute(
     'data-state',
     'collapsed'
@@ -95,14 +105,14 @@ test('path-mode Users inventory paginates with progress-aware Next and Previous 
   const markerEmail = uniqueEmail('users-page2-marker')
   createUsersForPagination(markerEmail, `users-page2-filler-${Date.now()}`)
 
-  await page.goto('/en/admin/users')
+  await page.goto(consolePath('/users'))
   await expect(page.getByText(markerEmail)).toHaveCount(0)
 
-  await page.getByRole('link', { name: /next/i }).click()
+  await page.getByRole('link', { name: messages.console.paginationNext }).click()
   await expect(page).toHaveURL(/[?&]page=2\b/)
   await expect(page.getByText(markerEmail)).toBeVisible()
 
-  await page.getByRole('link', { name: /previous/i }).click()
+  await page.getByRole('link', { name: messages.console.paginationPrevious }).click()
   // `page=1` is the canonical URL's default and is omitted, not written out
   // explicitly (`buildDiscoveryHref`) — so back on page 1 means no `page`
   // param at all, not `page=1`.
@@ -119,23 +129,23 @@ test('path-mode Users search filters against real data by a contains match, and 
   const targetEmail = `${token}@e2e.amcore.test`
   createNamedUser(targetEmail, `Findable ${token}`, new Date())
 
-  await page.goto('/en/admin/users')
+  await page.goto(consolePath('/users'))
   // This lane's local dev database persists and accumulates rows across
   // every run (`helpers.ts`), so the exact baseline total is unknown — only
   // that clearing the search must restore whatever it was.
   const total = page.locator('p[aria-live="polite"]')
   const baselineTotal = await total.textContent()
 
-  await page.getByLabel(/search users/i).fill(token)
+  await page.getByLabel(messages.console.usersSearchLabel).fill(token)
   await expect(page).toHaveURL(new RegExp(`[?&]search=${token}\\b`))
   await expect(page.getByText(targetEmail)).toBeVisible()
   // A freshly generated random token can only ever match the one fixture
   // row seeded above — proves this is a real backend `WHERE` over the full
   // dataset, not a client-side no-op or a filter over an already-paginated
   // slice (where an unrelated match could coincidentally also be absent).
-  await expect(total).toHaveText('1 user')
+  await expect(total).toHaveText(translate('console.usersTotal', { total: 1 }))
 
-  await page.getByRole('button', { name: /clear search/i }).click()
+  await page.getByRole('button', { name: messages.console.organizationsSearchClear }).click()
   await expect(page).not.toHaveURL(/[?&]search=/)
   await expect(total).toHaveText(baselineTotal ?? '')
 })
@@ -150,24 +160,26 @@ test('path-mode Users sort-by-name header orders real rows and toggles aria-sort
   createNamedUser(`${token}-a@e2e.amcore.test`, `AAA-${token}`, now)
   createNamedUser(`${token}-b@e2e.amcore.test`, `ZZZ-${token}`, now)
 
-  await page.goto(`/en/admin/users?search=${token}`)
+  await page.goto(consolePath(`/users?search=${token}`))
   await expect(page.getByText(`AAA-${token}`)).toBeVisible()
   await expect(page.getByText(`ZZZ-${token}`)).toBeVisible()
 
-  const userHeader = page.getByRole('columnheader', { name: /^Sort by User,/ })
-  await page.getByLabel(/search users/i).fill('uncommitted-sort-draft')
+  const userHeader = page.getByRole('columnheader', {
+    name: sortColumnPattern(messages.console.usersColumnUser),
+  })
+  await page.getByLabel(messages.console.usersSearchLabel).fill('uncommitted-sort-draft')
   await userHeader.getByRole('link').click()
   await expect(page).toHaveURL(/[?&]sortBy=name\b/)
   await page.waitForTimeout(400)
   await expect(page).toHaveURL(new RegExp(`[?&]search=${token}\\b`))
-  await expect(page.getByLabel(/search users/i)).toHaveValue(token)
+  await expect(page.getByLabel(messages.console.usersSearchLabel)).toHaveValue(token)
   await expect(userHeader).toHaveAttribute('aria-sort', 'ascending')
   const rowsAsc = page.getByRole('row').filter({ hasText: token })
   await expect(rowsAsc.first()).toContainText(`AAA-${token}`)
   await expect(rowsAsc.last()).toContainText(`ZZZ-${token}`)
 
   await page
-    .getByRole('columnheader', { name: /^Sort by User,/ })
+    .getByRole('columnheader', { name: sortColumnPattern(messages.console.usersColumnUser) })
     .getByRole('link')
     .click()
   await expect(page).toHaveURL(/[?&]sortOrder=desc\b/)
@@ -185,16 +197,16 @@ test('path-mode Users out-of-range recovery preserves the current search and sor
   const token = uniqueEmail('oor-token').split('@')[0]
   createNamedUser(`${token}@e2e.amcore.test`, `Solo ${token}`, new Date())
 
-  await page.goto(`/en/admin/users?search=${token}&sortBy=name&sortOrder=desc&page=2`)
+  await page.goto(consolePath(`/users?search=${token}&sortBy=name&sortOrder=desc&page=2`))
   // `EmptyTitle` (`shared/ui/empty.tsx`) renders a styled `<div>`, not a
   // heading element — matches `UsersOutOfRange.test.tsx`'s own assertion
   // style.
-  await expect(page.getByText('This page is unavailable')).toBeVisible()
+  await expect(page.getByText(messages.console.usersPageOutOfRangeTitle)).toBeVisible()
 
-  const recoveryLink = page.getByRole('link', { name: /first page/i })
+  const recoveryLink = page.getByRole('link', { name: messages.console.usersPageOutOfRangeAction })
   await expect(recoveryLink).toHaveAttribute(
     'href',
-    `/en/admin/users?search=${token}&sortBy=name&sortOrder=desc`
+    consolePath(`/users?search=${token}&sortBy=name&sortOrder=desc`)
   )
   await recoveryLink.click()
   await expect(page).toHaveURL(new RegExp(`[?&]search=${token}\\b`))
@@ -217,15 +229,15 @@ test('path-mode Users search input resyncs from the URL on browser Back', async 
   const tokenA = uniqueEmail('back-token-a').split('@')[0]
   const tokenB = uniqueEmail('back-token-b').split('@')[0]
 
-  await page.goto(`/en/admin/users?search=${tokenA}`)
-  await expect(page.getByLabel(/search users/i)).toHaveValue(tokenA)
+  await page.goto(consolePath(`/users?search=${tokenA}`))
+  await expect(page.getByLabel(messages.console.usersSearchLabel)).toHaveValue(tokenA)
 
-  await page.goto(`/en/admin/users?search=${tokenB}`)
-  await expect(page.getByLabel(/search users/i)).toHaveValue(tokenB)
+  await page.goto(consolePath(`/users?search=${tokenB}`))
+  await expect(page.getByLabel(messages.console.usersSearchLabel)).toHaveValue(tokenB)
 
   await page.goBack()
   await expect(page).toHaveURL(new RegExp(`[?&]search=${tokenA}\\b`))
-  await expect(page.getByLabel(/search users/i)).toHaveValue(tokenA)
+  await expect(page.getByLabel(messages.console.usersSearchLabel)).toHaveValue(tokenA)
 })
 
 test('the Users panel has no axe violations with an active search and a no-results state', async ({
@@ -234,15 +246,15 @@ test('the Users panel has no axe violations with an active search and a no-resul
   const email = uniqueEmail('axe-users-search')
   await signInAsPathAdmin(page, email)
 
-  await page.goto('/en/admin/users')
+  await page.goto(consolePath('/users'))
   await expectNoAxeViolations(page)
 
   const token = uniqueEmail('axe-search-token').split('@')[0]
-  await page.getByLabel(/search users/i).fill(token)
+  await page.getByLabel(messages.console.usersSearchLabel).fill(token)
   await expect(page).toHaveURL(new RegExp(`[?&]search=${token}\\b`))
   // A random token matches nothing — covers the "no results for your
   // search" empty state, not just the populated table.
-  await expect(page.getByText(/no matching users/i)).toBeVisible()
+  await expect(page.getByText(messages.console.usersNoSearchResultsTitle)).toBeVisible()
   await expectNoAxeViolations(page)
 })
 
@@ -250,10 +262,9 @@ test('the Users panel has no axe violations with a non-default sort applied', as
   const email = uniqueEmail('axe-users-sort')
   await signInAsPathAdmin(page, email)
 
-  await page.goto('/en/admin/users?sortBy=name&sortOrder=desc')
-  await expect(page.getByRole('columnheader', { name: /^Sort by User,/ })).toHaveAttribute(
-    'aria-sort',
-    'descending'
-  )
+  await page.goto(consolePath('/users?sortBy=name&sortOrder=desc'))
+  await expect(
+    page.getByRole('columnheader', { name: sortColumnPattern(messages.console.usersColumnUser) })
+  ).toHaveAttribute('aria-sort', 'descending')
   await expectNoAxeViolations(page)
 })

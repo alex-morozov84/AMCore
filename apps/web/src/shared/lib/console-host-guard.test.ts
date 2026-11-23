@@ -1,6 +1,8 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
+
+import { stubProductOrigins } from '@/test/product-origins'
 
 import { ADMIN_CONSOLE_CONFIG } from './admin-console-topology'
 import { isConsoleHost, withConsoleHostGuard } from './console-host-guard'
@@ -11,6 +13,12 @@ const mutableConfig = ADMIN_CONSOLE_CONFIG as unknown as {
 }
 const originalEnabled = ADMIN_CONSOLE_CONFIG.enabled
 const originalMode = ADMIN_CONSOLE_CONFIG.mode
+
+beforeEach(() => {
+  stubProductOrigins('https://app.example.test')
+  mutableConfig.enabled = true
+  mutableConfig.mode = 'path'
+})
 
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -23,7 +31,6 @@ afterEach(() => {
 describe('console host guard', () => {
   it('allows only the website host in generated path mode', () => {
     mutableConfig.mode = 'path'
-    vi.stubEnv('FRONTEND_URL', 'https://app.example.test')
 
     expect(isConsoleHost('app.example.test')).toBe(true)
     expect(isConsoleHost('console.example.test')).toBe(false)

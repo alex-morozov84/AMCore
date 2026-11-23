@@ -3,8 +3,8 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 
 import { getUserId, setSystemRole } from '../real-stack/admin-helpers'
-import { registerViaUi, TEST_PASSWORD, uniqueEmail } from '../real-stack/helpers'
-import { completeMfaSignIn } from '../shared/mfa-login'
+import { loginViaUi, registerViaUi, uniqueEmail } from '../real-stack/helpers'
+import { isProductHome, productPath } from '../shared/product-settings'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
 test('key controls use the isolated Console host and exact origin with live admission', async ({
@@ -33,13 +33,11 @@ test('key controls use the isolated Console host and exact origin with live admi
       { org: organizationId, id, user: userId }
     )
     const page = await console.newPage()
-    await page.goto('/en/login')
-    await page.getByLabel(/email/i).fill(email)
-    await page.getByLabel(/^password$/i).fill(TEST_PASSWORD)
-    await page.getByRole('button', { name: /sign in/i }).click()
-    await completeMfaSignIn(page, email)
-    await expect(page).toHaveURL(`${target.origins.console}/en`)
-    await page.goto(`/en/api-keys?id=${id}`)
+    await loginViaUi(page, email, { mfa: 'required', surface: 'console' })
+    await expect(page).toHaveURL(
+      (url) => url.origin === target.origins.console && isProductHome(url)
+    )
+    await page.goto(productPath(`/api-keys?id=${id}`))
     await expect(page.getByRole('row').filter({ hasText: 'Host integration' })).toBeVisible()
     const path = `/api/api-keys/${id}`
     const wrongOrigin = await page.request.delete(path, {

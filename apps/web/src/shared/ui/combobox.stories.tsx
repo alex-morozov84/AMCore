@@ -19,7 +19,7 @@ function CollectionSelect({ disabled = false }: { disabled?: boolean }) {
       <ComboboxTrigger aria-label="Collection">{value ?? 'Select a collection'}</ComboboxTrigger>
       <ComboboxContent aria-label="Choose a collection">
         <ComboboxInput aria-label="Search collections" />
-        <ComboboxList>
+        <ComboboxList aria-label="Collections">
           {(item: string) => (
             <ComboboxItem key={item} value={item}>
               {item}

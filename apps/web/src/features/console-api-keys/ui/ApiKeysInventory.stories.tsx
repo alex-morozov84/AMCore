@@ -4,6 +4,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { http, HttpResponse } from 'msw'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 
+import { getConsolePublicApiPath } from '@/shared/lib/console-public-api-path'
 import { TableHead } from '@/shared/ui/table'
 
 import messages from './api-key-copy.fixture.json'
@@ -67,7 +68,7 @@ export const SelectedConfirmation: Story = {
 export const NoOp: Story = {
   beforeEach({ msw }) {
     msw.use(
-      http.post('/api/console/api-keys/revoke', () =>
+      http.post(`/api${getConsolePublicApiPath('/api-keys/revoke')}`, () =>
         HttpResponse.json({ requestedCount: 2, affectedCount: 0 })
       )
     )

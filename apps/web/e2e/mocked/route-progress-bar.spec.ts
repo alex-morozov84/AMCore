@@ -1,6 +1,8 @@
+import { DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 import { expect } from '@playwright/test'
 
 import { test } from '../shared/auth-test'
+import { messages, productPath } from '../shared/product-settings'
 
 /**
  * The one thing neither route-progress-controller.test.ts (fake timers, no
@@ -26,41 +28,52 @@ test('a delayed Link navigation shows the bar, then hides it once the route reso
     await route.continue()
   })
 
-  await page.goto('/en/login')
+  await page.goto(productPath('/login'))
   await page.locator('html[data-route-progress-ready]').waitFor()
   const bar = page.getByTestId('route-progress-bar')
   await expect(bar).toBeHidden()
 
-  await page.getByRole('link', { name: /forgot your password/i }).click({ noWaitAfter: true })
+  await page
+    .getByRole('link', { name: messages.auth.forgotPassword, exact: true })
+    .click({ noWaitAfter: true })
 
   await expect(bar).toBeVisible()
   releaseRoute()
-  await expect(page).toHaveURL(/\/en\/forgot-password$/)
+  await expect(page).toHaveURL(productPath('/forgot-password'))
   await expect(bar).toBeHidden()
 })
 
-test('a delayed programmatic navigation (router.replace via the locale switcher) shows the bar', async ({
-  page,
-}) => {
-  let releaseRoute!: () => void
-  const routeBlocked = new Promise<void>((resolve) => {
-    releaseRoute = resolve
-  })
-  await page.route('**/ru/login**', async (route) => {
-    await routeBlocked
-    await route.continue()
-  })
+const alternateLocale = SERVED_LOCALES.find((locale) => locale !== DEFAULT_LOCALE)
+if (alternateLocale) {
+  const locale = alternateLocale
+  test('a delayed programmatic navigation (router.replace via the locale switcher) shows the bar', async ({
+    page,
+  }) => {
+    let releaseRoute!: () => void
+    const routeBlocked = new Promise<void>((resolve) => {
+      releaseRoute = resolve
+    })
+    await page.route(
+      (url) => url.pathname === productPath('/login', locale),
+      async (route) => {
+        await routeBlocked
+        await route.continue()
+      }
+    )
 
-  await page.goto('/en/login')
-  await page.locator('html[data-route-progress-ready]').waitFor()
-  const bar = page.getByTestId('route-progress-bar')
-  await page.getByRole('combobox', { name: /language/i }).selectOption('ru')
+    await page.goto(productPath('/login'))
+    await page.locator('html[data-route-progress-ready]').waitFor()
+    const bar = page.getByTestId('route-progress-bar')
+    await page
+      .getByRole('combobox', { name: messages.locale.label, exact: true })
+      .selectOption(locale)
 
-  await expect(bar).toBeVisible()
-  releaseRoute()
-  await expect(page).toHaveURL(/\/ru\/login$/)
-  await expect(bar).toBeHidden()
-})
+    await expect(bar).toBeVisible()
+    releaseRoute()
+    await expect(page).toHaveURL(productPath('/login', locale))
+    await expect(bar).toBeHidden()
+  })
+}
 
 test('browser back does not strand the bar at the maxDurationMs safety net', async ({ page }) => {
   // Regression for the bug found via hands-on owner testing (fixed in
@@ -68,28 +81,28 @@ test('browser back does not strand the bar at the maxDurationMs safety net', asy
   // on an already-committed page fire a phantom start() with no finish()
   // ever coming, resolved only by the controller's 6s safety net. Asserting
   // hidden well before that proves a real finish() fired, not the timeout.
-  await page.goto('/en/login')
-  await page.getByRole('link', { name: /sign up/i }).click()
-  await expect(page).toHaveURL(/\/en\/register$/)
+  await page.goto(productPath('/login'))
+  await page.getByRole('link', { name: messages.auth.register, exact: true }).click()
+  await expect(page).toHaveURL(productPath('/register'))
 
   const bar = page.getByTestId('route-progress-bar')
   await page.goBack()
-  await expect(page).toHaveURL(/\/en\/login$/)
+  await expect(page).toHaveURL(productPath('/login'))
   await expect(bar).toBeHidden({ timeout: 2000 })
 })
 
 test('a fast Link navigation to an already-resolved route never shows the bar', async ({
   page,
 }) => {
-  await page.goto('/en/login')
+  await page.goto(productPath('/login'))
   // Warm the destination first (next dev never auto-prefetches) so the
   // click below is genuinely fast, not incidentally slow as a first visit.
-  await page.goto('/en/register')
-  await page.goto('/en/login')
+  await page.goto(productPath('/register'))
+  await page.goto(productPath('/login'))
 
   const bar = page.getByTestId('route-progress-bar')
-  await page.getByRole('link', { name: /sign up/i }).click()
-  await expect(page).toHaveURL(/\/en\/register$/)
+  await page.getByRole('link', { name: messages.auth.register, exact: true }).click()
+  await expect(page).toHaveURL(productPath('/register'))
   await expect(bar).toBeHidden()
 })
 
@@ -98,12 +111,14 @@ test('a modifier-click never starts the bar in the current tab', async ({ page }
   // (Cmd on macOS, Ctrl elsewhere) this test doesn't need to settle --
   // Next's own linkClicked() checks metaKey/ctrlKey/shiftKey/altKey
   // identically, so any one of them proves the same exclusion path.
-  await page.goto('/en/login')
+  await page.goto(productPath('/login'))
   const bar = page.getByTestId('route-progress-bar')
 
-  await page.getByRole('link', { name: /sign up/i }).click({ modifiers: ['Shift'] })
+  await page
+    .getByRole('link', { name: messages.auth.register, exact: true })
+    .click({ modifiers: ['Shift'] })
 
-  await expect(page).toHaveURL(/\/en\/login$/)
+  await expect(page).toHaveURL(productPath('/login'))
   await expect(bar).toBeHidden()
 })
 
@@ -118,10 +133,12 @@ test('reduced motion uses neither crawl animation nor completion transition', as
     await route.continue()
   })
 
-  await page.goto('/en/login')
+  await page.goto(productPath('/login'))
   await page.locator('html[data-route-progress-ready]').waitFor()
   const bar = page.getByTestId('route-progress-bar')
-  await page.getByRole('link', { name: /forgot your password/i }).click({ noWaitAfter: true })
+  await page
+    .getByRole('link', { name: messages.auth.forgotPassword, exact: true })
+    .click({ noWaitAfter: true })
   await expect(bar).toBeVisible()
   await expect(bar).toHaveCSS('animation-name', 'none')
 
@@ -137,7 +154,7 @@ test('reduced motion uses neither crawl animation nor completion transition', as
     observer.observe(element, { attributes: true, attributeFilter: ['data-phase'] })
   })
   releaseRoute()
-  await page.waitForURL(/\/en\/forgot-password$/)
+  await page.waitForURL(productPath('/forgot-password'))
   await expect(page.locator('html')).toHaveAttribute('data-observed-completion', '0s')
   await expect(bar).toBeHidden()
 })

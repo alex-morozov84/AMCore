@@ -93,3 +93,12 @@ function readSettings(root, name, validate) {
 export const readLocaleSettings = (root) => readSettings(root, 'locales', validateLocaleSettings)
 export const readAdminConsoleSettings = (root) =>
   readSettings(root, 'admin-console', validateAdminConsoleSettings)
+
+export const readProductAdminPlacement = (root) =>
+  readSettings(root, 'product-admin', (value) => {
+    const problems = shapeProblems(value, ['version', 'mode', 'alias'])
+    if (!isRecord(value)) return problems
+    if (value.version !== 1) problems.push('version (invalid_value)')
+    if (!['path', 'host'].includes(value.mode)) problems.push('mode (invalid_value)')
+    return [...problems, ...aliasProblems(value.alias)]
+  })

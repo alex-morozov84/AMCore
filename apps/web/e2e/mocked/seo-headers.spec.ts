@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+import { productPath } from '../shared/product-settings'
+
 /**
  * Search-engine indexing is closed by default (docs/frontend/seo.md). The mocked lane never sets
  * `WEB_SEO_INDEXING`, so this asserts the closed state on real HTTP responses from `next dev`:
@@ -11,7 +13,7 @@ import { expect, test } from '@playwright/test'
 const NOINDEX = 'noindex, nofollow'
 
 test('a proxied page response is closed to search engines by header', async ({ request }) => {
-  const response = await request.get('/en/login')
+  const response = await request.get(productPath('/login'))
   expect(response.headers()['x-robots-tag']).toBe(NOINDEX)
 })
 
@@ -24,7 +26,7 @@ test('a route outside the proxy matcher still carries the static noindex header'
 })
 
 test('a private page is closed by the root noindex meta tag', async ({ page }) => {
-  await page.goto('/en/login')
+  await page.goto(productPath('/login'))
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', NOINDEX)
 })
 

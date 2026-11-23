@@ -1,40 +1,32 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
-
 import { DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 import { expect, type Page } from '@playwright/test'
 
-import { activeTarget } from '../support/managed-target.mjs'
-
 import { expectNoAxeViolations } from './axe'
-const catalogue = (locale: string) =>
-  JSON.parse(
-    readFileSync(join(activeTarget().snapshot, `apps/web/messages/${locale}.json`), 'utf8')
-  )
-const t = catalogue(DEFAULT_LOCALE).console
-const common = catalogue(DEFAULT_LOCALE).common
-const secondary = catalogue(
-  new Set<string>(SERVED_LOCALES).has('ru') ? 'ru' : DEFAULT_LOCALE
-).console
+import { consolePath, messages, messagesForLocale } from './product-settings'
+
+const t = messages.console
+const common = messages.common
+const secondaryLocale = SERVED_LOCALES.find((locale) => locale !== DEFAULT_LOCALE) ?? DEFAULT_LOCALE
+const secondary = messagesForLocale(secondaryLocale).console
 type Mode = (value: string) => unknown
 const card = (page: Page) => page.locator('[aria-labelledby="overview-attention-title"]')
 export async function summaryFaultJourney(page: Page, mode: Mode, assertReads: () => void) {
   mode('empty')
-  await page.goto('/en/admin')
+  await page.goto(consolePath())
   await expect(card(page)).toContainText(t.problems.empty)
   assertReads()
   mode('queues500')
-  await page.goto('/en/admin')
+  await page.goto(consolePath())
   await expect(card(page)).toContainText(t.problems.gaps)
   await expect(card(page)).toContainText(t.problems.sourceUnavailable)
   await expect(page.getByRole('heading', { name: t.overviewDiskTitle, exact: true })).toBeVisible()
   mode('all500')
-  await page.goto('/en/admin')
+  await page.goto(consolePath())
   await expect(card(page)).toContainText(t.problems.unavailable)
   await expect(page.getByRole('button', { name: t.overviewRefresh, exact: true })).toHaveCount(1)
   await expect(page.getByRole('button', { name: common.retry, exact: true })).toHaveCount(0)
   mode('retry')
-  await page.goto('/en/admin')
+  await page.goto(consolePath())
   await expect(page.getByRole('button', { name: t.overviewRefresh, exact: true })).toBeDisabled()
   await expect(
     page.getByText(new RegExp(t.problems.retryWait.split('{seconds,')[0] + '\\d+'))
@@ -56,17 +48,17 @@ export async function summaryFaultJourney(page: Page, mode: Mode, assertReads: (
   await expect(page.getByRole('button', { name: t.overviewRefresh, exact: true })).toBeEnabled()
   for (const fault of ['integrations401', 'malformed']) {
     mode(fault)
-    await page.goto('/en/admin')
+    await page.goto(consolePath())
     await expect(card(page)).toHaveCount(0)
     await expect(page.getByText(t.problems.empty)).toHaveCount(0)
   }
   mode('empty')
-  await page.goto('/en/admin')
+  await page.goto(consolePath())
   await expect(card(page)).toContainText(t.problems.empty)
 }
 export async function summaryMetricsJourney(page: Page, mode: Mode, metricsOrigin: string) {
   mode('many')
-  await page.goto('/en/admin')
+  await page.goto(consolePath())
   await expect(card(page).getByRole('heading', { level: 3 })).toHaveCount(5)
   await card(page).getByText(t.problems.more.replace('{count}', '2')).focus()
   await page.keyboard.press('Enter')
@@ -106,18 +98,18 @@ export async function summaryMetricsJourney(page: Page, mode: Mode, metricsOrigi
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' })
   await expect(page.locator('html')).toHaveClass(/dark/)
-  await page.goto('/ru/admin')
+  await page.goto(consolePath('', secondaryLocale))
   await expect(
     page.getByRole('heading', { name: secondary.problems.title, exact: true })
   ).toBeVisible()
   await expectNoAxeViolations(page)
-  await page.goto('/ru/admin/scheduled-jobs?focus=not-in-current-list')
+  await page.goto(consolePath('/scheduled-jobs?focus=not-in-current-list', secondaryLocale))
   await expect(
     page.getByRole('status').filter({ hasText: secondary.problems.focusMissing })
   ).toBeVisible()
-  await page.goto('/ru/admin/integrations?focus=email')
+  await page.goto(consolePath('/integrations?focus=email', secondaryLocale))
   await expect(page.locator('[data-console-source="integration:email"]:visible')).toBeFocused()
-  await page.goto('/ru/admin/background-work?focus=default')
+  await page.goto(consolePath('/background-work?focus=default', secondaryLocale))
   await expect(page.locator('[data-console-source="queue:default"]:visible')).toBeFocused()
   mode('pass')
 }

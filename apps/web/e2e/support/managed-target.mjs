@@ -21,17 +21,28 @@ export function testOptions() {
   if (m.lane === 'console-real-stack') baseURL = m.origins.console
   return {
     baseURL,
+    // Browser language drives locale negotiation when the journey has no saved preference.
+    locale: m.baseLocale,
     proxy: { server: m.relay },
-    launchOptions: { proxy: { server: m.relay }, args: ['--proxy-bypass-list=<-loopback>'] },
-    ignoreHTTPSErrors: m.topology === 'host',
+    launchOptions: {
+      proxy: { server: m.relay },
+      args: [
+        '--proxy-bypass-list=<-loopback>',
+        ...(m.mockTls ? [`--ignore-certificate-errors-spki-list=${m.mockTls.pin}`] : []),
+      ],
+    },
+    ignoreHTTPSErrors: m.topology === 'host' && !m.mockTls,
   }
 }
 export function outputPaths() {
   const m = activeTarget()
   const dir = `${m.worktree}/.amcore/stands/${m.id}`
+  const reporter = standReporters(m, dir)
+  if (process.env.AMCORE_BROWSER_REPORT)
+    reporter.push([join(m.snapshot, 'apps/web/e2e/support/browser-results.mjs')])
   return {
     outputDir: `${dir}/test-results`,
-    reporter: standReporters(m, dir),
+    reporter,
   }
 }
 export function standReporters(m, dir) {

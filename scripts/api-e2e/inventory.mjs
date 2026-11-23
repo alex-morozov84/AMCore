@@ -62,10 +62,30 @@ export function sourceContract() {
     }
   }
 }
+function requireBaseSuites(all) {
+  const base = process.env.API_E2E_PR_BASE
+  if (!base) return
+  if (!/^[a-f0-9]{40}$/.test(base)) throw new Error('Invalid API base commit')
+  const expected = execFileSync(
+    'git',
+    ['ls-tree', '-r', '--name-only', '-z', base, '--', 'apps/api/test'],
+    {
+      cwd: root,
+      encoding: 'utf8',
+    }
+  )
+    .split('\0')
+    .filter((file) => file.endsWith('.e2e-spec.ts'))
+  const current = new Set(all.map((file) => `apps/api/${file}`))
+  const missing = expected.filter((file) => !current.has(file))
+  if (missing.length) throw new Error(`Missing mandatory API suites: ${missing.join(', ')}`)
+}
+
 export function plan(count = 1) {
   effectiveConfig()
   sourceContract()
   const all = discover()
+  requireBaseSuites(all)
   const paths = files(resolve(api, 'test'), '.e2e-spec.ts')
     .map((path) => relative(api, path).replaceAll('\\', '/'))
     .sort()

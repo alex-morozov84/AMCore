@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
+import { stubProductOrigins } from '@/test/product-origins'
+
 import { fetchBackendResponse } from '../backend-transport'
 
 import { createBrowserAuthAttempt } from './browser-auth-attempt'
@@ -19,8 +21,7 @@ vi.mock('./browser-auth-attempt', () => ({
 }))
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.stubEnv('FRONTEND_URL', 'https://app.example.test')
-  vi.stubEnv('PRODUCT_ADMIN_ORIGIN', '')
+  stubProductOrigins('https://app.example.test')
   vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-bootstrap-private-key-at-least-32>')
 })
 afterEach(() => vi.unstubAllEnvs())

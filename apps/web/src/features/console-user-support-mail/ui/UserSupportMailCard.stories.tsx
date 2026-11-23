@@ -4,6 +4,8 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { delay, http, HttpResponse } from 'msw'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 
+import { getConsolePublicApiPath } from '@/shared/lib/console-public-api-path'
+
 import en from '../../../../messages/en.json'
 
 import { UserSupportMailCard } from './UserSupportMailCard'
@@ -12,7 +14,7 @@ const t = createTranslator({ locale: DEFAULT_LOCALE, messages: en.console.suppor
 
 const id = '00000000-0000-4000-8000-000000000001'
 const attemptId = '00000000-0000-4000-8000-000000000002'
-const endpoint = `/api/console/users/${id}/support-mail`
+const endpoint = `/api${getConsolePublicApiPath(`/users/${id}/support-mail`)}`
 const status: SupportMailStatus = {
   serverNow: '2026-10-24T12:00:00.000Z',
   provider: 'mock',

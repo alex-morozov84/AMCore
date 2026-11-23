@@ -2,14 +2,20 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { DEFAULT_LOCALE, localizedFrontendUrl } from '@amcore/shared'
+import { DEFAULT_LOCALE } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
+import {
+  browserCredentialRequest,
+  ensureAdministrationSession,
+  TEST_PASSWORD,
+  uniqueEmail,
+} from './helpers'
+import { organizationUi } from './organization-context.helpers'
 
 // Real BFF, real API, real browser: the access explanation of a member who holds the built-in ADMIN
 // role and a custom role that denies editing the name. Uses only the active managed test stand.
@@ -60,15 +66,8 @@ test('member access: roles, decisions, a veto with its cause, a failed read and 
   }
   const failures: string[] = []
   page.on('pageerror', (error) => failures.push(error.name))
-  await page.goto(
-    new URL(
-      localizedFrontendUrl(
-        target.origins.product,
-        DEFAULT_LOCALE,
-        `organizations/${org.id}/members`
-      )
-    ).pathname
-  )
+  await ensureAdministrationSession(context, email)
+  await page.goto(organizationUi(DEFAULT_LOCALE).url(`/${org.id}/members`))
   await openAccess()
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('heading', { name: t.title })).toBeVisible()

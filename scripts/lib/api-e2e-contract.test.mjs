@@ -117,7 +117,7 @@ test('CI full coverage keeps one stock execution path and strict aggregate', asy
   assert.equal((workflow.match(/name: API E2E\n/g) || []).length, 1)
   assert.match(
     workflow,
-    /api-e2e:\n[\s\S]*?needs: \[ci-selection, api-e2e-plan, api-e2e-shards\]\n {4}if: \$\{\{ always\(\) \}\}/
+    /api-e2e:\n {4}if:.*always\(\)[^\n]*[\s\S]*?needs: \[ci-selection, api-e2e-plan, api-e2e-shards\]/
   )
   assert.match(workflow, /fail-fast: false/)
   assert.match(workflow, /node scripts\/api-e2e\/aggregate.mjs api-e2e-evidence/)

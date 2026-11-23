@@ -1,6 +1,7 @@
 import { expect, type Request, test } from '@playwright/test'
 
 import { logoutViaApi, registerViaUi, uniqueEmail } from '../real-stack/helpers'
+import { isProductHome, productPath } from '../shared/product-settings'
 import { activeTarget } from '../support/managed-target.mjs'
 
 import { appleBrowserFixture } from './apple-browser-fixture'
@@ -38,7 +39,7 @@ for (const surface of ['site', 'admin'] as const) {
           const previous = request.redirectedFrom()
           if (
             (previous && new URL(previous.url()).pathname === callback) ||
-            (surface === 'site' && new URL(request.url()).pathname === '/en/login')
+            (surface === 'site' && new URL(request.url()).pathname === productPath('/login'))
           )
             errorReads.push(
               request.allHeaders().then((headers) => {
@@ -50,8 +51,8 @@ for (const surface of ['site', 'admin'] as const) {
         // A controlled callback error is a real browser navigation, without a real grant.
         await page.goto(`${origin}${callback}?code=review-invalid&state=review-invalid`)
         if (surface === 'site') {
-          await page.evaluate(() => location.assign('/en/login'))
-          await page.waitForURL('**/en/login')
+          await page.evaluate((login) => location.assign(login), productPath('/login'))
+          await page.waitForURL(productPath('/login'))
         }
         await Promise.all(errorReads)
         expect(errorReferrers).toEqual([undefined])
@@ -64,7 +65,7 @@ for (const surface of ['site', 'admin'] as const) {
         page.on('response', (response) => {
           const path = new URL(response.url()).pathname
           if (path === callback) callbackPolicies.push(response.headers()['referrer-policy'])
-          if (path === '/en/auth/callback')
+          if (path === productPath('/auth/callback'))
             documentPolicies.push(response.headers()['referrer-policy'])
           if (path === `${base}/complete`) postPolicies.push(response.headers()['referrer-policy'])
         })
@@ -85,7 +86,9 @@ for (const surface of ['site', 'admin'] as const) {
         await page.waitForURL(
           (url) =>
             url.origin === origin &&
-            url.pathname === (surface === 'admin' ? '/en/organizations' : '/en'),
+            (surface === 'admin'
+              ? url.pathname === productPath('/organizations')
+              : isProductHome(url)),
           { timeout: 15000 }
         )
         await Promise.all(reads)
@@ -96,7 +99,7 @@ for (const surface of ['site', 'admin'] as const) {
         expect(postPolicies).toEqual(['no-referrer'])
         expect((await context.request.get(`${origin}/api/auth/me`)).status()).toBe(200)
         const legacy = await context.request.get(
-          `${product}/ru/organizations/org_review/invites?status=expired&page=2&search=hello&unrelated=drop`,
+          `${product}${productPath('/organizations/org_review/invites?status=expired&page=2&search=hello&unrelated=drop')}`,
           { maxRedirects: 0 }
         )
         expect(legacy.status()).toBe(308)

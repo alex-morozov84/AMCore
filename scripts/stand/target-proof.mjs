@@ -5,6 +5,8 @@ const fields = [
   'attempt',
   'purpose',
   'fixtureProfile',
+  'settingsPolicy',
+  'exercisedSettings',
   'mailCaptureKey',
   'topology',
   'worktree',

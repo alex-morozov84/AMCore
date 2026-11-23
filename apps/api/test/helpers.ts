@@ -254,7 +254,10 @@ export async function setupE2ETest(
         () => postgresContainer.stop({ timeout: 10_000 }),
       ])
     } catch (cleanupError) {
-      throw new AggregateError([error, cleanupError], 'E2E bootstrap and cleanup failed')
+      // Preserve the primary exception when the cleanup also fails.
+      throw new AggregateError([error, cleanupError], 'E2E bootstrap and cleanup failed', {
+        cause: error,
+      })
     }
     throw error
   }

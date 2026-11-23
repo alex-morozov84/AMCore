@@ -211,12 +211,12 @@ test('aggregate explains unavailable planning before rejecting original failure 
     assert.equal(result.status, 1, result.stderr)
     assert.match(await readFile(summary, 'utf8'), /coverage unavailable/)
   }
-  assert.equal(jobs['web-e2e-plan'].steps.at(-1).run, 'node scripts/e2e-ci.mjs --plan-ci')
+  assert.match(jobs['web-e2e-plan'].steps.at(-1).run, /node scripts\/e2e-ci.mjs --plan-ci/)
   assert.ok(
     jobs['web-e2e-lanes'].steps.find((s) => s.id === 'audit-upload').with.path.endsWith('/view/')
   )
   assert.deepEqual(
     [jobs['web-e2e-plan']['timeout-minutes'], jobs['web-e2e']['timeout-minutes']],
-    [5, 5]
+    [10, 5]
   )
 })

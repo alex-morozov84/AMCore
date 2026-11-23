@@ -24,6 +24,7 @@ export interface ManagedTarget {
   }
   hostnames: { product: string; console: string; api: string; staff?: string }
   caFile?: string
+  mockTls?: { dir: string; pin: string }
   relay: string
   lane: string
 }

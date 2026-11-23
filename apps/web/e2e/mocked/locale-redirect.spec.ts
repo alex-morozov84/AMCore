@@ -1,27 +1,30 @@
+import { DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
-/**
- * `localePrefix: 'always'` (`src/i18n/routing.ts`) means `/` never renders
- * directly — it always redirects to an explicit `/{locale}` path, resolved
- * from `Accept-Language` on the first visit. No mocking needed: this is
- * pure browser-originating routing, grouped into the mocked lane for its
- * infra cost, not because anything is intercepted.
- */
+import { productPath } from '../shared/product-settings'
 
-test.describe('locale redirect', () => {
-  test.use({ locale: 'en-US' })
+for (const { locale, preference, group, title } of [
+  {
+    locale: 'en',
+    preference: 'en-US',
+    group: 'locale redirect',
+    title: 'redirects "/" to "/en" for an English browser',
+  },
+  {
+    locale: 'ru',
+    preference: 'ru-RU',
+    group: 'locale redirect — Russian',
+    title: 'redirects "/" to "/ru" for a Russian browser',
+  },
+] as const) {
+  test.describe(group, () => {
+    test.use({ locale: preference })
 
-  test('redirects "/" to "/en" for an English browser', async ({ page }) => {
-    await page.goto('/')
-    await expect(page).toHaveURL(/\/en(\/|$)/)
+    test(title, async ({ page }) => {
+      const expected = SERVED_LOCALES.find((served) => served === locale) ?? DEFAULT_LOCALE
+      await page.goto('/')
+      await expect(page).toHaveURL(productPath('/login', expected))
+      await expect(page.locator('html')).toHaveAttribute('lang', expected)
+    })
   })
-})
-
-test.describe('locale redirect — Russian', () => {
-  test.use({ locale: 'ru-RU' })
-
-  test('redirects "/" to "/ru" for a Russian browser', async ({ page }) => {
-    await page.goto('/')
-    await expect(page).toHaveURL(/\/ru(\/|$)/)
-  })
-})
+}

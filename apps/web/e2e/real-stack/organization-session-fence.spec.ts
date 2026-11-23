@@ -4,7 +4,13 @@ import { observeContextReads, saveContextDiagnostics } from '../support/context-
 import { activeTarget } from '../support/managed-target.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
+import {
+  browserCredentialRequest,
+  ensureAdministrationSession,
+  productAdministrationOrigin,
+  TEST_PASSWORD,
+  uniqueEmail,
+} from './helpers'
 import { organizationUi } from './organization-context.helpers'
 
 let phase = 'setup'
@@ -45,11 +51,20 @@ async function fixture(page: Page) {
     api.accessToken
   )
   const ui = organizationUi()
-  await page.goto(ui.path(`/${organization.id}`))
+  const adminOrigin = productAdministrationOrigin()
+  await ensureAdministrationSession(page.context(), email)
+  await page.goto(ui.url(`/${organization.id}`))
   await expect(page.getByRole('heading', { name: organization.name, exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: ui.text('refresh'), exact: true })).toBeEnabled()
   await settle()
-  return { origin, email, actor: api.user, organization, ui }
+  return {
+    origin: adminOrigin,
+    separate: adminOrigin !== origin,
+    email,
+    actor: api.user,
+    organization,
+    ui,
+  }
 }
 
 async function settle() {
@@ -63,7 +78,8 @@ async function settle() {
 
 async function replace(page: Page, f: Awaited<ReturnType<typeof fixture>>) {
   mark('credential-dispatch')
-  const login = await browserCredentialRequest(page.request, '/api/auth/login', {
+  const path = f.separate ? '/api/product-admin/auth/login' : '/api/auth/login'
+  const login = await browserCredentialRequest(page.request, path, {
     headers: { origin: f.origin },
     data: { email: f.email, password: TEST_PASSWORD },
   })

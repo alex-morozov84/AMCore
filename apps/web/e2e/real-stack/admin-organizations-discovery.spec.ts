@@ -1,9 +1,19 @@
 import { expect, type Page, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
+import { requirePathConsole } from '../shared/console-applicability'
+import {
+  consolePath,
+  isProductHome,
+  messages,
+  sortColumnPattern,
+  translate,
+} from '../shared/product-settings'
 
 import { createOrganization, setSystemRole } from './admin-helpers'
 import { loginViaUi, registerViaUi, uniqueEmail } from './helpers'
+
+requirePathConsole()
 
 async function signInAsPathAdmin(page: Page, prefix: string) {
   const email = uniqueEmail(prefix)
@@ -11,7 +21,7 @@ async function signInAsPathAdmin(page: Page, prefix: string) {
   setSystemRole(email, 'SUPER_ADMIN')
   await page.context().clearCookies()
   await loginViaUi(page, email)
-  await expect(page).toHaveURL(/\/en\/?$/)
+  await expect(page).toHaveURL(isProductHome)
 }
 
 test('Organizations search filters real data, resets page, and clears', async ({ page }) => {
@@ -20,17 +30,17 @@ test('Organizations search filters real data, resets page, and clears', async ({
   const orgName = `Findable ${token}`
   createOrganization(orgName, `${token}-slug`)
 
-  await page.goto('/en/admin/organizations?page=2')
+  await page.goto(consolePath('/organizations?page=2'))
   const total = page.locator('p[aria-live="polite"]')
   const baselineTotal = await total.textContent()
-  await page.getByLabel(/search organizations/i).fill(token)
+  await page.getByLabel(messages.console.organizationsSearchLabel).fill(token)
 
   await expect(page).toHaveURL(new RegExp(`[?&]search=${token}\\b`))
   await expect(page).not.toHaveURL(/[?&]page=/)
   await expect(page.getByRole('cell', { name: orgName })).toBeVisible()
-  await expect(total).toHaveText('1 organization')
+  await expect(total).toHaveText(translate('console.organizationsTotal', { total: 1 }))
 
-  await page.getByRole('button', { name: /clear search/i }).click()
+  await page.getByRole('button', { name: messages.console.organizationsSearchClear }).click()
   await expect(page).not.toHaveURL(/[?&]search=/)
   await expect(total).toHaveText(baselineTotal ?? '')
 })
@@ -42,8 +52,10 @@ test('Organizations sort-by-name orders real rows and toggles aria-sort', async 
   createOrganization(`AAA-${token}`, `${token}-a`, now)
   createOrganization(`ZZZ-${token}`, `${token}-b`, now)
 
-  await page.goto(`/en/admin/organizations?search=${token}`)
-  const nameHeader = page.getByRole('columnheader', { name: /^Sort by Name,/ })
+  await page.goto(consolePath(`/organizations?search=${token}`))
+  const nameHeader = page.getByRole('columnheader', {
+    name: sortColumnPattern(messages.console.organizationsColumnName),
+  })
   await nameHeader.getByRole('link').click()
   await expect(nameHeader).toHaveAttribute('aria-sort', 'ascending')
   let rows = page.getByRole('row').filter({ hasText: token })
@@ -63,12 +75,14 @@ test('Organizations out-of-range recovery preserves search and sort', async ({ p
   const token = uniqueEmail('org-oor-token').split('@')[0]
   createOrganization(`Solo ${token}`, `${token}-solo`)
 
-  await page.goto(`/en/admin/organizations?search=${token}&sortBy=name&sortOrder=desc&page=2`)
-  await expect(page.getByText('This page is unavailable')).toBeVisible()
-  const recoveryLink = page.getByRole('link', { name: /first page/i })
+  await page.goto(consolePath(`/organizations?search=${token}&sortBy=name&sortOrder=desc&page=2`))
+  await expect(page.getByText(messages.console.organizationsPageOutOfRangeTitle)).toBeVisible()
+  const recoveryLink = page.getByRole('link', {
+    name: messages.console.organizationsPageOutOfRangeAction,
+  })
   await expect(recoveryLink).toHaveAttribute(
     'href',
-    `/en/admin/organizations?search=${token}&sortBy=name&sortOrder=desc`
+    consolePath(`/organizations?search=${token}&sortBy=name&sortOrder=desc`)
   )
   await recoveryLink.click()
   await expect(page).not.toHaveURL(/[?&]page=/)
@@ -80,12 +94,12 @@ test('Organizations search input resyncs from the URL on browser Back', async ({
   const tokenA = uniqueEmail('org-back-token-a').split('@')[0]
   const tokenB = uniqueEmail('org-back-token-b').split('@')[0]
 
-  await page.goto(`/en/admin/organizations?search=${tokenA}`)
-  await expect(page.getByLabel(/search organizations/i)).toHaveValue(tokenA)
-  await page.goto(`/en/admin/organizations?search=${tokenB}`)
-  await expect(page.getByLabel(/search organizations/i)).toHaveValue(tokenB)
+  await page.goto(consolePath(`/organizations?search=${tokenA}`))
+  await expect(page.getByLabel(messages.console.organizationsSearchLabel)).toHaveValue(tokenA)
+  await page.goto(consolePath(`/organizations?search=${tokenB}`))
+  await expect(page.getByLabel(messages.console.organizationsSearchLabel)).toHaveValue(tokenB)
   await page.goBack()
-  await expect(page.getByLabel(/search organizations/i)).toHaveValue(tokenA)
+  await expect(page.getByLabel(messages.console.organizationsSearchLabel)).toHaveValue(tokenA)
 })
 
 test('Organizations discovery states have no axe violations', async ({ page }) => {
@@ -94,18 +108,33 @@ test('Organizations discovery states have no axe violations', async ({ page }) =
   const fixture = uniqueEmail('axe-org-row').split('@')[0]
   createOrganization(`Accessible ${fixture}`, `${fixture}-slug`)
 
-  await page.goto(`/en/admin/organizations?search=${token}`)
-  await expect(page.getByText(/no matching organizations/i)).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Create organization', exact: true })).toBeEnabled()
-  await expect(page.getByRole('button', { name: 'Refresh list', exact: true })).toBeEnabled()
+  await page.goto(consolePath(`/organizations?search=${token}`))
+  await expect(page.getByText(messages.console.organizationsNoSearchResultsTitle)).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: messages.console.organizationProvisioning.start, exact: true })
+  ).toBeEnabled()
+  await expect(
+    page.getByRole('button', {
+      name: messages.console.organizationAdministration.attentionRefresh,
+      exact: true,
+    })
+  ).toBeEnabled()
   await expectNoAxeViolations(page)
 
-  await page.goto('/en/admin/organizations?sortBy=name&sortOrder=desc')
-  await expect(page.getByRole('columnheader', { name: /^Sort by Name,/ })).toHaveAttribute(
-    'aria-sort',
-    'descending'
-  )
-  await expect(page.getByRole('button', { name: 'Create organization', exact: true })).toBeEnabled()
-  await expect(page.getByRole('button', { name: 'Refresh list', exact: true })).toBeEnabled()
+  await page.goto(consolePath('/organizations?sortBy=name&sortOrder=desc'))
+  await expect(
+    page.getByRole('columnheader', {
+      name: sortColumnPattern(messages.console.organizationsColumnName),
+    })
+  ).toHaveAttribute('aria-sort', 'descending')
+  await expect(
+    page.getByRole('button', { name: messages.console.organizationProvisioning.start, exact: true })
+  ).toBeEnabled()
+  await expect(
+    page.getByRole('button', {
+      name: messages.console.organizationAdministration.attentionRefresh,
+      exact: true,
+    })
+  ).toBeEnabled()
   await expectNoAxeViolations(page)
 })

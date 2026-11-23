@@ -4,13 +4,14 @@ import { http, HttpResponse } from 'msw'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
+import { getConsolePublicApiPath } from '@/shared/lib/console-public-api-path'
 
 import messages from '../../../../messages/en.json'
 
 import { OrganizationProvisioning } from './organization-provisioning'
 
 const t = messages.console.organizationProvisioning
-const root = '/api/console/organization-provisionings'
+const root = `/api${getConsolePublicApiPath('/organization-provisionings')}`
 const binding = 'a'.repeat(64)
 const policy = { role: 'ADMIN', mailMode: 'mock', createAllowed: true }
 const session = http.get(`${root}/session`, () =>
@@ -103,7 +104,7 @@ export const MissingRetainedInvitation: Story = {
       handlers: [
         session,
         readiness,
-        http.get('/api/console/organizations/north-shop/provisioning', () =>
+        http.get(`/api${getConsolePublicApiPath('/organizations/north-shop/provisioning')}`, () =>
           HttpResponse.json({
             binding,
             data: {
@@ -155,7 +156,7 @@ export const CreatedResult: Story = {
             { status: 201 }
           )
         }),
-        http.get('/api/console/organizations/north-shop/provisioning', () =>
+        http.get(`/api${getConsolePublicApiPath('/organizations/north-shop/provisioning')}`, () =>
           HttpResponse.json({
             binding,
             data: {
@@ -188,9 +189,7 @@ export const CreatedResult: Story = {
     )
     expect(within(dialog).getByRole('link', { name: t.openOrganization })).toHaveAttribute(
       'href',
-      // Rendered as `en`; the locale prefix exists only when several locales are served, and
-      // the folder is the Console alias from the settings file.
-      `${localePathPrefix('en')}/${ADMIN_CONSOLE_CONFIG.alias}/organizations/north-shop`
+      `${localePathPrefix('en')}${ADMIN_CONSOLE_CONFIG.mode === 'path' ? '/' + ADMIN_CONSOLE_CONFIG.alias : ''}/organizations/north-shop`
     )
     expect(canvas.queryByText(t.pendingHelp)).not.toBeInTheDocument()
     await userEvent.click(within(dialog).getByRole('button', { name: t.dismissReceipt }))

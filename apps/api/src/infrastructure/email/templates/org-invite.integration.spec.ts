@@ -25,8 +25,8 @@ const baseProps = {
 declare const DOMParser: typeof import('happy-dom').DOMParser
 
 describe('OrgInviteEmail Template (Integration)', () => {
-  it('should render in the base locale (English) by default with the sign-in CTA', async () => {
-    const html = await render(OrgInviteEmail({ ...baseProps, hasAccount: true }))
+  it('should render in English when requested with the sign-in CTA', async () => {
+    const html = await render(OrgInviteEmail({ ...baseProps, hasAccount: true, locale: 'en' }))
 
     // English content
     expect(html).toContain('Acme Inc.')
@@ -47,7 +47,7 @@ describe('OrgInviteEmail Template (Integration)', () => {
   })
 
   it('should render the sign-up CTA when the recipient has no account', async () => {
-    const html = await render(OrgInviteEmail({ ...baseProps, hasAccount: false }))
+    const html = await render(OrgInviteEmail({ ...baseProps, hasAccount: false, locale: 'en' }))
 
     expect(html).toContain('Create an account to join')
     expect(html).not.toContain('Sign in to accept the invitation')

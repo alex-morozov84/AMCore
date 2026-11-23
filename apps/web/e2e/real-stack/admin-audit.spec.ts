@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
+import { requirePathConsole } from '../shared/console-applicability'
+import { consolePath, isProductHome, messages, translate } from '../shared/product-settings'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
 import {
@@ -14,6 +16,8 @@ import {
   setSystemRole,
 } from './admin-helpers'
 import { loginViaUi, registerViaUi, uniqueEmail } from './helpers'
+
+requirePathConsole()
 
 test.use({
   baseURL: activeTarget().origins.product,
@@ -28,25 +32,25 @@ test('Audit navigation is deliberate, read-audited and fresh on history travel',
   setSystemRole(email, 'SUPER_ADMIN')
   await page.context().clearCookies()
   await loginViaUi(page, email)
-  await expect(page).toHaveURL(/\/en\/?$/)
+  await expect(page).toHaveURL(isProductHome)
   const marker = randomUUID()
   createAuditProbe(email, `${marker}-a`, 3)
   createAuditProbe(email, `${marker}-b`, 2)
   createAuditProbe(email, `${marker}-c`, 1)
 
-  await page.goto('/en/admin')
-  const nav = page.getByRole('link', { name: 'Audit', exact: true })
+  await page.goto(consolePath(''))
+  const nav = page.getByRole('link', { name: messages.console.auditTitle, exact: true })
   await nav.hover()
   await page.waitForTimeout(500)
   expect(countAuditViews(email)).toBe(0)
   await nav.click()
-  await expect(page.getByRole('heading', { name: 'Audit' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: messages.console.auditTitle })).toBeVisible()
   await expect(page.getByRole('table').getByText(`${marker}-c`)).toBeVisible()
   if (process.env.T003_CAPTURE_UI) await page.screenshot({ path: process.env.T003_CAPTURE_UI })
   expect(countAuditViews(email)).toBe(1)
 
   await page.goto(
-    `/en/admin/audit?action=admin.cleanup.executed&actorId=${getUserId(email)}&limit=1`
+    consolePath(`/audit?action=admin.cleanup.executed&actorId=${getUserId(email)}&limit=1`)
   )
   await expect(page.getByRole('table').getByText(`${marker}-c`)).toBeVisible()
   expect(countAuditViews(email)).toBe(2)
@@ -67,7 +71,7 @@ test('Audit navigation is deliberate, read-audited and fresh on history travel',
     }
     new MutationObserver(inspect).observe(document.body, { childList: true, subtree: true })
   })
-  await page.getByRole('link', { name: 'Older' }).click()
+  await page.getByRole('link', { name: messages.console.audit.older }).click()
   await expect(page.getByRole('table').getByText(`${marker}-b`)).toBeVisible()
   await network.send('Network.emulateNetworkConditions', {
     offline: false,
@@ -82,13 +86,13 @@ test('Audit navigation is deliberate, read-audited and fresh on history travel',
     )
   ).toBe(true)
   expect(countAuditViews(email)).toBe(3)
-  await page.getByRole('link', { name: 'Older' }).click()
+  await page.getByRole('link', { name: messages.console.audit.older }).click()
   await expect(page.getByRole('table').getByText(`${marker}-a`)).toBeVisible()
   expect(countAuditViews(email)).toBe(4)
-  await page.getByRole('link', { name: 'Newer' }).click()
+  await page.getByRole('link', { name: messages.console.audit.previous }).click()
   await expect(page.getByRole('table').getByText(`${marker}-b`)).toBeVisible()
   expect(countAuditViews(email)).toBe(5)
-  await page.getByRole('link', { name: 'Newer' }).click()
+  await page.getByRole('link', { name: messages.console.audit.previous }).click()
   await expect(page.getByRole('table').getByText(`${marker}-c`)).toBeVisible()
   expect(countAuditViews(email)).toBe(6)
 
@@ -124,33 +128,31 @@ test('Audit navigation is deliberate, read-audited and fresh on history travel',
 test('Audit event and name journeys keep filters useful', async ({ page }) => {
   const email = uniqueEmail('audit-journey')
   await registerViaUi(page, email)
-  await expect(page).toHaveURL(/\/en\/?$/)
+  await expect(page).toHaveURL(isProductHome)
   setSystemRole(email, 'SUPER_ADMIN')
   await page.context().clearCookies()
   await loginViaUi(page, email)
-  await expect(page).toHaveURL(/\/en\/?$/)
+  await expect(page).toHaveURL(isProductHome)
   const marker = randomUUID()
   createAuditProbe(email, marker, 1)
 
-  await page.goto('/en/admin/audit?action=admin.cleanup.executed')
+  await page.goto(consolePath('/audit?action=admin.cleanup.executed'))
   const row = page.getByRole('row').filter({ hasText: marker })
   await expect(row).toContainText(email)
+  await expect(page.getByText(messages.console.audit.identityNotice)).toBeVisible()
   await expect(
-    page.getByText(
-      'Names and email addresses come from current profiles and may have changed since the event.'
-    )
+    row.getByRole('button', { name: messages.console.audit.copyId }).first()
   ).toBeVisible()
-  await expect(row.getByRole('button', { name: /Copy ID/ }).first()).toBeVisible()
-  await expect(row).not.toContainText('Unsafe or unavailable ID')
-  await row.getByRole('link', { name: 'Filter actor' }).click()
+  await expect(row).not.toContainText(messages.console.audit.unknownId)
+  await row.getByRole('link', { name: messages.console.audit.filterActor }).click()
   await expect(page).toHaveURL(/actorId=/)
   await expect(row).toBeVisible()
-  await page.getByRole('link', { name: 'Clear filters' }).click()
-  await expect(page).toHaveURL(/\/en\/admin\/audit$/)
-  await page.getByRole('button', { name: 'Last 24 hours' }).click()
-  await page.getByRole('button', { name: 'Choose dates' }).click()
-  await expect(page.getByLabel('Start time')).not.toHaveValue('')
-  await expect(page.getByLabel('End time')).not.toHaveValue('')
+  await page.getByRole('link', { name: messages.console.audit.clear }).click()
+  await expect(page).toHaveURL((url) => url.pathname === consolePath('/audit'))
+  await page.getByRole('button', { name: messages.console.audit.recentDay }).click()
+  await page.getByRole('button', { name: messages.console.audit.chooseDates }).click()
+  await expect(page.getByLabel(messages.console.audit.startTime)).not.toHaveValue('')
+  await expect(page.getByLabel(messages.console.audit.endTime)).not.toHaveValue('')
   const today = new Date()
   const isoDay = (offset: number) =>
     new Date(today.getTime() + offset * 86_400_000).toISOString().slice(0, 10)
@@ -159,29 +161,35 @@ test('Audit event and name journeys keep filters useful', async ({ page }) => {
   await expect(calendarDay(1)).toBeDisabled()
   await calendarDay(-1).click()
   await calendarDay(0).click()
-  await expect(page.getByRole('button', { name: 'Choose dates' })).toHaveAttribute(
-    'aria-label',
-    /\d{2}\/\d{2}\/\d{4}.*\d{2}\/\d{2}\/\d{4}/
-  )
+  await expect(
+    page.getByRole('button', { name: messages.console.audit.chooseDates })
+  ).toHaveAttribute('aria-label', /\d{2}[/.]\d{2}[/.]\d{4}.*\d{2}[/.]\d{2}[/.]\d{4}/)
   await page.keyboard.press('Escape')
-  await page.getByRole('button', { name: 'Apply filters' }).click()
+  await page.getByRole('button', { name: messages.console.audit.apply }).click()
   await expect(page).toHaveURL(/from=/)
   const utcBounds = new URL(page.url()).searchParams
-  const zone = page.getByRole('combobox', { name: 'Display time zone' })
+  const zone = page.getByRole('combobox', { name: messages.console.timeZone.label })
   await zone.click()
-  await page.getByRole('option', { name: /Local time.*Europe\/Moscow.*UTC\+03:00/ }).click()
-  await expect(zone).toContainText('Time: UTC+03:00')
-  await page.getByRole('button', { name: 'Apply filters' }).click()
+  await page
+    .getByRole('option', {
+      name: translate('console.timeZone.localOption', {
+        zone: 'Europe/Moscow',
+        offset: 'UTC+03:00',
+      }),
+    })
+    .click()
+  await expect(zone).toContainText(translate('console.timeZone.display', { zone: 'UTC+03:00' }))
+  await page.getByRole('button', { name: messages.console.audit.apply }).click()
   await expect(page).toHaveURL(/from=/)
   const localBounds = new URL(page.url()).searchParams
   expect(localBounds.get('from')).toBe(utcBounds.get('from'))
   expect(localBounds.get('to')).toBe(utcBounds.get('to'))
   await expectNoAxeViolations(page)
 
-  const dateTrigger = page.getByRole('button', { name: 'Choose dates' })
+  const dateTrigger = page.getByRole('button', { name: messages.console.audit.chooseDates })
   await dateTrigger.focus()
   await page.keyboard.press('Enter')
-  await expect(page.getByLabel('Start time')).toBeVisible()
+  await expect(page.getByLabel(messages.console.audit.startTime)).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(dateTrigger).toBeFocused()
 
@@ -192,34 +200,34 @@ test('Audit event and name journeys keep filters useful', async ({ page }) => {
   const lookupResponse = page.waitForResponse((response) =>
     response.url().includes('/audit/lookup')
   )
-  await page.getByLabel('Search current user by name or email').fill(token)
+  await page.getByLabel(messages.console.audit.lookupUser).fill(token)
   const lookup = await lookupResponse
   expect(lookup.status()).toBe(200)
-  await expect(page.getByText('First 10 shown — refine your search to find more.')).toBeVisible()
-  await expect(page.getByRole('button', { name: /Select current record/ })).toHaveCount(10)
-  await page
-    .getByRole('button', { name: /Select current record/ })
-    .first()
-    .click()
+  await expect(page.getByText(messages.console.audit.lookupRefine)).toBeVisible()
+  await expect(page.getByRole('button', { name: messages.console.audit.lookupSelect })).toHaveCount(
+    10
+  )
+  await page.getByRole('button', { name: messages.console.audit.lookupSelect }).first().click()
   await expect(page).toHaveURL(/actorId=/)
   await expect(page.locator('section[aria-live="polite"]')).toBeFocused()
 
-  await page.getByRole('button', { name: 'Target', exact: true }).click()
-  await page.getByLabel('Search current user by name or email').fill(token)
-  await page.getByLabel('Search current user by name or email').press('Enter')
-  await expect(page.getByRole('button', { name: /Select current record/ })).toHaveCount(10)
-  await page
-    .getByRole('button', { name: /Select current record/ })
-    .first()
-    .click()
+  await page.getByRole('button', { name: messages.console.audit.target, exact: true }).click()
+  await page.getByLabel(messages.console.audit.lookupUser).fill(token)
+  await page.getByLabel(messages.console.audit.lookupUser).press('Enter')
+  await expect(page.getByRole('button', { name: messages.console.audit.lookupSelect })).toHaveCount(
+    10
+  )
+  await page.getByRole('button', { name: messages.console.audit.lookupSelect }).first().click()
   await expect(page).toHaveURL(/targetId=/)
 
   const organizationToken = `auditorg${Date.now()}`
   createOrganization(organizationToken, organizationToken)
-  await page.getByLabel('Search current organization by name or slug').fill(organizationToken)
-  await page.getByLabel('Search current organization by name or slug').press('Enter')
-  await expect(page.getByRole('button', { name: /Select current record/ })).toHaveCount(1)
-  await page.getByRole('button', { name: /Select current record/ }).click()
+  await page.getByLabel(messages.console.audit.lookupOrganization).fill(organizationToken)
+  await page.getByLabel(messages.console.audit.lookupOrganization).press('Enter')
+  await expect(page.getByRole('button', { name: messages.console.audit.lookupSelect })).toHaveCount(
+    1
+  )
+  await page.getByRole('button', { name: messages.console.audit.lookupSelect }).click()
   await expect(page).toHaveURL(/organizationId=/)
 })
 
@@ -229,7 +237,7 @@ test('Audit-view events are hidden until the operator enables them', async ({ pa
   setSystemRole(email, 'SUPER_ADMIN')
   await page.context().clearCookies()
   await loginViaUi(page, email)
-  await expect(page).toHaveURL(/\/en\/?$/)
+  await expect(page).toHaveURL(isProductHome)
   // Seed an owned read event inside the initial time window. Later page reads
   // occur after that fixed window and are not guaranteed to be its first row.
   expect(
@@ -240,14 +248,14 @@ test('Audit-view events are hidden until the operator enables them', async ({ pa
       { marker: randomUUID(), email }
     ).trim()
   ).toBe('INSERT 0 1')
-  await page.goto('/en/admin/audit?limit=1')
-  await expect(page.getByRole('heading', { name: 'Audit' })).toBeVisible()
+  await page.goto(consolePath('/audit?limit=1'))
+  await expect(page.getByRole('heading', { name: messages.console.auditTitle })).toBeVisible()
   await expect(page.getByRole('table')).not.toContainText('admin.audit_logs.viewed')
-  await page.getByRole('link', { name: 'Older' }).click()
+  await page.getByRole('link', { name: messages.console.audit.older }).click()
   await expect(page).toHaveURL(/cursor=/)
 
-  await page.getByRole('checkbox', { name: 'Show audit views' }).check()
-  await page.getByRole('button', { name: 'Apply filters' }).click()
+  await page.getByRole('checkbox', { name: messages.console.audit.includeReadEvents }).check()
+  await page.getByRole('button', { name: messages.console.audit.apply }).click()
   await expect(page).toHaveURL(/includeReadEvents=true/)
   await expect(page).not.toHaveURL(/cursor=/)
   await expect(page.getByRole('table')).toContainText('admin.audit_logs.viewed')

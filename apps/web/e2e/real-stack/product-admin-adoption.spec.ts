@@ -13,14 +13,21 @@ import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 import { directApi } from './credential-containment.helpers'
 import {
   browserCredentialRequest,
+  ensureAdministrationSession,
   probeRefusalEvidence,
+  productAdministrationOrigin,
   TEST_PASSWORD,
   uniqueEmail,
 } from './helpers'
 import { organizationUi } from './organization-context.helpers'
 
 // This declaration follows the spec into discovered CI, including failure/retry.
-test.use({ trace: 'off', screenshot: 'off', video: 'off' })
+test.use({
+  baseURL: productAdministrationOrigin(),
+  trace: 'off',
+  screenshot: 'off',
+  video: 'off',
+})
 const ownedContexts: BrowserContext[] = []
 let before: Awaited<ReturnType<typeof probeRefusalEvidence>>
 let reads: ReturnType<typeof observeContextReads>
@@ -105,6 +112,12 @@ async function adoptionOwner(context: BrowserContext) {
   const identity = await context.request.get(new URL('/api/auth/me', target.origins.product).href)
   expect(identity.status()).toBe(200)
   expect((await identity.json()).user.id).toBe(owner.user.id)
+  await ensureAdministrationSession(context, email)
+  const adminIdentity = await context.request.get(
+    new URL('/api/auth/me', productAdministrationOrigin()).href
+  )
+  expect(adminIdentity.status()).toBe(200)
+  expect((await adminIdentity.json()).user.id).toBe(owner.user.id)
   return { target, ui, messages, email, owner }
 }
 
@@ -192,7 +205,7 @@ test('adoption denies foreign documents and API without exposing data', async ({
   page,
   context,
 }) => {
-  const { target, ui, messages } = await adoptionOwner(context)
+  const { ui, messages } = await adoptionOwner(context)
   // A real separate account/organization provides the foreign target, not a random missing ID.
   const outsider = await safeApi('auth/register', {
     email: uniqueEmail('adopter-foreign'),
@@ -224,8 +237,11 @@ test('adoption denies foreign documents and API without exposing data', async ({
   foreignDocument!.unavailableVisible = true
   foreignDocument!.foreignNameVisible = false
   const bootstrap = await context.request.get('/api/product-access/bootstrap')
+  expect(bootstrap.status()).toBe(200)
   const { binding } = await bootstrap.json()
-  const headers = { origin: target.origins.product, 'X-AMCore-Context-Session': binding }
+  expect(typeof binding).toBe('string')
+  expect(binding.length).toBeGreaterThan(0)
+  const headers = { origin: productAdministrationOrigin(), 'X-AMCore-Context-Session': binding }
   const beforeForeign = count(
     'SELECT count(*) FROM core.audit_log WHERE "organizationId"=:\'org\';',
     { org: foreign.id }
@@ -397,10 +413,11 @@ test('adoption revokes member keys on removal and protects the last administrato
       })
     ).status()
   ).toBe(200)
+  await ensureAdministrationSession(staff, colleagueEmail)
   const staffPage = await staff.newPage()
   await staffPage.goto(
     localizedFrontendUrl(
-      target.origins.product,
+      productAdministrationOrigin(),
       DEFAULT_LOCALE,
       `${productAdminPath('/settings/api-keys')}?organizationId=${org}`
     )

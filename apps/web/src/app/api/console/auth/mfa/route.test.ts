@@ -6,20 +6,22 @@ vi.mock('@/shared/api/bff/account-mfa-handler', () => ({
   handleAccountMfa: vi.fn(async () => Response.json({ kind: 'unavailable' }, { status: 503 })),
 }))
 import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
+import { stubProductOrigins } from '@/test/product-origins'
 
 import { GET, POST } from './route'
 
-const config = ADMIN_CONSOLE_CONFIG as unknown as { mode: string }
-const original = config.mode
+const config = ADMIN_CONSOLE_CONFIG as unknown as { mode: string; enabled: boolean }
+const original = { mode: config.mode, enabled: config.enabled }
 beforeEach(() => {
+  config.enabled = true
   config.mode = 'host'
   vi.stubEnv('ADMIN_CONSOLE_HOSTNAME', 'console.example.test')
   vi.stubEnv('ADMIN_CONSOLE_ORIGIN', 'https://console.example.test')
-  vi.stubEnv('FRONTEND_URL', 'https://shop.example.test')
+  stubProductOrigins('https://shop.example.test')
   vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-console-route-private-key-at-least-32>')
 })
 afterEach(() => {
-  config.mode = original
+  Object.assign(config, original)
   vi.unstubAllEnvs()
 })
 const request = (host: string, method = 'GET', origin?: string) =>

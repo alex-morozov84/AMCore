@@ -1,3 +1,5 @@
+import { consoleFixture, consoleFixtureLane } from '../e2e-ci-plan.mjs'
+import { assertCompiledSettings } from './settings-policy.mjs'
 import { standDeadline } from '../lib/lighthouse-deadlines.mjs'
 import { toolingFingerprint, compiledFingerprint } from '../lighthouse/reuse.mjs'
 import { runAuditPhase } from './lighthouse-phase.mjs'
@@ -5,14 +7,15 @@ import { setProcessDeadline } from './process.mjs'
 import { prepareMfaE2E } from './mfa-e2e.mjs'
 import { admitInvocation, endInvocation } from './invocation.mjs'
 import { join } from 'node:path'
-import { mkdir } from 'node:fs/promises'
+import assert from 'node:assert/strict'
+import { mkdir, readFile } from 'node:fs/promises'
 import { run, cleanEnvironment } from './process.mjs'
 import { relay } from './relay.mjs'
 import { directory, save } from './state.mjs'
 import { supervise } from './supervisor.mjs'
 import { mockEnvironment } from './mock-environment.mjs'
 import { allocateControlSocket } from './control-socket.mjs'
-import { groupArguments, profileInventory } from './test-inventory.mjs'
+import { groupArguments, profileInventory, configuredInventory } from './test-inventory.mjs'
 
 export async function test(m, lane, token, extra = [], group, auditOnly = false) {
   m.auditOnly = auditOnly
@@ -56,8 +59,36 @@ export async function test(m, lane, token, extra = [], group, auditOnly = false)
         AMCORE_STAND_TOKEN: token,
       }),
     }
-    if (!auditOnly && !group) await profileInventory(m, lane, options, extra)
-    const filters = !auditOnly && group ? await groupArguments(m, group, options) : []
+    const evidence = process.env.AMCORE_BROWSER_EVIDENCE
+      ? JSON.parse(process.env.AMCORE_BROWSER_EVIDENCE)
+      : undefined
+    const fixture = evidence?.lane === consoleFixtureLane ? consoleFixture(m.worktree) : undefined
+    if (evidence?.configured) options.env.AMCORE_CONFIGURED_CASES = '1'
+    const reportFile = join(tmp, 'browser-evidence.json')
+    if (evidence) {
+      if (fixture) {
+        assert.equal(m.fixtureProfile, fixture.name)
+        assert.equal(lane, fixture.project)
+        assert.deepEqual(extra, fixture.args)
+      } else assert.equal(m.settingsPolicy, 'preserve', 'S0 evidence requires preserved settings')
+      await assertCompiledSettings(m, evidence.configured && !fixture, fixture?.name)
+      options.env.AMCORE_BROWSER_REPORT = JSON.stringify({ ...evidence, file: reportFile })
+    }
+    if (!auditOnly && !group) {
+      if (evidence)
+        await configuredInventory(
+          options,
+          lane,
+          evidence.expected,
+          evidence.configured,
+          fixture?.args
+        )
+      else await profileInventory(m, lane, options, extra)
+    }
+    const filters =
+      !auditOnly && group
+        ? await groupArguments(m, group, options, evidence?.expected, evidence?.configured)
+        : []
     if (!auditOnly)
       await run(
         'pnpm',
@@ -73,6 +104,12 @@ export async function test(m, lane, token, extra = [], group, auditOnly = false)
         ],
         options
       )
+    if (evidence) {
+      await assertCompiledSettings(m, evidence.configured && !fixture, fixture?.name)
+      const { expected, ...identity } = evidence
+      m.browserEvidence = JSON.parse(await readFile(reportFile, 'utf8'))
+      assert.deepEqual(m.browserEvidence, { ...identity, observed: expected })
+    }
     m.testOutcome = auditOnly ? 'not_run_local_audit' : 'passed'
     if (process.env.AMCORE_AUDIT_OWNER) await runAuditPhase(m, token)
   } catch (error) {

@@ -67,8 +67,8 @@ test('CI invokes the same fail-closed local lane runner, preserves retries and i
   )
   const gate = jobs['web-e2e']
   assert.equal(gate.name, 'Web E2E')
-  assert.equal(gate.if, '${{ always() }}')
-  assert.deepEqual(gate.needs, ['web-e2e-plan', 'web-e2e-lanes'])
+  assert.match(gate.if, /always\(\).*'web-e2e'/)
+  assert.deepEqual(gate.needs, ['ci-selection', 'web-e2e-plan', 'web-e2e-lanes'])
   const temporary = mkdtempSync(join(tmpdir(), 't084-ci-gate-'))
   const identity = { run: '123', attempt: '1', source: 'a'.repeat(40) }
   const plan = auditPlan(root, identity)

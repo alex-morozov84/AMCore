@@ -1,6 +1,7 @@
 import { expect, type Page, test } from '@playwright/test'
 
 import { logoutViaApi, registerViaUi, uniqueEmail } from '../real-stack/helpers'
+import { isProductHome, messages, productPath } from '../shared/product-settings'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
 import { appleBrowserFixture } from './apple-browser-fixture'
@@ -39,7 +40,7 @@ test('site Apple completion creates one verified identity and preserves first fo
     const seen = await appleBrowserFixture(context, product, email, true, { surface: 'site' })
     // The website UI currently exposes Google only; test its existing Apple transport directly.
     await page.goto(`${product}/api/auth/oauth/apple`)
-    await terminal(page, (url) => url.origin === product && url.pathname === '/en')
+    await terminal(page, (url) => url.origin === product && isProductHome(url))
     expect(seen()).toBe(true)
     const response = await context.request.get(`${product}/api/auth/me`)
     expect(response.status()).toBe(200)
@@ -120,12 +121,14 @@ test('ordinary staff Apple login cannot register a new account', async ({ browse
   try {
     const page = await context.newPage()
     const seen = await appleBrowserFixture(context, staff, email)
-    await page.goto(`${staff}/en/login`)
-    await page.getByRole('link', { name: /continue with apple/i }).click()
+    await page.goto(`${staff}${productPath('/login')}`)
+    await page.getByRole('link', { name: messages.auth.continueWithApple, exact: true }).click()
     await terminal(
       page,
       (url) =>
-        url.origin === staff && url.pathname === '/en/login' && url.searchParams.has('oauthError')
+        url.origin === staff &&
+        url.pathname === productPath('/login') &&
+        url.searchParams.has('oauthError')
     )
     expect(seen()).toBe(true)
     expect((await context.request.get(`${staff}/api/auth/me`)).status()).toBe(401)

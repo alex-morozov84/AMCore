@@ -94,7 +94,7 @@ test('shell preserves no-option deletion, conditional fallback and original fail
     const step = workflow.jobs['web-e2e-lanes'].steps.find(
       (item) => item.name === 'Free unused SDK disk space for Docker lanes'
     )
-    assert.equal(step.if, "matrix.lane != 'mocked'")
+    assert.equal(step.if, "matrix.lane != 'mocked' && matrix.lane != 'configured-mocked'")
     const eligible = [
       'path-standard',
       'path-disruptive',

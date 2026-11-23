@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+import { requirePathConsole } from '../shared/console-applicability'
+import { consolePath, isProductHome, messages } from '../shared/product-settings'
 import { storageSettingJourney } from '../shared/storage-setting-journey'
 import { guardedSql } from '../support/managed-target.mjs'
 import {
@@ -11,18 +13,20 @@ import {
 import { setSystemRole } from './admin-helpers'
 import { loginViaUi, registerViaUi, uniqueEmail } from './helpers'
 
+requirePathConsole()
+
 test('Overview Edit/Cancel/Save and operator reset in path topology', async ({ page }) => {
   test.setTimeout(180_000)
   settingsProof('start')
   try {
     const email = uniqueEmail('storage-setting-path')
     await registerViaUi(page, email)
-    await expect(page).toHaveURL(/\/en\/?$/)
+    await expect(page).toHaveURL(isProductHome)
     setSystemRole(email, 'SUPER_ADMIN')
     await page.context().clearCookies()
     await loginViaUi(page, email)
-    await expect(page).toHaveURL(/\/en\/?$/)
-    await page.goto('/en/admin')
+    await expect(page).toHaveURL(isProductHome)
+    await page.goto(consolePath(''))
     await storageSettingJourney(page, '/api/console/runtime-settings/storage-probe', async () => {
       await expect
         .poll(
@@ -82,12 +86,12 @@ test('runtime adoption survives Redis outage, worker restart and real database r
   try {
     const email = uniqueEmail('storage-setting-failures')
     await registerViaUi(page, email)
-    await expect(page).toHaveURL(/\/en\/?$/)
+    await expect(page).toHaveURL(isProductHome)
     setSystemRole(email, 'SUPER_ADMIN')
     await page.context().clearCookies()
     await loginViaUi(page, email)
-    await expect(page).toHaveURL(/\/en\/?$/)
-    await page.goto('/en/admin')
+    await expect(page).toHaveURL(isProductHome)
+    await page.goto(consolePath(''))
     const path = '/api/console/runtime-settings/storage-probe'
     const initial = await page.request.get(path)
     expect(initial.status()).toBe(200)
@@ -159,7 +163,9 @@ test('runtime adoption survives Redis outage, worker restart and real database r
       .toBe(1)
     const unavailable = await page.request.get(path)
     expect(unavailable.status()).toBe(503)
-    await expect(page.getByRole('heading', { name: 'File storage', exact: true })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: messages.console.overviewFilesTitle, exact: true })
+    ).toBeVisible()
     await expect
       .poll(
         () =>

@@ -1,23 +1,18 @@
+import { PRODUCT_ADMIN_CONFIG } from '@amcore/shared'
 import { expect, type Page, test } from '@playwright/test'
 
 import { setSystemRole } from '../real-stack/admin-helpers'
-import { logoutViaApi, registerViaUi, TEST_PASSWORD, uniqueEmail } from '../real-stack/helpers'
+import { loginViaUi, logoutViaApi, registerViaUi, uniqueEmail } from '../real-stack/helpers'
 import { expectNoAxeViolations } from '../shared/axe'
-import { completeMfaSignIn } from '../shared/mfa-login'
+import { messages, productPath } from '../shared/product-settings'
 import { activeTarget } from '../support/managed-target.mjs'
 import { settingsProof } from '../support/runtime-settings-proof'
 
 test.use({ trace: 'off', screenshot: 'off', video: 'off' })
 
 async function login(page: Page, origin: string, email: string) {
-  await page.goto(`${origin}/en/login`)
-  await page.getByRole('textbox', { name: /email/i }).fill(email)
-  await page.getByLabel(/^password$/i).fill(TEST_PASSWORD)
-  const signIn = page.waitForResponse(
-    (r) => new URL(r.url()).pathname.endsWith('/auth/login') && r.request().method() === 'POST'
-  )
-  await page.getByRole('button', { name: /sign in/i }).click()
-  if ((await signIn).status() === 202) await completeMfaSignIn(page, email)
+  const console = activeTarget().origins.console === origin
+  await loginViaUi(page, email, console ? { origin, surface: 'console' } : { origin })
   await page.waitForURL((url) => url.origin === origin && !url.pathname.endsWith('/login'))
 }
 
@@ -89,11 +84,15 @@ test('one browser preserves product, staff and Console identities and contains c
     } finally {
       await transplanted.close()
     }
-    await page.goto(`${staff}/en/organizations/not-present-placement/members`)
-    await expect(page.getByRole('heading', { name: 'Page unavailable', exact: true })).toBeVisible()
+    await page.goto(`${staff}${productPath('/organizations/not-present-placement/members')}`)
+    await expect(
+      page.getByRole('heading', { name: messages.productAdmin.unavailableTitle, exact: true })
+    ).toBeVisible()
     await expectNoAxeViolations(page)
-    await page.getByRole('button', { name: /sign out/i }).click()
-    await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: messages.auth.logout, exact: true }).click()
+    await expect(
+      page.getByRole('heading', { name: messages.productAdmin.loginTitle, exact: true })
+    ).toBeVisible()
     expect((await context.request.get(`${consoleOrigin}/api/access`)).status()).toBe(204)
   } finally {
     await context.close()
@@ -107,13 +106,23 @@ test('host edge rejects physical/unknown routes, preserves safe login and assets
   const { product, staff } = activeTarget().origins
   if (!staff) throw new Error('Staff fixture required')
   for (const origin of [product, staff])
-    expect((await request.get(`${origin}/en/manage/organizations`)).status()).toBe(404)
-  expect((await request.get(`${staff}/en/unknown-placement-page`)).status()).toBe(404)
+    expect(
+      (
+        await request.get(
+          `${origin}${productPath('/' + PRODUCT_ADMIN_CONFIG.alias + '/organizations')}`
+        )
+      ).status()
+    ).toBe(404)
+  expect((await request.get(`${staff}${productPath('/unknown-placement-page')}`)).status()).toBe(
+    404
+  )
   expect((await request.get(`${staff}/api/auth/login`)).status()).toBe(404)
   expect((await request.get(`${staff}/favicon.ico`)).status()).toBe(200)
-  await page.goto('/en/organizations?view=list')
-  await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible()
-  await expect(page.getByRole('link', { name: /sign up/i })).toHaveCount(0)
+  await page.goto(productPath('/organizations?view=list'))
+  await expect(
+    page.getByRole('heading', { name: messages.productAdmin.loginTitle, exact: true })
+  ).toBeVisible()
+  await expect(page.getByRole('link', { name: messages.auth.register, exact: true })).toHaveCount(0)
   await expectNoAxeViolations(page)
 })
 
@@ -196,11 +205,11 @@ test('Console host during a vault stall: copied cookies, invented cookie and ope
     expect(operatorAccess.status()).toBe(503)
     for (const [, ctx] of copies) {
       const copyPage = await ctx.newPage()
-      await copyPage.goto(`${consoleOrigin}/en`, { timeout: 15_000 })
+      await copyPage.goto(`${consoleOrigin}${productPath()}`, { timeout: 15_000 })
       forbiddenConsoleMarkup(await copyPage.content())
       await copyPage.close()
     }
-    await page.goto(`${consoleOrigin}/en`, { timeout: 15_000 })
+    await page.goto(`${consoleOrigin}${productPath()}`, { timeout: 15_000 })
     await expect(page.getByText(TEMPORARY).first()).toBeVisible()
     forbiddenConsoleMarkup(await page.content())
     expect(await page.content()).not.toContain(operator)

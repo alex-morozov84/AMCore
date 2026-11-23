@@ -6,6 +6,7 @@ import request from 'supertest'
 
 import {
   AuthErrorCode,
+  localePathPrefix,
   type RequestPrincipal,
   SupportMailErrorCode,
   supportMailReceiptSchema,
@@ -140,7 +141,7 @@ describe('Console support mail: real admission, token/audit commits and receipt 
       .set('Authorization', `Bearer ${bearer}`)
       .expect(200)
     expect(providerSend).toHaveBeenCalledTimes(1)
-    expect(captured[0]!.html).toContain('/ru/reset-password?token=')
+    expect(captured[0]!.html).toContain(`${localePathPrefix('ru')}/reset-password?token=`)
     const audit = await prisma.auditLog.findMany({
       where: { action: { startsWith: 'admin.user.support_mail_' } },
     })

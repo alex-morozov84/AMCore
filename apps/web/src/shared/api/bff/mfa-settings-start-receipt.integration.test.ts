@@ -10,13 +10,14 @@ import { ContextRequestError } from './context-errors'
 import { settingsStartReceipt } from './mfa-settings-start-receipt'
 import { resolveProductWebContext } from './product-web-context.server'
 import { getWebRedisClient } from './redis-client'
+import { redisFixtureSite, redisFixtureStaff } from './redis-integration-origins.testkit'
 
 let container: StartedRedisContainer
 beforeAll(async () => {
   container = await new RedisContainer('redis:7-alpine').start()
   vi.stubEnv('REDIS_URL', container.getConnectionUrl())
-  vi.stubEnv('FRONTEND_URL', 'http://localhost:3002')
-  vi.stubEnv('PRODUCT_ADMIN_ORIGIN', '')
+  vi.stubEnv('FRONTEND_URL', redisFixtureSite)
+  vi.stubEnv('PRODUCT_ADMIN_ORIGIN', redisFixtureStaff)
   vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-settings-receipt-key-at-least-32>')
 })
 beforeEach(async () => (await getWebRedisClient()).flushDb())
@@ -27,8 +28,11 @@ afterAll(async () => {
 })
 
 function fixture() {
-  const request = new Request('http://localhost:3002/api/auth/mfa', {
-    headers: { host: 'localhost:3002', cookie: `amcore_browser_context=${'a'.repeat(43)}` },
+  const request = new Request(`${redisFixtureSite}/api/auth/mfa`, {
+    headers: {
+      host: new URL(redisFixtureSite).host,
+      cookie: `amcore_browser_context=${'a'.repeat(43)}`,
+    },
   })
   const context = resolveProductWebContext(request.headers, 'site-auth')
   const source = {

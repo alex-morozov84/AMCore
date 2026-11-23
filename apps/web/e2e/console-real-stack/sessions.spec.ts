@@ -1,10 +1,11 @@
-import { completeMfaSignIn, completeMfaStepUp } from '../shared/mfa-login'
+import { completeMfaStepUp } from '../shared/mfa-login'
+import { isProductHome, messages, productPath, translate } from '../shared/product-settings'
 import { activeTarget } from '../support/managed-target.mjs'
 
 const standTarget = activeTarget()
 import { expect, test } from '@playwright/test'
 
-import { registerViaUi, TEST_PASSWORD, uniqueEmail } from '../real-stack/helpers'
+import { loginViaUi, registerViaUi, TEST_PASSWORD, uniqueEmail } from '../real-stack/helpers'
 import { guardedExec, guardedSql } from '../support/managed-target.mjs'
 
 import { ageSessionLastAuthAt, setSystemRole } from './helpers'
@@ -24,23 +25,19 @@ test('host session helper preserves current UA on actual vault rotation; Session
   })
   const productPage = await product.newPage()
   await registerViaUi(productPage, email)
-  await expect(productPage).toHaveURL(/\/en\/?$/)
+  await expect(productPage).toHaveURL(isProductHome)
   await product.clearCookies()
   await registerViaUi(productPage, target)
-  await expect(productPage).toHaveURL(/\/en\/?$/)
+  await expect(productPage).toHaveURL(isProductHome)
   setSystemRole(email, 'SUPER_ADMIN')
   const admin = await browser.newContext({
     baseURL: `${standTarget.origins.console}`,
     ignoreHTTPSErrors: true,
   })
   const page = await admin.newPage()
-  await page.goto('/en/login')
-  await page.getByLabel(/email/i).fill(email)
-  await page.getByLabel(/^password$/i).fill(TEST_PASSWORD)
-  await page.getByRole('button', { name: /sign in/i }).click()
-  await completeMfaSignIn(page, email)
+  await loginViaUi(page, email, { mfa: 'required', surface: 'console' })
   await expect(page).toHaveURL(
-    new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
+    (url) => url.origin === standTarget.origins.console && isProductHome(url)
   )
   await page.waitForLoadState('networkidle')
   ageSessionLastAuthAt(email)
@@ -61,7 +58,7 @@ test('host session helper preserves current UA on actual vault rotation; Session
   const targetId = guardedSql(`SELECT id FROM core.users WHERE "emailCanonical" = :'email';`, {
     email: target,
   }).trim()
-  const refreshed = await admin.request.get(`/en/users/${targetId}`, {
+  const refreshed = await admin.request.get(productPath(`/users/${targetId}`), {
     headers: { 'User-Agent': ua },
   })
   expect(refreshed.status()).toBe(200)
@@ -71,28 +68,31 @@ test('host session helper preserves current UA on actual vault rotation; Session
       { email }
     ).trim()
   ).toBe(ua)
-  await page.goto(`/en/users/${targetId}`)
-  await expect(page.getByRole('heading', { level: 2, name: /Sessions \(1 total\)/ })).toBeVisible()
+  await page.goto(productPath(`/users/${targetId}`))
+  await expect(
+    page.getByRole('heading', {
+      level: 2,
+      name: translate('console.userSessionsHeading', { count: 1 }),
+    })
+  ).toBeVisible()
   const responses: number[] = []
   page.on('response', (response) => {
     if (response.url().endsWith('/api/auth/step-up')) responses.push(response.status())
   })
-  await page.getByRole('button', { name: 'Revoke all sessions', exact: true }).click()
+  await page
+    .getByRole('button', { name: messages.console.userSessionsRevokeAll, exact: true })
+    .click()
   await page
     .getByRole('alertdialog')
-    .getByRole('button', { name: 'Revoke all sessions', exact: true })
+    .getByRole('button', { name: messages.console.userSessionsRevokeAll, exact: true })
     .click()
-  const stepUp = page.getByRole('dialog', { name: /confirm your password/i })
+  const stepUp = page.getByRole('dialog', { name: messages.console.stepUpTitle })
   await expect(stepUp).toBeVisible()
-  await stepUp.getByLabel(/^password$/i).fill(TEST_PASSWORD)
-  await stepUp.getByRole('button', { name: /confirm/i }).click()
+  await stepUp.getByLabel(messages.console.loginPassword, { exact: true }).fill(TEST_PASSWORD)
+  await stepUp.getByRole('button', { name: messages.console.stepUpSubmit }).click()
   await completeMfaStepUp(page, email)
-  await expect(page.getByText('No active sessions.', { exact: true })).toBeVisible()
+  await expect(page.getByText(messages.console.userSessionsEmpty, { exact: true })).toBeVisible()
   expect(responses).toEqual([202, 204])
   await admin.close()
   await product.close()
 })
-
-function escapeOrigin(origin: string): string {
-  return origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}

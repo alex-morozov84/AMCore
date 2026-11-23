@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { DEFAULT_LOCALE, localizedFrontendUrl, SERVED_LOCALES } from '@amcore/shared'
+import {
+  DEFAULT_LOCALE,
+  localizedFrontendUrl,
+  productAdminPath,
+  SERVED_LOCALES,
+} from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
@@ -9,7 +14,13 @@ import { closeCredentialPage } from '../shared/credential-artifacts'
 import { activeTarget } from '../support/managed-target.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
+import {
+  browserCredentialRequest,
+  ensureAdministrationSession,
+  productAdministrationOrigin,
+  TEST_PASSWORD,
+  uniqueEmail,
+} from './helpers'
 
 // Never retain one-time credentials in browser artifacts, including a failed assertion.
 test.use({ trace: 'off', screenshot: 'off', video: 'off' })
@@ -41,8 +52,12 @@ for (const locale of SERVED_LOCALES) {
       { name: 'Own key browser proof' },
       login.accessToken
     )
-    const path = new URL(localizedFrontendUrl(target.origins.product, locale, 'settings/api-keys'))
-      .pathname
+    await ensureAdministrationSession(context, email)
+    const path = localizedFrontendUrl(
+      productAdministrationOrigin(),
+      locale,
+      productAdminPath('/settings/api-keys')
+    )
     const failures: string[] = []
     page.on('pageerror', (error) => failures.push(error.message))
     await page.goto(`${path}?organizationId=${organization.id}`)

@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
 import {
@@ -6,9 +6,9 @@ import {
   aliasProblems,
   readAdminConsoleSettings,
   readLocaleSettings,
+  readProductAdminPlacement,
 } from './settings-files.mjs'
 
-const configPath = 'packages/shared/src/config/product-admin.json'
 const terminal = /^(?:page|route)\.[cm]?[jt]sx?$/
 const metadata =
   /^(?:robots|sitemap|manifest|icon|apple-icon|opengraph-image|twitter-image|favicon)(?:\.|$)/
@@ -21,17 +21,7 @@ function assets(directory, prefix = '') {
   })
 }
 
-export function readProductAdminPlacement(root) {
-  const config = JSON.parse(readFileSync(join(root, configPath), 'utf8'))
-  if (
-    Object.keys(config).sort().join(',') !== 'alias,mode,version' ||
-    config.version !== 1 ||
-    !['path', 'host'].includes(config.mode) ||
-    !/^[a-z][a-z0-9_-]{0,31}$/.test(config.alias)
-  )
-    throw new Error('Invalid product-admin source config')
-  return config
-}
+export { readProductAdminPlacement } from './settings-files.mjs'
 
 /** Inspect actual endpoints; routing groups do not occupy public segments. */
 function inventory(directory, segments = [], result = []) {

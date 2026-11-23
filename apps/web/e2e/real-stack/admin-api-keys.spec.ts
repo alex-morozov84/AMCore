@@ -1,13 +1,24 @@
 import { randomUUID } from 'node:crypto'
 
+import { SERVED_LOCALES } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { scanAccessibility } from '../shared/axe'
+import { requirePathConsole } from '../shared/console-applicability'
 import { completeMfaStepUp } from '../shared/mfa-login'
+import {
+  consolePath,
+  isProductHome,
+  messages,
+  messagesForLocale,
+  translate,
+} from '../shared/product-settings'
 import { guardedSql } from '../support/managed-target.mjs'
 
 import { ageSessionLastAuthAt, getUserId, setSystemRole } from './admin-helpers'
 import { loginViaUi, registerViaUi, TEST_PASSWORD, uniqueEmail } from './helpers'
+
+requirePathConsole()
 
 function seedKeys(userId: string) {
   const organizationId = randomUUID()
@@ -37,17 +48,23 @@ test('platform key discovery, captured bulk step-up, lifecycle history and respo
   setSystemRole(email, 'SUPER_ADMIN')
   await page.context().clearCookies()
   await loginViaUi(page, email)
-  await expect(page).toHaveURL(/\/en\/?$/)
+  await expect(page).toHaveURL(isProductHome)
   const ownerId = getUserId(email),
     { keys, organizationId } = seedKeys(ownerId)
-  await page.goto(`/en/admin/api-keys?userId=${ownerId}&organizationId=${organizationId}&limit=20`)
-  await expect(page.getByRole('heading', { name: 'API keys', exact: true })).toBeVisible()
-  await expect(page.getByText('22 keys', { exact: true })).toBeVisible()
-  const search = page.getByRole('textbox', { name: 'Search key names' })
+  await page.goto(
+    consolePath(`/api-keys?userId=${ownerId}&organizationId=${organizationId}&limit=20`)
+  )
+  await expect(
+    page.getByRole('heading', { name: messages.console.apiKeys.title, exact: true })
+  ).toBeVisible()
+  await expect(
+    page.getByText(translate('console.apiKeys.total', { count: 22 }), { exact: true })
+  ).toBeVisible()
+  const search = page.getByRole('textbox', { name: messages.console.apiKeys.searchLabel })
   await search.fill('Lifecycle')
   await expect(page).toHaveURL(/search=Lifecycle/)
   expect(new URL(page.url()).searchParams.get('userId')).toBe(ownerId)
-  await page.getByRole('link', { name: 'Next', exact: true }).click()
+  await page.getByRole('link', { name: messages.console.paginationNext, exact: true }).click()
   await expect(page).toHaveURL(/page=2/)
   await expect(page.getByRole('row').filter({ hasText: 'Lifecycle 21' })).toBeVisible()
   await page.goBack()
@@ -58,7 +75,7 @@ test('platform key discovery, captured bulk step-up, lifecycle history and respo
   await expect(page).toHaveURL(/search=Lifecycle(?:\+|%20)00/)
   await expect(page.getByRole('row').filter({ hasText: 'Lifecycle 00' })).toBeVisible()
   await expect(page.getByRole('row').filter({ hasText: 'Lifecycle 01' })).toHaveCount(0)
-  await page.getByRole('checkbox', { name: 'Select eligible keys on this page' }).check()
+  await page.getByRole('checkbox', { name: messages.console.apiKeys.selectPage }).check()
   ageSessionLastAuthAt(email)
   const mutations: number[] = [],
     stepUpBodies: string[] = []
@@ -74,17 +91,23 @@ test('platform key discovery, captured bulk step-up, lifecycle history and respo
     stepUpBodies.push(await response.text())
     await route.fulfill({ response })
   })
-  await page.getByRole('button', { name: 'Revoke selected (1)' }).click()
+  await page
+    .getByRole('button', { name: translate('console.apiKeys.revokeSelected', { count: 1 }) })
+    .click()
   const confirm = page.getByRole('alertdialog')
   await expect(confirm).toContainText('Lifecycle 00')
-  await confirm.getByRole('button', { name: 'Revoke', exact: true }).click()
+  await confirm.getByRole('button', { name: messages.console.apiKeys.revoke, exact: true }).click()
   const stepUp = page.getByRole('dialog')
   await expect(stepUp).toBeVisible()
-  await stepUp.getByLabel(/^password$/i).fill(TEST_PASSWORD)
-  await stepUp.getByRole('button', { name: /confirm|continue|verify/i }).click()
+  await stepUp.getByLabel(messages.console.loginPassword, { exact: true }).fill(TEST_PASSWORD)
+  await stepUp.getByRole('button', { name: messages.console.stepUpSubmit }).click()
   await completeMfaStepUp(page, email)
-  await expect(page.getByRole('row').filter({ hasText: 'Lifecycle 00' })).toContainText('Revoked')
-  await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeFocused()
+  await expect(page.getByRole('row').filter({ hasText: 'Lifecycle 00' })).toContainText(
+    messages.console.apiKeys.revoked
+  )
+  await expect(
+    page.getByRole('button', { name: messages.console.overviewRefresh, exact: true })
+  ).toBeFocused()
   expect(mutations).toEqual([403, 200])
   expect(stepUpBodies.every((body) => !body.includes('accessToken'))).toBe(true)
   expect(
@@ -100,10 +123,18 @@ test('platform key discovery, captured bulk step-up, lifecycle history and respo
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(page.getByText('Lifecycle 00', { exact: true }).last()).toBeVisible()
   expect((await scanAccessibility(page)).violations).toEqual([])
-  await page.goto(`/ru/admin/api-keys?id=${keys[0]!.id}`)
-  await expect(page.getByRole('heading', { name: 'API-ключи', exact: true })).toBeVisible()
-  await expect(page.getByText('Отозван', { exact: true }).last()).toBeVisible()
+  const reviewLocale = SERVED_LOCALES.at(-1)!
+  const reviewMessages = messagesForLocale(reviewLocale)
+  await page.goto(consolePath(`/api-keys?id=${keys[0]!.id}`, reviewLocale))
+  await expect(
+    page.getByRole('heading', { name: reviewMessages.console.apiKeys.title, exact: true })
+  ).toBeVisible()
+  await expect(
+    page.getByText(reviewMessages.console.apiKeys.revoked, { exact: true }).last()
+  ).toBeVisible()
   setSystemRole(email, 'USER')
   await page.reload()
-  await expect(page.getByRole('heading', { name: 'API-ключи', exact: true })).toHaveCount(0)
+  await expect(
+    page.getByRole('heading', { name: reviewMessages.console.apiKeys.title, exact: true })
+  ).toHaveCount(0)
 })

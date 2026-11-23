@@ -3,7 +3,7 @@ import { toolingFingerprint } from './reuse.mjs'
 import { readdir, readFile, mkdir } from 'node:fs/promises'
 import { appendFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { auditPlan, auditCatalogue, invariant, digest } from '../lib/lighthouse-plan.mjs'
+import { auditPlan, invariant, digest } from '../lib/lighthouse-plan.mjs'
 import { runIdentity } from './identity.mjs'
 import {
   validateEnvelopes,
@@ -12,9 +12,12 @@ import {
 } from '../lib/lighthouse-ci-evidence.mjs'
 import { unpackReports } from '../lib/lighthouse-archive.mjs'
 import { verifyView } from '../lib/lighthouse-view-export.mjs'
-import { checkCoverage } from '../lib/lighthouse-coverage.mjs'
+import { checkCoverage, coverageInputs } from '../lib/lighthouse-coverage.mjs'
 
-const plan = auditPlan(process.cwd(), runIdentity(process.cwd()))
+const plan = auditPlan(process.cwd(), runIdentity(process.cwd()), {
+  configured: process.env.AMCORE_E2E_INVENTORY === 'configured',
+  upstream: process.env.AMCORE_CI_ROLE === 'upstream-starter',
+})
 invariant(
   JSON.parse(process.env.AMCORE_EXPECTED_AUDIT_PLAN).digest === plan.digest,
   'unexpected-ci-plan'
@@ -44,10 +47,7 @@ if (process.argv.includes('--envelopes')) {
     await readdir(join(root, 'bundles')),
     plan
   )
-  const catalogue = auditCatalogue(process.cwd(), plan.choices)
-  const resolvers = [{ scope: 'product-admin', prefix: `/${plan.choices.productAdmin.alias}` }]
-  if (plan.choices.console)
-    resolvers.push({ scope: 'console', prefix: `/${plan.choices.console.slug}` })
+  const { catalogue, resolvers } = coverageInputs(process.cwd(), plan.choices)
   const provenance = {
     lock: digest(await readFile('pnpm-lock.yaml')),
     content: await snapshot(process.cwd()),

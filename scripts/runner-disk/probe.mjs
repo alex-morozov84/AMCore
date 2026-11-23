@@ -20,6 +20,9 @@ export function probe(
 ) {
   if (
     ![
+      'configured-standard',
+      'configured-disruptive',
+      'configured-console',
       'path-standard',
       'path-disruptive',
       'staff-path-oauth',

@@ -1,12 +1,24 @@
+import { SERVED_LOCALES } from '@amcore/shared'
 import { expect, type Page, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
+import { requirePathConsole } from '../shared/console-applicability'
 import { completeMfaStepUp } from '../shared/mfa-login'
+import { consolePath, isProductHome, messages, messagesForLocale } from '../shared/product-settings'
 
 import { ageSessionLastAuthAt, setEmailVerified, setSystemRole } from './admin-helpers'
 import { loginViaUi, registerViaUi, TEST_PASSWORD, uniqueEmail } from './helpers'
 
-const ROWS = ['Email', 'Files', 'Sign-in providers', 'Queue', 'AI', 'Telegram']
+requirePathConsole()
+
+const ROWS = [
+  messages.console.integrations.names.email,
+  messages.console.integrations.names.storage,
+  messages.console.integrations.names.oauth,
+  messages.console.integrations.names.queue,
+  messages.console.integrations.names.ai,
+  messages.console.integrations.names.telegram,
+]
 
 async function signInAsOperator(page: Page, prefix: string, verified = true) {
   const email = uniqueEmail(prefix)
@@ -15,7 +27,7 @@ async function signInAsOperator(page: Page, prefix: string, verified = true) {
   if (verified) setEmailVerified(email)
   await page.context().clearCookies()
   await loginViaUi(page, email)
-  await expect(page).toHaveURL(/\/en\/?$/)
+  await expect(page).toHaveURL(isProductHome)
   return email
 }
 
@@ -28,23 +40,31 @@ test('path-mode Integrations lists every registered service and never starts a c
     if (request.method() !== 'GET' && /\/api\/.*integrations/.test(request.url()))
       writes.push(request.url())
   })
-  await page.goto('/en/admin')
-  await page.getByRole('link', { name: 'Integrations', exact: true }).click()
-  await expect(page).toHaveURL(/\/en\/admin\/integrations$/)
-  await expect(page.getByRole('heading', { name: 'Integrations', level: 1 })).toBeVisible()
+  await page.goto(consolePath(''))
+  await page
+    .getByRole('link', { name: messages.console.integrations.tableLabel, exact: true })
+    .click()
+  await expect(page).toHaveURL((url) => url.pathname === consolePath('/integrations'))
+  await expect(
+    page.getByRole('heading', { name: messages.console.integrations.tableLabel, level: 1 })
+  ).toBeVisible()
 
-  const table = page.getByRole('table', { name: 'Integrations' })
+  const table = page.getByRole('table', { name: messages.console.integrations.tableLabel })
   for (const name of ROWS) await expect(table.getByText(name, { exact: true })).toBeVisible()
-  const email = table.getByRole('row').filter({ hasText: 'Email' })
-  await expect(email).toContainText('Set up, not verified')
-  await expect(email).toContainText('No stored result')
-  await expect(table.getByRole('row').filter({ hasText: 'Sign-in providers' })).toContainText(
-    'Configuration only'
-  )
+  const email = table
+    .getByRole('row')
+    .filter({ hasText: messages.console.integrations.names.email })
+  await expect(email).toContainText(messages.console.integrations.headline.setUpNotVerified)
+  await expect(email).toContainText(messages.console.integrations.noStoredResult)
+  await expect(
+    table.getByRole('row').filter({ hasText: messages.console.integrations.names.oauth })
+  ).toContainText(messages.console.integrations.scope.configuration_only)
 
   const observed = page.locator('time').first()
   const before = await observed.getAttribute('datetime')
-  await page.getByRole('button', { name: 'Refresh', exact: true }).click()
+  await page
+    .getByRole('button', { name: messages.console.integrations.refresh, exact: true })
+    .click()
   await expect(observed).not.toHaveAttribute('datetime', before!)
   expect(writes).toEqual([])
   await expectNoAxeViolations(page)
@@ -62,37 +82,62 @@ test('path-mode Integrations sends one test email after a recent password check 
     if (/\/integrations\/email\/probe\/prepare$/.test(request.url())) prepares.push(request.url())
     else if (/\/integrations\/email\/probe$/.test(request.url())) probes.push(request.url())
   })
-  await page.goto('/en/admin/integrations')
-  await page.getByRole('button', { name: 'Send test email' }).click()
-  await expect(page.getByText('Send a test email?')).toBeVisible()
+  await page.goto(consolePath('/integrations'))
+  await page
+    .getByRole('button', { name: messages.console.integrations.probe.operator_email_test.button })
+    .click()
+  await expect(
+    page.getByText(messages.console.integrations.probe.operator_email_test.confirmTitle)
+  ).toBeVisible()
   await expect(page.getByText(/\*\*\*@/)).toBeVisible()
-  await page.getByRole('button', { name: 'Send test' }).click()
+  await page
+    .getByRole('button', {
+      name: messages.console.integrations.probe.operator_email_test.confirmAction,
+    })
+    .click()
 
   // The session is old, so the Console asks for the password once and retries the same attempt.
-  await expect(page.getByText('Confirm your password')).toBeVisible()
-  await page.getByLabel('Password', { exact: true }).fill(TEST_PASSWORD)
-  await page.getByRole('button', { name: 'Confirm' }).click()
+  await expect(page.getByText(messages.console.stepUpTitle)).toBeVisible()
+  await page.getByLabel(messages.console.loginPassword, { exact: true }).fill(TEST_PASSWORD)
+  await page.getByRole('button', { name: messages.console.stepUpSubmit }).click()
 
   await completeMfaStepUp(page, email)
-  await expect(page.getByText(/Simulated\. The mock provider is in use/)).toBeVisible()
+  await expect(
+    page.getByText(messages.console.integrations.probe.operator_email_test.outcome.simulated)
+  ).toBeVisible()
   expect(prepares).toHaveLength(1)
   // The first POST was refused for the missing password check, the retry carried the same id.
   expect(probes.length).toBeGreaterThanOrEqual(2)
   await expectNoAxeViolations(page)
-  await page.getByRole('button', { name: 'Close' }).click()
+  await page
+    .getByRole('button', { name: messages.console.organizationAdministration.close })
+    .click()
 
-  const row = page.getByRole('table', { name: 'Integrations' }).getByRole('row').filter({
-    hasText: 'Email',
-  })
-  await expect(row).toContainText('Simulated')
-  await expect(page.getByRole('button', { name: 'Send test email' })).toBeDisabled()
+  const row = page
+    .getByRole('table', { name: messages.console.integrations.tableLabel })
+    .getByRole('row')
+    .filter({
+      hasText: messages.console.integrations.names.email,
+    })
+  await expect(row).toContainText(messages.console.integrations.result.simulated)
   await expect(
-    page.getByRole('table', { name: 'Integrations' }).getByText(/A test was started a moment ago/)
+    page.getByRole('button', {
+      name: messages.console.integrations.probe.operator_email_test.button,
+    })
+  ).toBeDisabled()
+  await expect(
+    page
+      .getByRole('table', { name: messages.console.integrations.tableLabel })
+      .getByText(messages.console.integrations.probe.operator_email_test.unavailable.cooldown)
   ).toBeVisible()
 
   const before = probes.length
-  await page.getByRole('button', { name: /Last test/ }).click()
-  await expect(page.getByText(/Simulated\. The mock provider is in use/)).toBeVisible()
+  await page
+    .getByRole('button', { name: messages.console.integrations.probe.operator_email_test.lastTest })
+    .click()
+  await expect(
+    page.getByText(messages.console.integrations.probe.operator_email_test.outcome.simulated)
+  ).toBeVisible()
   expect(probes).toHaveLength(before)
   expect(prepares).toHaveLength(1)
 })
@@ -101,12 +146,18 @@ test('path-mode Integrations disables the test without a verified address and sa
   page,
 }) => {
   await signInAsOperator(page, 'admin-integrations-unverified', false)
-  await page.goto('/en/admin/integrations')
-  await expect(page.getByRole('button', { name: 'Send test email' })).toBeDisabled()
+  await page.goto(consolePath('/integrations'))
+  await expect(
+    page.getByRole('button', {
+      name: messages.console.integrations.probe.operator_email_test.button,
+    })
+  ).toBeDisabled()
   await expect(
     page
-      .getByRole('table', { name: 'Integrations' })
-      .getByText('Your account has no verified email address.')
+      .getByRole('table', { name: messages.console.integrations.tableLabel })
+      .getByText(
+        messages.console.integrations.probe.operator_email_test.unavailable.no_verified_address
+      )
   ).toBeVisible()
 })
 
@@ -114,21 +165,31 @@ test('path-mode Integrations is available in Russian, readable on a narrow scree
   page,
 }) => {
   const email = await signInAsOperator(page, 'admin-integrations-ru')
-  await page.goto('/ru/admin/integrations')
-  await expect(page.getByRole('heading', { name: 'Интеграции', level: 1 })).toBeVisible()
+  const reviewLocale = SERVED_LOCALES.at(-1)!
+  const reviewMessages = messagesForLocale(reviewLocale)
+  await page.goto(consolePath('/integrations', reviewLocale))
   await expect(
-    page.getByRole('table', { name: 'Интеграции' }).getByText('Почта', { exact: true })
+    page.getByRole('heading', { name: reviewMessages.console.integrations.title, level: 1 })
+  ).toBeVisible()
+  await expect(
+    page
+      .getByRole('table', { name: reviewMessages.console.integrations.title })
+      .getByText(reviewMessages.console.integrations.names.email, { exact: true })
   ).toBeVisible()
 
   await page.setViewportSize({ width: 390, height: 844 })
-  await expect(page.getByRole('table', { name: 'Интеграции' })).toBeHidden()
-  await expect(page.getByRole('list', { name: 'Интеграции' })).toBeVisible()
+  await expect(
+    page.getByRole('table', { name: reviewMessages.console.integrations.title })
+  ).toBeHidden()
+  await expect(
+    page.getByRole('list', { name: reviewMessages.console.integrations.title })
+  ).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true
   )
   await expectNoAxeViolations(page)
 
   setSystemRole(email, 'USER')
-  const response = await page.goto('/en/admin/integrations')
+  const response = await page.goto(consolePath('/integrations'))
   expect(response?.status()).toBe(404)
 })

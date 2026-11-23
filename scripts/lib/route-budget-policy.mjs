@@ -1,6 +1,7 @@
 // Route budget policy: route keys `scope:/path`, budget files and the per-route verdict.
 // A scope resolver claims the routes under one physical prefix (for example the product
 // administration alias); unclaimed routes belong to scope `app`.
+import { readAdminConsoleSettings, readProductAdminPlacement } from './settings-files.mjs'
 import { RouteBudgetError } from './route-budget-inputs.mjs'
 
 const fail = (message) => {
@@ -76,4 +77,22 @@ export function evaluate(keyed, rows, budgets, mandatory) {
       return { key, route, bytes, limit, over }
     })
   return { report, failures }
+}
+
+export function scopeRegistry(root) {
+  const { alias } = readProductAdminPlacement(root)
+  const resolvers = [{ scope: 'product-admin', prefix: `/${alias}` }]
+  const mandatory = ['app:/', 'app:/login', 'app:/register', 'app:/settings/sessions']
+  mandatory.push('product-admin:/organizations')
+  // The Console folder stays in every build (a disabled Console answers 404), so its budget
+  // scope is mandatory in every mode; only the alias must be valid.
+  let slug
+  try {
+    slug = readAdminConsoleSettings(root).alias
+  } catch (error) {
+    throw new RouteBudgetError(error.message)
+  }
+  resolvers.push({ scope: 'admin-console', prefix: `/${slug}` })
+  mandatory.push('admin-console:/')
+  return { resolvers, mandatory, scopes: new Set(['app', ...resolvers.map((r) => r.scope)]) }
 }

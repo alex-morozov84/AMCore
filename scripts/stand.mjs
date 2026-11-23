@@ -1,3 +1,6 @@
+import { closedSignupOAuthProfile } from './stand/apple-oauth-fixture.mjs'
+import { preservedTopology } from './stand/settings-policy.mjs'
+import { projectChoices } from './stand/project.mjs'
 import { standDeadline } from './lib/lighthouse-deadlines.mjs'
 import { productAdminProfiles } from './stand/product-admin-source.mjs'
 import { snapshot } from './stand/snapshot.mjs'
@@ -21,6 +24,8 @@ const value = (flag, fallback) => (args.includes(flag) ? args[args.indexOf(flag)
 const lane = value('--lane', 'real-stack')
 const group = value('--ci-group')
 const fixture = value('--fixture')
+const settingsPolicy = value('--settings-policy', 'variant')
+if (!['preserve', 'variant'].includes(settingsPolicy)) throw new Error('Invalid settings policy')
 const auditOnly = args.includes('--audit-only')
 const reuseAudit = args.includes('--reuse-audit')
 if (reuseAudit && (!auditOnly || process.env.CI === 'true'))
@@ -41,6 +46,7 @@ if (
   args.includes('--fixture') &&
   (![
     'console-summary',
+    closedSignupOAuthProfile,
     'organization-setup',
     'organization-shop',
     'organization-provisioning',
@@ -51,6 +57,8 @@ if (
     lane === 'mocked')
 )
   throw new Error('Only organization fixtures on fresh Docker E2E are supported')
+if (fixture === closedSignupOAuthProfile && lane !== 'console-real-stack')
+  throw new Error('Closed signup OAuth fixture requires the Console host lane')
 if (fixture === 'product-admin-oauth-path' && lane !== 'real-stack')
   throw new Error('Path OAuth fixture requires the real-stack lane')
 if (fixture && group)
@@ -66,6 +74,8 @@ let topology
 if (lane === 'product-admin-real-stack') topology = 'host'
 lanes.push('console-real-stack')
 if (lane === 'console-real-stack') topology = 'host'
+if (settingsPolicy === 'preserve' && ['up', 'preview', 'e2e'].includes(action))
+  topology = preservedTopology(lane, await projectChoices(root))
 const id = value('--id', action === 'e2e' ? `e2e-${randomUUID()}` : 'preview')
 // Explicit risk acceptance for a build whose Docker export is not proved finished;
 // recorded in the manifest as acceptance, never as proof (see local-stands guide).
@@ -154,6 +164,10 @@ async function execute() {
       if (action === 'e2e' && (existing.topology === 'host') !== (topology === 'host'))
         throw new Error('E2E topology does not match selected lane')
       if (existing.state === 'purged') throw new Error('Purged ID; select a fresh stand ID')
+      if (settingsPolicy === 'preserve' && !existing.settingsPolicy)
+        throw new Error('Legacy stand has no settings policy; use a fresh stand ID for preserve')
+      if (existing.settingsPolicy && existing.settingsPolicy !== settingsPolicy)
+        throw new Error('Cannot switch the settings policy of an existing stand')
       m = existing
       if (lane !== 'mocked' && !['stopped', 'allocated', 'configured'].includes(m.state))
         await dataAdmission(m)
@@ -173,7 +187,8 @@ async function execute() {
               (lane === 'product-admin-real-stack' ? 'product-admin-three-host' : undefined)),
         (allocated) => {
           m = allocated
-        }
+        },
+        settingsPolicy
       )
     if (lane !== 'mocked') await boot(m, !existing)
     if (interrupted) throw new Error('Interrupted startup')

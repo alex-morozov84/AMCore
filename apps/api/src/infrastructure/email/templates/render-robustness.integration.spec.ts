@@ -7,13 +7,15 @@
  *  - NO raw message-id leakage (a missing key would render its literal id),
  *  - a non-empty plaintext alternative (`render(node, { plainText: true })`)
  *    that contains the localized words and no HTML tags,
- *  - locale fallback to English when `locale` is omitted.
+ *  - locale fallback to the configured default when `locale` is omitted.
  *
  * @see https://react.email/docs/introduction#testing
  */
 
 import { render } from '@react-email/render'
 import { describe, expect, it } from 'vitest'
+
+import { DEFAULT_LOCALE } from '@amcore/shared'
 
 import { emailMessages, type Locale } from '../messages'
 
@@ -117,10 +119,11 @@ describe('email templates — render robustness (EQS-08)', () => {
     )
   })
 
-  it('falls back to the base locale (English) when locale is omitted', async () => {
+  it('falls back to the configured default when locale is omitted', async () => {
     const html = await render(WelcomeEmail({ name: 'Ivan', email: 'ivan@example.com' }))
 
-    expect(html).toContain('Welcome')
-    expect(html).not.toContain('Добро пожаловать')
+    const titles = { en: 'Welcome', ru: 'Добро пожаловать' }
+    expect(html).toContain(titles[DEFAULT_LOCALE])
+    expect(html).not.toContain(titles[DEFAULT_LOCALE === 'en' ? 'ru' : 'en'])
   })
 })

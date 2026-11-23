@@ -1,4 +1,5 @@
 const areaNames = [
+  'apiE2e',
   'docs',
   'ui',
   'web',
@@ -29,7 +30,8 @@ export function normalizeCiAreas(outputs) {
   return Object.fromEntries(
     areaNames.map((name) => {
       if (name === 'unknown') return [name, [...files.all].some((file) => !known.has(file))]
-      const excluded = name === 'web' ? files.ui : name === 'infra' ? files.monitoring : new Set()
+      const excluded =
+        { web: files.ui, infra: files.monitoring, api: files.apiE2e }[name] ?? new Set()
       return [name, [...files[name]].some((file) => !excluded.has(file))]
     })
   )
@@ -60,25 +62,30 @@ export function selectCiGroups({ role, mode, areas, diffComplete, integration = 
     a('unknown') ||
     a('common') ||
     a('tools')
+  const apiOnly =
+    !full &&
+    a('apiE2e') &&
+    Object.entries(areas).every(([key, value]) => !value || key === 'apiE2e')
   const code = full || ['ui', 'web', 'api', 'infra', 'tools', 'email', 'deployment'].some(a)
   const heavy = mode !== 'heavy-off'
-  const api = full || a('api')
-  const web = full || a('ui') || a('web') || a('api') || a('infra') || a('deployment')
+  const api = full || a('api') || a('apiE2e')
+  const web = !apiOnly && (full || a('ui') || a('web') || a('api') || a('infra') || a('deployment'))
   const runtime = full || a('web') || a('api') || a('infra') || a('deployment')
   const upstream = role === 'upstream-starter'
   return {
     quality: code ? 'code' : 'docs',
     static: true,
-    scripts: heavy && code,
-    build: heavy && (full || a('ui') || a('web') || a('api') || a('deployment')),
+    scripts: heavy && code && !apiOnly,
+    unit: code && !apiOnly,
+    build: heavy && !apiOnly && (full || a('ui') || a('web') || a('api') || a('deployment')),
     api: heavy && api,
-    redis: heavy && (full || a('web') || a('api')),
+    redis: heavy && !apiOnly && (full || a('web') || a('api')),
     web: heavy && web ? (runtime ? 'runtime' : 'ui') : 'none',
     storybook: heavy && (full || a('ui') || a('web')),
-    capability: heavy && upstream && api,
-    notification: heavy && api,
-    images: heavy && (full || a('api') || a('infra')),
-    monitoring: heavy && (full || a('api') || a('monitoring')) ? 'live' : 'static',
+    capability: heavy && !apiOnly && upstream && api,
+    notification: heavy && !apiOnly && api,
+    images: heavy && !apiOnly && (full || a('api') || a('infra')),
+    monitoring: heavy && !apiOnly && (full || a('api') || a('monitoring')) ? 'live' : 'static',
     portability:
       heavy && upstream
         ? [
@@ -92,4 +99,14 @@ export function selectCiGroups({ role, mode, areas, diffComplete, integration = 
     deployment: heavy && (full || a('deployment')),
     safety: heavy && (full || a('tools')),
   }
+}
+
+export function isIndependentWebChange({ mode, diffComplete, integration, areas }) {
+  return (
+    mode === 'normal' &&
+    diffComplete &&
+    !integration &&
+    (areas.ui === true || areas.web === true) &&
+    Object.entries(areas).every(([key, value]) => !value || ['ui', 'web'].includes(key))
+  )
 }

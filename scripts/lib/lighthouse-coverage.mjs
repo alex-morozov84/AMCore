@@ -1,7 +1,8 @@
 import { join } from 'node:path'
 import { assertSupportedNext, expectedPages, readJson } from './route-budget-inputs.mjs'
 import { keyRoutes } from './route-budget-policy.mjs'
-import { auditCatalogue, auditChoices, invariant, digest } from './lighthouse-plan.mjs'
+import { readAdminConsoleSettings } from './settings-files.mjs'
+import { auditCatalogue, auditChoices, invariant, digest, json } from './lighthouse-plan.mjs'
 
 export function checkCoverage(pages, catalogue, resolvers) {
   const keyed = keyRoutes(pages, resolvers)
@@ -32,9 +33,29 @@ export function checkCoverage(pages, catalogue, resolvers) {
   return [...rows.values()].sort((a, b) => a.route.localeCompare(b.route))
 }
 
-export function collectCoverage(root, input) {
-  const choices = auditChoices(root)
+/** Disabled Console retains physical routes. Its declared routes are excluded from measurement. */
+export function coverageInputs(root, choices = auditChoices(root)) {
+  const console = readAdminConsoleSettings(root)
   const catalogue = auditCatalogue(root, choices)
+  const resolvers = [
+    { scope: 'product-admin', prefix: `/${choices.productAdmin.alias}` },
+    { scope: 'console', prefix: `/${console.alias}` },
+  ]
+  if (console.mode === 'disabled') {
+    const disabled = json(root, 'apps/web/e2e/console-real-stack/lighthouse/catalogue.json')
+    catalogue.coverage.push(
+      ...disabled.coverage.map(({ route }) => ({
+        route,
+        kind: 'excluded',
+        reason: 'This route is unavailable because Console is disabled by source settings.',
+      }))
+    )
+  }
+  return { catalogue, resolvers }
+}
+
+export function collectCoverage(root, input) {
+  const { catalogue, resolvers } = coverageInputs(root)
   assertSupportedNext(
     input?.next ?? readJson(join(root, 'apps/web/node_modules/next/package.json'), 'Next').version
   )
@@ -42,8 +63,6 @@ export function collectCoverage(root, input) {
     input?.pages ??
       readJson(join(root, 'apps/web/.next/app-path-routes-manifest.json'), 'built manifest')
   )
-  const resolvers = [{ scope: 'product-admin', prefix: `/${choices.productAdmin.alias}` }]
-  resolvers.push({ scope: 'console', prefix: `/${choices.console.slug}` })
   const rows = checkCoverage(pages, catalogue, resolvers)
   return {
     rows,

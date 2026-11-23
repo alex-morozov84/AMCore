@@ -8,6 +8,8 @@ import {
 } from '@amcore/shared'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { stubProductOrigins } from '@/test/product-origins'
+
 import { revokeBackendSession } from './backend-session-revocation'
 import { publishInvitedOAuth } from './invitation-oauth-exchange'
 import { recoverPublishedInvitedOAuth } from './invitation-oauth-recovery'
@@ -49,8 +51,7 @@ function makeRequest(pathAndQuery: string): Request {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.stubEnv('FRONTEND_URL', 'https://app.example.test')
-  vi.stubEnv('PRODUCT_ADMIN_ORIGIN', '')
+  stubProductOrigins('https://app.example.test')
   vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-test-context-key-with-at-least-32>')
   vi.mocked(recoverPublishedInvitedOAuth).mockResolvedValue(null)
 })

@@ -1,15 +1,14 @@
+import { SERVED_LOCALES } from '@amcore/shared'
 import { expect } from '@playwright/test'
 
-import en from '../../messages/en.json'
-import ru from '../../messages/ru.json'
 import { test } from '../shared/auth-test'
 import { expectNoAxeViolations } from '../shared/axe'
+import { messagesForLocale, productPath } from '../shared/product-settings'
 
 // Client-state proof only. API cryptography and real Redis publication have separate suites.
-for (const { locale, messages, width } of [
-  { locale: 'en', messages: en.accountMfa, width: 1280 },
-  { locale: 'ru', messages: ru.accountMfa, width: 360 },
-] as const) {
+for (const locale of SERVED_LOCALES) {
+  const messages = messagesForLocale(locale).accountMfa
+  const width = locale === 'ru' ? 360 : 1280
   test(`server recovery shows the recovery error and grants only new-app setup (${locale})`, async ({
     page,
   }) => {
@@ -54,7 +53,7 @@ for (const { locale, messages, width } of [
       return route.fulfill({ json: { view: view() } })
     })
     await page.setViewportSize({ width, height: 900 })
-    await page.goto(`/${locale}/mfa`)
+    await page.goto(productPath('/mfa', locale))
     const submit = async () => {
       await page.getByLabel(messages.password, { exact: true }).fill('<fake-local-password>')
       await page.getByLabel(messages.emergencyTicket, { exact: true }).fill('r'.repeat(43))
@@ -62,7 +61,7 @@ for (const { locale, messages, width } of [
     }
     await submit()
     await expect(page.locator('[data-slot="alert"]')).toContainText(
-      (locale === 'en' ? en : ru).errors.MFA_RECOVERY_TICKET_INVALID
+      messagesForLocale(locale).errors.MFA_RECOVERY_TICKET_INVALID
     )
     await expectNoAxeViolations(page)
     await submit()
@@ -145,7 +144,7 @@ for (const { locale, messages, width } of [
       return route.fulfill({ json: { view: view() } })
     })
     await page.setViewportSize({ width, height: 900 })
-    await page.goto(`/${locale}/mfa`)
+    await page.goto(productPath('/mfa', locale))
     await page.getByRole('button', { name: messages.connectApp, exact: true }).click()
     await expect(page.getByRole('img', { name: messages.qrLabel })).toBeVisible()
     await page.getByRole('textbox').fill('123456')
@@ -157,7 +156,8 @@ for (const { locale, messages, width } of [
     await expectNoAxeViolations(page)
     await finish.click()
     await page.getByRole('button', { name: messages.checkResult, exact: true }).click()
-    await page.waitForURL((url) => url.pathname === `/${locale}` || url.pathname === `/${locale}/`)
+    // This mock completes the client flow without publishing a real login session.
+    await expect(page).toHaveURL(productPath('/login', locale))
     expect(actions).toEqual(['start_enrollment', 'verify', 'acknowledge_codes', 'reconcile_login'])
     await expectNoAxeViolations(page)
   })

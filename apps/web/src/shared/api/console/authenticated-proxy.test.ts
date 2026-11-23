@@ -11,13 +11,18 @@ import { getOptionalSessionEntry } from '@/shared/api/bff/dal'
 import { SessionNotFoundError, SessionVaultUnavailableError } from '@/shared/api/bff/errors'
 import { isTrustedOrigin } from '@/shared/api/bff/origin-guard'
 import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
+import { stubProductOrigins } from '@/test/product-origins'
 
 import { isConsoleRequestOriginTrusted, resolveConsoleAccessToken } from './authenticated-proxy'
 import { isTrustedConsoleOrigin } from './origin-guard'
 import { getConsoleSessionEntry } from './session'
 
-const mutableConfig = ADMIN_CONSOLE_CONFIG as { mode: 'disabled' | 'path' | 'host' }
+const mutableConfig = ADMIN_CONSOLE_CONFIG as {
+  enabled: boolean
+  mode: 'disabled' | 'path' | 'host'
+}
 const originalMode = ADMIN_CONSOLE_CONFIG.mode
+const originalEnabled = ADMIN_CONSOLE_CONFIG.enabled
 
 function request(method = 'PATCH'): Request {
   const host = mutableConfig.mode === 'host' ? 'console.example.test' : 'app.example.test'
@@ -31,15 +36,20 @@ function request(method = 'PATCH'): Request {
 }
 
 beforeEach(() => {
+  stubProductOrigins('https://app.example.test')
   vi.clearAllMocks()
   vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', 'test-key-'.repeat(8))
-  vi.stubEnv('FRONTEND_URL', 'https://app.example.test')
   vi.stubEnv('ADMIN_CONSOLE_ORIGIN', 'https://console.example.test')
   vi.stubEnv('ADMIN_CONSOLE_HOSTNAME', 'console.example.test')
-  mutableConfig.mode = originalMode
+  mutableConfig.enabled = true
+  mutableConfig.mode = 'path'
 })
 
-afterEach(() => vi.unstubAllEnvs())
+afterEach(() => {
+  mutableConfig.enabled = originalEnabled
+  mutableConfig.mode = originalMode
+  vi.unstubAllEnvs()
+})
 
 describe('isConsoleRequestOriginTrusted', () => {
   it('uses the strict console-host check in host mode', () => {

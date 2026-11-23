@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 
 import { directApi } from '../real-stack/credential-containment.helpers'
-import { registerViaUi, TEST_PASSWORD, uniqueEmail } from '../real-stack/helpers'
+import { loginViaUi, registerViaUi, TEST_PASSWORD, uniqueEmail } from '../real-stack/helpers'
+import { messages, productPath, translate } from '../shared/product-settings'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
 test.use({ trace: 'off', screenshot: 'off', video: 'off' })
@@ -45,20 +46,26 @@ test('later membership loss hides data on refresh/reload and permits independent
         link: `c${randomUUID().replaceAll('-', '').slice(0, 24)}`,
       }
     )
-    await page.goto(`${staff}/en/login`)
-    await page.getByRole('textbox', { name: /email/i }).fill(email)
-    await page.getByLabel(/^password$/i).fill(TEST_PASSWORD)
-    await page.getByRole('button', { name: /sign in/i }).click()
-    await page.waitForURL((url) => url.origin === staff && url.pathname === '/en/organizations')
-    const deep = `${staff}/en/organizations/${org.id}/members`
+    await loginViaUi(page, email, { origin: staff })
+    await page.waitForURL(
+      (url) => url.origin === staff && url.pathname === productPath('/organizations')
+    )
+    const deep = `${staff}${productPath(`/organizations/${org.id}/members`)}`
     await page.goto(deep)
     await expect(
       page.getByRole('heading', { name: 'Private removed organization', exact: true })
     ).toBeVisible()
     await expect(page.getByRole('row').filter({ hasText: email })).toBeVisible()
     // Server-rendered rows can precede hydration; prove interaction before revoking access.
-    await page.getByRole('button', { name: `Actions for ${email}`, exact: true }).click()
-    await expect(page.getByRole('menuitem', { name: 'Edit roles', exact: true })).toBeVisible()
+    await page
+      .getByRole('button', {
+        name: translate('organizationMembers.actionFor', { name: email }),
+        exact: true,
+      })
+      .click()
+    await expect(
+      page.getByRole('menuitem', { name: messages.organizationMembers.edit, exact: true })
+    ).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(page.getByRole('menu')).toHaveCount(0)
     const removed = await fetch(
@@ -68,7 +75,10 @@ test('later membership loss hides data on refresh/reload and permits independent
     expect(removed.status).toBe(204)
     // Existing focus activation refreshes authority without replaying a mutation.
     await page.evaluate(() => window.dispatchEvent(new Event('focus')))
-    const denied = page.getByRole('heading', { name: 'Page unavailable', exact: true })
+    const denied = page.getByRole('heading', {
+      name: messages.productAdmin.unavailableTitle,
+      exact: true,
+    })
     await expect(denied).toBeVisible()
     await expect(page.getByText('Private removed organization', { exact: true })).toHaveCount(0)
     await expect(page.getByRole('table')).toHaveCount(0)
@@ -91,9 +101,11 @@ test('later membership loss hides data on refresh/reload and permits independent
     const logout = page.waitForResponse(
       (response) => new URL(response.url()).pathname === '/api/product-admin/auth/logout'
     )
-    await page.getByRole('button', { name: 'Sign out', exact: true }).click()
+    await page.getByRole('button', { name: messages.auth.logout, exact: true }).click()
     expect((await logout).status()).toBe(200)
-    await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: messages.productAdmin.loginTitle, exact: true })
+    ).toBeVisible()
     const buyerMe = await context.request.get(`${product}/api/auth/me`)
     expect(buyerMe.status()).toBe(200)
     expect((await buyerMe.json()).user.email).toBe(buyer)

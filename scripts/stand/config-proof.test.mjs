@@ -173,7 +173,12 @@ for (const mode of ['path', 'host']) {
 test('console summary E2E owns its internal fault source and loopback offline Grafana', async () => {
   const id = `summary-config-${randomUUID()}`
   try {
-    const m = await create(id, 'e2e', 'path', false, 'console-summary')
+    const m = await create(id, 'e2e', undefined, false, 'console-summary')
+    assert.equal(m.topology, 'path')
+    assert.equal(m.productAdminHost, false)
+    assert.equal(m.exercisedSettings['product-admin'].mode, 'path')
+    assert.equal(m.exercisedSettings['admin-console'].mode, 'path')
+    assert.deepEqual(m.exercisedSettings.locales, m.sourceSettings.locales)
     await configuration(m)
     assert.equal(m.model.services.web.environment.API_URL, 'http://summary-source:8098')
     assert.equal(

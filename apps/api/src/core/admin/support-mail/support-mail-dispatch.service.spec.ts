@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 
 import { mockDeep } from 'jest-mock-extended'
 
-import type { RequestPrincipal } from '@amcore/shared'
+import { PRODUCT_ADMIN_CONFIG, type RequestPrincipal } from '@amcore/shared'
 
 import type { EnvService } from '../../../env/env.service'
 import type { PrismaClient, SupportMailAttempt } from '../../../generated/prisma/client'
@@ -84,7 +84,8 @@ describe('Support mail dispatch deadlines and one physical transport', () => {
       EMAIL_PROVIDER: 'mock',
       EMAIL_FROM: 'sender@example.test',
       FRONTEND_URL: 'https://site.example.test',
-      PRODUCT_ADMIN_ORIGIN: undefined,
+      PRODUCT_ADMIN_ORIGIN:
+        PRODUCT_ADMIN_CONFIG.mode === 'host' ? 'https://office.example.test' : undefined,
       STEP_UP_MAX_AGE_SECONDS: 300,
       PASSWORD_RESET_EXPIRY_MINUTES: 15,
       EMAIL_VERIFICATION_EXPIRY_HOURS: 48,

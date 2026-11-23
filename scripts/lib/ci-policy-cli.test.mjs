@@ -64,13 +64,18 @@ test('actual event command preserves PR choice and applies post-merge or explici
     assert.equal(result.status, 0, result.stderr)
     assert.equal(JSON.parse(result.stdout).mode, 'heavy-off')
   }
-  const once = invoke('workflow_dispatch', head, { inputs: { 'full-once': 'true' } })
+  const once = invoke('workflow_dispatch', head, {
+    inputs: { 'full-once': 'true', 'source-sha': head },
+  })
   assert.equal(once.status, 0, once.stderr)
   assert.equal(JSON.parse(once.stdout).mode, 'full')
   assert.equal(JSON.parse(once.stdout).saved, 'heavy-off')
   assert.equal(readFileSync(file, 'utf8'), saved)
   for (const response of [
-    invoke('push', head, { inputs: { 'full-once': true } }),
+    invoke('push', head, { inputs: { 'full-once': true, 'source-sha': head } }),
+    invoke('workflow_dispatch', head, {
+      inputs: { 'full-once': true, 'source-sha': '0'.repeat(40) },
+    }),
     invoke('workflow_dispatch', head, { inputs: { 'full-once': 'yes' } }),
     invoke('push', head, {}, 'alex-morozov84/AMCore'),
     invoke('push', 'HEAD'),

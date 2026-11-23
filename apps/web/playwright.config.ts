@@ -21,6 +21,11 @@ import { activeTarget, outputPaths, testOptions } from './e2e/support/managed-ta
  */
 const target = activeTarget()
 
+const tls = target.mockTls
+const tlsArgs = tls
+  ? ` --experimental-https --experimental-https-key ${tls.dir}/key.pem --experimental-https-cert ${tls.dir}/cert.pem`
+  : ''
+
 export default defineConfig({
   ...outputPaths(),
   testDir: './e2e',
@@ -51,8 +56,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `pnpm exec next dev --hostname 127.0.0.1 --port ${target.ports.web}`,
-    url: target.origins.product,
+    command: `pnpm exec next dev --hostname 127.0.0.1 --port ${target.ports.web}${tlsArgs}`,
+    url: tls ? `https://127.0.0.1:${target.ports.web}/sw.js` : target.origins.product,
     reuseExistingServer: false,
     gracefulShutdown: { signal: 'SIGTERM', timeout: 5_000 },
     timeout: 120_000,

@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 
-import { logoutViaApi, registerViaUi, TEST_PASSWORD, uniqueEmail } from '../real-stack/helpers'
+import { loginViaUi, logoutViaApi, registerViaUi, uniqueEmail } from '../real-stack/helpers'
+import { isProductHome, productPath } from '../shared/product-settings'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
 import { getBrowserFixture } from './get-browser-fixture'
@@ -33,7 +34,9 @@ for (const provider of ['google', 'github'] as const) {
           await page.waitForURL(
             (url) =>
               url.origin === origin &&
-              url.pathname === (surface === 'admin' ? '/en/organizations' : '/en'),
+              (surface === 'admin'
+                ? url.pathname === productPath('/organizations')
+                : isProductHome(url)),
             { timeout: 15000 }
           )
         } catch {
@@ -69,11 +72,10 @@ for (const provider of ['google', 'github'] as const) {
     try {
       const page = await context.newPage()
       await registerViaUi(page, email)
-      await page.goto(`${staff}/en/login`)
-      await page.getByRole('textbox', { name: /email/i }).fill(email)
-      await page.getByLabel(/^password$/i).fill(TEST_PASSWORD)
-      await page.getByRole('button', { name: /sign in/i }).click()
-      await page.waitForURL((url) => url.origin === staff && url.pathname === '/en/organizations')
+      await loginViaUi(page, email, { origin: staff })
+      await page.waitForURL(
+        (url) => url.origin === staff && url.pathname === productPath('/organizations')
+      )
       const sessionBefore = (await context.cookies(staff)).find(
         (cookie) => cookie.name === '__Host-amcore_staff_session'
       )?.value
@@ -86,13 +88,13 @@ for (const provider of ['google', 'github'] as const) {
       const countBefore = sessions()
       const seen = await getBrowserFixture(context, staff, identityEmail, provider, 'admin', true)
       await page.goto(`${staff}/api/product-admin/auth/oauth/${provider}/link`, {
-        referer: `${staff}/en/organizations`,
+        referer: `${staff}${productPath('/organizations')}`,
       })
       try {
         await page.waitForURL(
           (url) =>
             url.origin === staff &&
-            url.pathname === '/en/auth/linked' &&
+            url.pathname === productPath('/auth/linked') &&
             url.searchParams.get('linked') === provider,
           { timeout: 15000 }
         )

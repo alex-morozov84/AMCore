@@ -13,6 +13,8 @@ vi.mock('./mfa-settings-start-receipt', () => ({
   ),
 }))
 
+import { stubProductOrigins } from '@/test/product-origins'
+
 import { fetchBackendResponse } from '../backend-transport'
 
 import { authFailureResponse } from './auth-failure-response'
@@ -25,7 +27,7 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 it('preserves the HTTP429 code and Retry-After at the public error boundary', async () => {
-  vi.stubEnv('FRONTEND_URL', 'https://app.example.test')
+  stubProductOrigins('https://app.example.test')
   vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-settings-context-key-at-least-32>')
   const request = new Request('https://app.example.test/api/auth/mfa', {
     headers: {

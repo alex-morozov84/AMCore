@@ -15,14 +15,16 @@ export const productAdminProfiles = [
 
 /** Copy-only topology rehearsal; never modifies the authoring checkout or runtime policy. */
 export async function prepareProductAdminSource(m) {
-  if (!m.productAdminHost && m.fixtureProfile !== 'product-admin-oauth-path') return
+  const pathOAuth = m.fixtureProfile === 'product-admin-oauth-path'
+  const pathSummary = m.fixtureProfile === 'console-summary'
+  if (!m.productAdminHost && !pathOAuth && !pathSummary) return
   const path = join(m.snapshot, 'packages/shared/src/config/product-admin.json')
   const config = JSON.parse(await readFile(path, 'utf8'))
-  if (m.fixtureProfile === 'product-admin-oauth-path') {
+  if (pathOAuth || pathSummary) {
     config.mode = 'path'
     await writeFile(path, JSON.stringify(config, null, 2) + '\n')
     productAdminEdgeFiles(m.snapshot, true)
-    await prepareAppleOAuthFixture(m)
+    if (pathOAuth) await prepareAppleOAuthFixture(m)
     return
   }
   if (productAdminProfiles.includes(m.fixtureProfile)) {

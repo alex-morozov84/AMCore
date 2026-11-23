@@ -1,10 +1,9 @@
-import { DEFAULT_LOCALE, localizedFrontendUrl, SERVED_LOCALES } from '@amcore/shared'
+import { DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 import { expect, type Page } from '@playwright/test'
 
-import en from '../../messages/en.json'
-import ru from '../../messages/ru.json'
 import { test } from '../shared/auth-test'
 import { expectNoAxeViolations } from '../shared/axe'
+import { messages as authCopy, productPath } from '../shared/product-settings'
 
 const passwordHints = {
   en: 'Use at least 8 characters, including one uppercase Latin letter (A–Z) and one digit (0–9).',
@@ -47,21 +46,20 @@ test('login form rejects an invalid submission without calling the BFF', async (
     return route.abort()
   })
 
-  await page.goto('/en/login')
+  await page.goto(productPath('/login'))
   // A real visibility interaction establishes hydration before submitting invalid data.
-  await page.getByRole('button', { name: /^show password$/i }).click()
+  await page.getByRole('button', { name: authCopy.common.showPassword, exact: true }).click()
   await expect(page.locator('input[name="password"]')).toHaveAttribute('type', 'text')
-  await page.getByRole('button', { name: /^hide password$/i }).click()
+  await page.getByRole('button', { name: authCopy.common.hidePassword, exact: true }).click()
   await expect(page.locator('input[name="password"]')).toHaveAttribute('type', 'password')
 
-  await page.getByRole('textbox', { name: /email/i }).fill('not-an-email')
+  await page.getByRole('textbox', { name: authCopy.auth.email, exact: true }).fill('not-an-email')
   // Password left empty — required field.
-  await page.getByRole('button', { name: /sign in/i }).click()
+  await page.getByRole('button', { name: authCopy.auth.login, exact: true }).click()
 
-  await expect(page.getByRole('textbox', { name: /email/i })).toHaveAttribute(
-    'aria-invalid',
-    'true'
-  )
+  await expect(
+    page.getByRole('textbox', { name: authCopy.auth.email, exact: true })
+  ).toHaveAttribute('aria-invalid', 'true')
   expect(loginRequestSeen).toBe(false)
 })
 
@@ -72,25 +70,28 @@ test('register form rejects a weak password without calling the BFF', async ({ p
     return route.abort()
   })
 
-  await page.goto('/en/register')
+  await page.goto(productPath('/register'))
 
   const input = await expectPasswordHint(page, DEFAULT_LOCALE)
 
-  await page.getByRole('textbox', { name: /email/i }).fill('spike-e2e@example.com')
+  await page
+    .getByRole('textbox', { name: authCopy.auth.email, exact: true })
+    .fill('spike-e2e@example.com')
   // `registerSchema` requires min 8 chars + an uppercase + a digit.
   await input.fill('weak')
-  await page.getByRole('button', { name: /sign up/i }).click()
+  await page.getByRole('button', { name: authCopy.auth.register, exact: true }).click()
 
   await expect(input).toHaveAttribute('aria-invalid', 'true')
   await expectHintAndErrorDescription(page)
   expect(registerRequestSeen).toBe(false)
 })
 
-test('registration hint is localized in Russian', async ({ page }) => {
-  test.skip(!new Set<string>(SERVED_LOCALES).has('ru'), 'Russian locale is not enabled')
-  await page.goto('/ru/register')
-  await expectPasswordHint(page, 'ru')
-})
+if (SERVED_LOCALES.some((locale) => locale === 'ru')) {
+  test('registration hint is localized in Russian', async ({ page }) => {
+    await page.goto(productPath('/register', 'ru'))
+    await expectPasswordHint(page, 'ru')
+  })
+}
 
 test('reset form explains the password rule and rejects a weak password locally', async ({
   page,
@@ -101,25 +102,26 @@ test('reset form explains the password rule and rejects a weak password locally'
     return route.abort()
   })
 
-  await page.goto(`/en/reset-password?token=${'a'.repeat(64)}`)
+  await page.goto(productPath(`/reset-password?token=${'a'.repeat(64)}`))
   const input = await expectPasswordHint(page, DEFAULT_LOCALE)
   await input.fill('weak')
-  await page.getByRole('button', { name: /reset password/i }).click()
+  await page.getByRole('button', { name: authCopy.auth.resetPasswordSubmit, exact: true }).click()
 
   await expect(input).toHaveAttribute('aria-invalid', 'true')
   await expectHintAndErrorDescription(page)
   expect(resetRequestSeen).toBe(false)
 })
 
-test('reset hint is localized in Russian and absent without a token', async ({ page }) => {
-  test.skip(!new Set<string>(SERVED_LOCALES).has('ru'), 'Russian locale is not enabled')
-  await page.goto(`/ru/reset-password?token=${'a'.repeat(64)}`)
-  await expectPasswordHint(page, 'ru')
+if (SERVED_LOCALES.some((locale) => locale === 'ru')) {
+  test('reset hint is localized in Russian and absent without a token', async ({ page }) => {
+    await page.goto(productPath(`/reset-password?token=${'a'.repeat(64)}`, 'ru'))
+    await expectPasswordHint(page, 'ru')
 
-  await page.goto('/ru/reset-password')
-  await expect(page.locator('input[type="password"]')).toHaveCount(0)
-  await expect(page.getByText(passwordHints.ru, { exact: true })).toHaveCount(0)
-})
+    await page.goto(productPath('/reset-password', 'ru'))
+    await expect(page.locator('input[type="password"]')).toHaveCount(0)
+    await expect(page.getByText(passwordHints.ru, { exact: true })).toHaveCount(0)
+  })
+}
 
 test('valid reset submission reaches the BFF and replaces the form on success', async ({
   page,
@@ -131,22 +133,22 @@ test('valid reset submission reaches the BFF and replaces the form on success', 
   })
 
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto(`/en/reset-password?token=${'a'.repeat(64)}`)
+  await page.goto(productPath(`/reset-password?token=${'a'.repeat(64)}`))
   const oldHeading = await page.getByRole('heading', { level: 1 }).innerText()
   const oldSubtitle = await page.locator('[data-slot="card-description"]').innerText()
   const input = await expectPasswordHint(page, DEFAULT_LOCALE)
   await input.fill('CorrectPassword1')
-  await page.getByRole('button', { name: /reset password/i }).click()
+  await page.getByRole('button', { name: authCopy.auth.resetPasswordSubmit, exact: true }).click()
 
-  await expect(page.getByText(/your password has been reset/i)).toBeVisible()
+  await expect(page.getByText(authCopy.auth.resetPasswordSuccess, { exact: true })).toBeVisible()
   await expect(page.getByText(passwordHints[DEFAULT_LOCALE], { exact: true })).toHaveCount(0)
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
-    /^(Password changed|Пароль изменён)$/
+    authCopy.auth.resetPasswordSuccessTitle
   )
   await expect(page.getByRole('heading', { name: oldHeading, exact: true })).toHaveCount(0)
   await expect(page.getByText(oldSubtitle, { exact: true })).toHaveCount(0)
   await expect(page.locator('input[type="password"]')).toHaveCount(0)
-  await expect(page.getByRole('link', { name: /^(Sign in|Войти)$/ })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: authCopy.auth.login, exact: true })).toHaveAttribute(
     'href',
     /\/login$/
   )
@@ -158,9 +160,7 @@ test('valid reset submission reaches the BFF and replaces the form on success', 
 })
 
 // These page branches need actual Next route/query/link wiring but no live backend.
-const authCopy = { en, ru }[DEFAULT_LOCALE]
-const authPath = (route: string) =>
-  new URL(localizedFrontendUrl('https://page.example', DEFAULT_LOCALE, route)).pathname
+const authPath = (route: string) => productPath(`/${route}`)
 
 test('login page links to forgot-password', async ({ page }) => {
   await page.goto(authPath('login'))

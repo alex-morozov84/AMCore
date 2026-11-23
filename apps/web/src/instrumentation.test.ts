@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { logServerError } from '@/shared/lib/server-logger'
+import { stubProductOrigins } from '@/test/product-origins'
 
 import { onRequestError, register } from './instrumentation'
 
@@ -14,6 +15,7 @@ vi.mock('@/shared/lib/admin-console-startup', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  stubProductOrigins('https://app.example.test')
   vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-context-key-at-least-32-characters>')
 })
 

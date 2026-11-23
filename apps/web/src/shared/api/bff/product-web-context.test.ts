@@ -1,5 +1,6 @@
 // @vitest-environment node
 import type * as Shared from '@amcore/shared'
+import { PRODUCT_ADMIN_CONFIG } from '@amcore/shared'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const settings = vi.hoisted(() => ({ mode: 'path' as 'path' | 'host' }))
@@ -42,7 +43,7 @@ describe('server-selected product context', () => {
     expect(admin.cookieName).toBe(site.cookieName)
     expect(admin.store).toBe(site.store)
     expect(admin.lock).toBe(site.lock)
-    expect(admin.loginPath).toBe('/manage/login')
+    expect(admin.loginPath).toBe(`/${PRODUCT_ADMIN_CONFIG.alias}/login`)
     expect(admin.frontend).toBe('admin')
     expect(site.frontend).toBe('site')
   })

@@ -22,8 +22,8 @@ const baseProps = {
 declare const DOMParser: typeof import('happy-dom').DOMParser
 
 describe('PasswordResetEmail Template (Integration)', () => {
-  it('should render in the base locale (English) by default', async () => {
-    const html = await render(PasswordResetEmail(baseProps))
+  it('should render in English when requested', async () => {
+    const html = await render(PasswordResetEmail({ ...baseProps, locale: 'en' }))
 
     expect(html).toMatch(/<table/i)
     expect(html).toMatch(/style="/i)

@@ -4,12 +4,12 @@ import { test } from 'node:test'
 import { parse } from 'yaml'
 
 const jobs = parse(readFileSync('.github/workflows/ci.yml', 'utf8')).jobs
-const expected = ['test-unit-redis', 'test-capability', 'test-notification-ai', 'api-e2e']
+const expected = ['test-unit', 'test-redis', 'test-capability', 'test-notification-ai', 'api-e2e']
 const gate = jobs.test
 test('Test retains always admission and shares the tested selection-aware CLI', () => {
   assert.equal(gate.name, 'Test')
   assert.equal(gate['timeout-minutes'], 5)
-  assert.equal(gate.if, '${{ always() }}')
+  assert.match(gate.if, /always\(\).*'test'/)
   assert.deepEqual(gate.needs, ['ci-selection', ...expected])
   const admission = gate.steps.find((step) => step.run)
   assert.equal(admission.run, 'node scripts/ci-required.mjs test')
@@ -23,16 +23,18 @@ test('independent leaves preserve commands and frozen preparation without aggreg
   // The mirror step is first; its script never fails the job (a warning instead).
   const mirror = 'bash scripts/docker-registry-mirror.sh'
   const commands = {
-    'test-unit-redis': [mirror, 'pnpm test', 'pnpm --filter web test:integration'],
+    'test-unit': ['pnpm test'],
+    'test-redis': [
+      mirror,
+      'pnpm --filter @amcore/shared build',
+      'pnpm --filter web test:integration',
+    ],
     'test-capability': [mirror, 'pnpm test:capability-extension'],
     'test-notification-ai': [mirror, 'pnpm test:extension-contracts'],
   }
   for (const [key, runs] of Object.entries(commands)) {
     const job = jobs[key]
-    assert.deepEqual(
-      job.needs,
-      key === 'test-unit-redis' ? ['lint', 'typecheck'] : ['ci-selection', 'lint', 'typecheck']
-    )
+    assert.deepEqual(job.needs, ['ci-selection', 'lint', 'typecheck'])
     assert.deepEqual(
       job.steps
         .filter((step) => step.run && !step.run.startsWith('pnpm install'))

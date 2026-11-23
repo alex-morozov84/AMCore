@@ -3,10 +3,12 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { http, HttpResponse } from 'msw'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 
+import { getConsolePublicApiPath } from '@/shared/lib/console-public-api-path'
+
 import { UserSessionsCard } from './UserSessionsCard'
 
 const USER_ID = 'user-123'
-const SESSIONS_URL = `/api/console/users/${USER_ID}/sessions`
+const SESSIONS_URL = `/api${getConsolePublicApiPath(`/users/${USER_ID}/sessions`)}`
 
 const IPHONE_SESSION: AdminSession = {
   sessionId: 'family-iphone',

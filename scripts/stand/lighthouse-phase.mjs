@@ -1,3 +1,4 @@
+import { assertSettings } from './settings-policy.mjs'
 import { writeView } from '../lib/lighthouse-view-export.mjs'
 import { admitAuditAfterTests } from '../lib/lighthouse-admission.mjs'
 import { packReports } from '../lib/lighthouse-archive.mjs'
@@ -19,11 +20,19 @@ export async function runAuditPhase(m, token) {
   invoked.add(m)
   const expected = JSON.parse(process.env.AMCORE_AUDIT_PLAN)
   const lane = process.env.AMCORE_AUDIT_OWNER
-  const plan = auditPlan(m.worktree, {
-    run: expected.run,
-    attempt: expected.attempt,
-    source: expected.source,
-  })
+  if (expected.configuredCases?.[lane]) {
+    invariant(m.settingsPolicy === 'preserve', 'configured-audit-requires-preserved-settings')
+    await assertSettings(m)
+  }
+  const plan = auditPlan(
+    m.worktree,
+    { run: expected.run, attempt: expected.attempt, source: expected.source },
+    {
+      configured: expected.execution === 'configured',
+      upstream: expected.upstream,
+      configuredCases: expected.configuredCases,
+    }
+  )
   invariant(
     plan.digest === expected.digest && plan.assignments[lane]?.length,
     'unassigned-audit-phase'
