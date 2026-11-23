@@ -174,7 +174,9 @@ seven days; inspect retries separately from clean passes. The unchanged mandator
 ### Write a browser test for the product settings
 
 Put a live product browser spec in `apps/web/e2e/real-stack/`. The ordinary
-PR workflow discovers new cases there and selects the browser family.
+PR workflow discovers new cases there. It assigns the sign-in example below
+to `configured-standard`. The `path-standard` command above runs the separate
+local path variant.
 For product URLs use `productPath` and match text with `messages` or
 `messagesForLocale(locale)`. For example, navigate to `productPath('/login')`
 and use `messages.auth.email` to find the email field.
@@ -191,7 +193,8 @@ test('sign-in asks for the account email', async ({ page }) => {
 })
 ```
 
-After opening a PR, inspect **CI selection** and **Web E2E plan** in its workflow run.
+After opening a PR, check **CI selection** for the browser family and
+**Web E2E plan** for the assigned group.
 Open the assigned **Web E2E (<lane>)** job. Open its
 **Run isolated E2E lane** step and search for the test title. The live stand
 reports individual results in the log and keeps the HTML report disabled
