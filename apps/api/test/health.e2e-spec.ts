@@ -48,11 +48,9 @@ describe('Health (e2e)', () => {
   it.each(['/health', '/health/ready', '/health/live'])(
     'preserves 503 for a returned down indicator at %s',
     async (path) => {
-      const spy = jest
-        .spyOn(app.get(MemoryHealthIndicator), 'checkHeap')
-        .mockResolvedValue({
-          memory_heap: { status: 'down', message: 'Heap limit exceeded', responseTime: 0 },
-        })
+      const spy = jest.spyOn(app.get(MemoryHealthIndicator), 'checkHeap').mockResolvedValue({
+        memory_heap: { status: 'down', message: 'Heap limit exceeded', responseTime: 0 },
+      })
       try {
         const response = await request(app.getHttpServer()).get(path).expect(503)
         expect(response.body.statusCode).toBe(503)
