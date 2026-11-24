@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { parseCiRole, resolveCiPolicy } from './lib/ci-policy.mjs'
+import { verifyForkInitialization } from './lib/ci-fork-initialization.mjs'
 import { readCiPolicySources } from './lib/ci-policy-source.mjs'
 
 try {
@@ -18,9 +19,16 @@ try {
   if (requested !== undefined && ![true, false, 'true', 'false'].includes(requested))
     throw new Error('full-once must be an explicit boolean workflow input')
   const fullOnce = requested === true || requested === 'true'
+  if (event === 'workflow_dispatch' && !fullOnce)
+    throw new Error('Manual checks require explicit full-once')
   const expectedSha = payload.inputs?.['source-sha']
   if (fullOnce && (!/^[a-f0-9]{40}$/.test(expectedSha ?? '') || expectedSha !== head))
     throw new Error('Full-once requires source-sha matching the checked-out commit')
+  if (
+    fullOnce &&
+    execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim() !== head
+  )
+    throw new Error('Manual checkout does not match source-sha')
   const sources = readCiPolicySources({ root, event, base, head })
   // Source reads above admit exact commits before either SHA enters a Git argument.
   const roleAt = (sha) =>
@@ -28,8 +36,17 @@ try {
       execFileSync('git', ['show', `${sha}:PROJECT_CONTEXT.md`], { cwd: root, encoding: 'utf8' })
     )
   const role = roleAt(head)
-  if (base && role !== roleAt(base))
-    throw new Error('CI repository role cannot change in an ordinary PR')
+  if (base && role !== roleAt(base)) {
+    if (role !== 'downstream-product')
+      throw new Error('CI repository role cannot change in an ordinary PR')
+    await verifyForkInitialization(root, repository, payload, process.env)
+  }
+  if (
+    event === 'push' &&
+    /^0{40}$/.test(payload.before ?? '') &&
+    (payload.created !== true || payload.ref !== 'refs/heads/main' || payload.after !== head)
+  )
+    throw new Error('Invalid first main push identity')
   const policy = resolveCiPolicy({
     role,
     repository,

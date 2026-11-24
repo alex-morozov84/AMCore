@@ -23,6 +23,14 @@ When this file and the guide disagree, follow the guide and report the differenc
 
 ## Create a product
 
+Before the first push, ask how the team accepts changes. Wait for the answer.
+Then ask what CI should check: what could have broken (recommended), everything
+applicable, or only quick checks. Explain that quick checks can miss a broken
+browser sign-in and show the time example in the
+[CI guide](../../../docs/operations/ci-security.md#choose-automatic-checks-for-a-product).
+Record the owner's choice before delivery. A Fork's first PR uses the starter
+check mode. The chosen mode applies after merge.
+
 Follow these guide sections in order:
 
 1. [Choose the repository and protection mode](../../../docs/operations/updating-a-fork.md#choose-the-repository-and-protection-mode):

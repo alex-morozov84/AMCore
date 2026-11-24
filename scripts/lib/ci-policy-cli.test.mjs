@@ -64,6 +64,12 @@ test('actual event command preserves PR choice and applies post-merge or explici
     assert.equal(result.status, 0, result.stderr)
     assert.equal(JSON.parse(result.stdout).mode, 'heavy-off')
   }
+  const firstPush = { created: true, before: '0'.repeat(40), after: head, ref: 'refs/heads/main' }
+  assert.equal(JSON.parse(invoke('push', head, firstPush).stdout).mode, 'heavy-off')
+  assert.match(
+    invoke('push', head, { ...firstPush, created: false }).stderr,
+    /Invalid first main push/
+  )
   const once = invoke('workflow_dispatch', head, {
     inputs: { 'full-once': 'true', 'source-sha': head },
   })

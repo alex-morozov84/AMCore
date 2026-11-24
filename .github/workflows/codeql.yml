@@ -8,6 +8,18 @@ on:
   schedule:
     - cron: '17 3 * * 1'
 
+  workflow_dispatch:
+    inputs:
+      full-once:
+        description: Scan once even when the saved mode is heavy-off
+        type: boolean
+        required: true
+        default: true
+      source-sha:
+        description: Exact commit to scan
+        type: string
+        required: true
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -29,12 +41,36 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      - name: Evaluate scan policy
+        id: policy
+        env:
+          CI_POLICY_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            jq -e '.inputs["full-once"] == "true" or .inputs["full-once"] == true' "$GITHUB_EVENT_PATH" > /dev/null
+          fi
+          policy=$(node scripts/ci-policy.mjs)
+          mode=$(jq -er '.mode' <<< "$policy")
+          if [[ "$mode" == heavy-off ]]; then
+            echo 'Scan omitted by saved heavy-off policy. No scan coverage.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
 
       - name: Initialize CodeQL
+        if: steps.policy.outputs.mode != 'heavy-off'
         uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           languages: javascript-typescript
           build-mode: none
 
       - name: Analyze and upload SARIF
+        if: steps.policy.outputs.mode != 'heavy-off'
         uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3

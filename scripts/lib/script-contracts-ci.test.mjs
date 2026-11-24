@@ -73,7 +73,7 @@ test('selection preflight dominates preparation and exclusions have direct selec
     }
   }
   assert.equal(
-    jobs['ci-required'].steps.find((step) => step.run).env.CI_PLAN,
+    jobs['ci-required'].steps.find((step) => step.name === 'Require every CI family').env.CI_PLAN,
     '${{ needs.ci-selection.outputs.plan }}'
   )
 })
@@ -106,7 +106,7 @@ test('credited pushes repeat classification and image smoke retains reports with
   assert.equal(filter.with.base, '${{ github.event.before }}')
   assert.equal(filter.with.ref, '${{ github.sha }}')
   assert.equal(
-    gate.steps.find((step) => step.run).env.CI_FILTER_OUTPUTS,
+    gate.steps.find((step) => step.name === 'Require every CI family').env.CI_FILTER_OUTPUTS,
     '${{ toJSON(steps.delivery-filter.outputs) }}'
   )
   const steps = ci.jobs['docker-image-smoke'].steps

@@ -6,6 +6,18 @@ on:
   pull_request:
     branches: [main]
 
+  workflow_dispatch:
+    inputs:
+      full-once:
+        description: Run the full applicable plan once
+        type: boolean
+        required: true
+        default: true
+      source-sha:
+        description: Exact commit to check
+        type: string
+        required: true
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'push' && format('push-{0}', github.run_id) || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -40,12 +52,9 @@ jobs:
         with:
           node-version: 24
       - name: Admit supported policy and source before filtering
-        run: |
-          policy=$(node scripts/ci-policy.mjs)
-          jq -e '.mode != "heavy-off" and .proposed != "heavy-off"' <<< "$policy" > /dev/null || {
-            echo "::error::Heavy-off is outside the supported CI rollout"
-            exit 1
-          }
+        env:
+          CI_POLICY_TOKEN: ${{ github.token }}
+        run: node scripts/ci-policy.mjs
       - name: Classify changed paths
         id: filter
         continue-on-error: true
@@ -62,6 +71,7 @@ jobs:
         id: plan
         env:
           CI_EVIDENCE_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}
+          CI_POLICY_TOKEN: ${{ github.event_name == 'pull_request' && github.token || '' }}
           CI_FILTER_OUTPUTS: ${{ steps.filter.outcome == 'success' && toJSON(steps.filter.outputs) || '{}' }}
         run: node scripts/ci-selection.mjs
 
@@ -118,9 +128,14 @@ jobs:
           filters: .github/ci-paths.yml
           list-files: json
           predicate-quantifier: every
+      - name: Preserve migration history in reduced CI
+        if: (github.event_name == 'pull_request' || github.event_name == 'push') && fromJSON(needs.ci-selection.outputs.plan).inputs.mode == 'heavy-off'
+        run: node scripts/check-migration-history.mjs
+
       - name: Require every CI family
         env:
           CI_EVIDENCE_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}
+          CI_POLICY_TOKEN: ${{ github.event_name == 'pull_request' && github.token || '' }}
           CI_FILTER_OUTPUTS: ${{ toJSON(steps.delivery-filter.outputs) }}
           CI_PROOF_PATH: ${{ runner.temp }}/ci-pr-proof.json
           CI_RESULTS: ${{ toJSON(needs) }}
@@ -361,6 +376,7 @@ jobs:
           node-version: 24
       - name: Require selected Test dependencies
         env:
+          CI_POLICY_TOKEN: ${{ github.token }}
           CI_RESULTS: ${{ toJSON(needs) }}
           CI_PLAN: ${{ needs.ci-selection.outputs.plan }}
         run: node scripts/ci-required.mjs test
@@ -499,6 +515,7 @@ jobs:
       - name: Admit API execution or explicit non-applicability
         id: admission
         env:
+          CI_POLICY_TOKEN: ${{ github.token }}
           CI_RESULTS: ${{ toJSON(needs) }}
           CI_PLAN: ${{ needs.ci-selection.outputs.plan }}
         run: node scripts/ci-required.mjs api
@@ -542,6 +559,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Preserve shared migration history
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
         run: node scripts/check-migration-history.mjs
 
       # Unit and contract tests of the repository's own tooling: the init:brand

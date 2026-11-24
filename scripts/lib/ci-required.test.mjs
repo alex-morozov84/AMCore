@@ -30,7 +30,7 @@ test('admission covers every workflow job, including browser and component famil
     [...requiredCiJobs, 'ci-selection'].sort()
   )
   assert.equal(jobs['ci-required'].if, '${{ always() }}')
-  const step = jobs['ci-required'].steps.find((entry) => entry.run)
+  const step = jobs['ci-required'].steps.find((entry) => entry.name === 'Require every CI family')
   assert.equal(step.env.CI_RESULTS, '${{ toJSON(needs) }}')
   assert.equal(step.run, 'node scripts/ci-required.mjs')
   assert.doesNotThrow(() => requireCompleteCi(successful()))

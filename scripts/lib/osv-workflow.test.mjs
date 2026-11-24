@@ -13,10 +13,13 @@ const job = workflow.jobs.osv
 const scan = job.steps.find((step) => step.name === 'Scan repository with OSV-Scanner')
 
 test('OSV keeps weekly recursive SARIF reporting and verified binary installation', () => {
-  assert.equal(job.if, "github.event_name == 'schedule'")
+  assert.equal(
+    job.if,
+    "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
+  )
   assert.ok(workflow.on.schedule.some((item) => item.cron === '43 3 * * 1'))
   assert.equal(job.permissions['security-events'], 'write')
-  assert.equal(scan.if, undefined)
+  assert.equal(scan.if, "steps.policy.outputs.mode != 'heavy-off'")
   assert.equal(scan['continue-on-error'], undefined)
   assert.match(
     scan.run,
@@ -30,7 +33,9 @@ test('OSV keeps weekly recursive SARIF reporting and verified binary installatio
   assert.match(upload.uses, /^github\/codeql-action\/upload-sarif@[a-f0-9]{40}$/)
   assert.equal(upload.with.sarif_file, 'osv-results.sarif')
   assert.equal(upload.with.category, 'osv-scanner')
-  assert.equal(upload.if, undefined)
+  assert.equal(upload.if, scan.if)
+  assert.equal(install.if, scan.if)
+  assert.ok(workflow.on.workflow_dispatch.inputs['source-sha'].required)
   assert.equal(upload['continue-on-error'], undefined)
 })
 

@@ -127,6 +127,9 @@ Creating repositories, pushing code and changing settings require the product ow
    Run initialization before any product commit or tag namespacing. Verify `initialized_from_amcore_version` equals `SOURCE_TAG`.
    Preserve that value thereafter; it describes the starting point, not the latest update.
    Resolve verification failures using the [initializer recovery guide](../frontend/brand-theme-and-tokens.md#recover-from-a-failure).
+   Before the first push, decide how your team accepts changes. Then choose the
+   [automatic checks](ci-security.md#choose-automatic-checks-for-a-product) and
+   record the choice in `ci/product.json`. Check what could have broken by default.
    Commit the inspected initialization changes only after the value and checks are correct.
 
 5. **Independent copy only, before creating any product release tags:** list all copied `v*` tags,
@@ -144,7 +147,9 @@ Creating repositories, pushing code and changing settings require the product ow
 
 6. Deliver initialization to the product, preserving the selected source as an ancestor.
    For an empty independent destination, push the explicit product branch to `main` (`git push origin product-start:main`).
-   For a Fork, push `product-start` and open a PR into its matching `main`.
+   For a Fork, enable Actions, push `product-start` and open a PR into its matching `main`.
+   The first PR uses the starter check mode. The product mode applies after merge.
+   Keep this PR limited to initialization.
    Configure the selected protection mode and verify required CI before subsequent updates.
    Push only explicitly selected branches or product tags, never `--tags` or `--mirror`.
 
@@ -288,7 +293,7 @@ Do not resolve an ambiguous identity, permission or data conflict by taking an e
 
 Never edit, delete, rename or squash a migration after it reaches shared `main`/a release,
 or after applying it to a database you intend to retain. Unshared, unapplied work may still be corrected.
-**Script contracts** compares migration files with the PR merge checkout's first parent.
+**Script contracts** (or **CI required** in reduced mode) compares migration files with the PR merge checkout's first parent.
 After a direct push to `main`, it compares them with the previous commit recorded in the push event.
 It accepts new migrations and rejects edits, renames or deletions of existing migrations.
 The workflow fetches the full history and verifies that `HEAD` matches `GITHUB_SHA`.
