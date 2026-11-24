@@ -37,7 +37,7 @@ test('first fork PR requires the published source and permits only initializatio
   }
   t.mock.method(globalThis, 'fetch', async (url) => {
     const result = responses[new URL(url).pathname.slice('/repos/'.length)]
-    return new Response(JSON.stringify(result ?? {}), { status: result ? 200 : 404 })
+    return { ok: Boolean(result), json: async () => result }
   })
   const commitPr = (script) => {
     put(
