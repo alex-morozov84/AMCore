@@ -78,6 +78,27 @@ test('selection preflight dominates preparation and exclusions have direct selec
   )
 })
 
+test('only the initial filter can recover from an action failure', () => {
+  const steps = ci.jobs['ci-selection'].steps
+  const preflight = steps.find(
+    (step) => step.name === 'Admit supported policy and source before filtering'
+  )
+  const filter = steps.find((step) => step.id === 'filter')
+  const plan = steps.find((step) => step.id === 'plan')
+  assert.ok(steps.indexOf(preflight) < steps.indexOf(filter))
+  assert.ok(steps.indexOf(filter) < steps.indexOf(plan))
+  assert.equal(preflight['continue-on-error'], undefined)
+  assert.equal(filter['continue-on-error'], true)
+  assert.equal(plan.if, undefined)
+  assert.equal(plan['continue-on-error'], undefined)
+  assert.equal(
+    plan.env.CI_FILTER_OUTPUTS,
+    "${{ steps.filter.outcome == 'success' && toJSON(steps.filter.outputs) || '{}' }}"
+  )
+  const recheck = ci.jobs['ci-required'].steps.find((step) => step.id === 'delivery-filter')
+  assert.equal(recheck['continue-on-error'], undefined)
+})
+
 test('credited pushes repeat classification and image smoke retains reports without Code Scanning', () => {
   const gate = ci.jobs['ci-required']
   const filter = gate.steps.find((step) => step.id === 'delivery-filter')
@@ -89,12 +110,15 @@ test('credited pushes repeat classification and image smoke retains reports with
     '${{ toJSON(steps.delivery-filter.outputs) }}'
   )
   const steps = ci.jobs['docker-image-smoke'].steps
-  const artifact = steps.find((step) => step.name === 'Retain image scan reports')
-  assert.equal(artifact.if, undefined)
-  assert.deepEqual(artifact.with.path.trim().split('\n'), [
-    'trivy-results.sarif',
-    'migrator-trivy-results.sarif',
-  ])
+  for (const [image, path] of [
+    ['runner', 'trivy-results.sarif'],
+    ['migrator', 'migrator-trivy-results.sarif'],
+  ]) {
+    const artifact = steps.find((step) => step.name === `Retain ${image} Trivy report`)
+    assert.equal(artifact.if, undefined)
+    assert.equal(artifact.with.path, path)
+    assert.equal(artifact.with['if-no-files-found'], 'error')
+  }
   for (const name of ['Upload Trivy SARIF', 'Upload migrator Trivy SARIF']) {
     const upload = steps.find((step) => step.name === name)
     assert.match(upload.if, /head.repo.full_name == github.repository/)

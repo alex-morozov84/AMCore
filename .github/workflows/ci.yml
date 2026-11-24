@@ -48,6 +48,7 @@ jobs:
           }
       - name: Classify changed paths
         id: filter
+        continue-on-error: true
         if: github.event_name == 'pull_request' || github.event_name == 'push'
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
@@ -61,7 +62,7 @@ jobs:
         id: plan
         env:
           CI_EVIDENCE_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}
-          CI_FILTER_OUTPUTS: ${{ toJSON(steps.filter.outputs) }}
+          CI_FILTER_OUTPUTS: ${{ steps.filter.outcome == 'success' && toJSON(steps.filter.outputs) || '{}' }}
         run: node scripts/ci-selection.mjs
 
   ci-required:
@@ -735,23 +736,11 @@ jobs:
             --output trivy-results.sarif \
             "$AMCORE_API_IMAGE"
 
-      - name: Scan the built migrator image with Trivy
-        run: node scripts/scan-migrator-image.mjs "$AMCORE_API_MIGRATOR_IMAGE"
-
-      - name: Upload migrator vulnerability inventory
+      - name: Retain runner Trivy report
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: migrator-vulnerability-inventory
-          path: migrator-vuln-inventory.json
-          if-no-files-found: error
-
-      - name: Retain image scan reports
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: image-trivy-sarif
-          path: |
-            trivy-results.sarif
-            migrator-trivy-results.sarif
+          name: runner-trivy-sarif
+          path: trivy-results.sarif
           if-no-files-found: error
 
       - name: Upload Trivy SARIF
@@ -760,6 +749,23 @@ jobs:
         with:
           sarif_file: trivy-results.sarif
           category: trivy-image
+
+      - name: Scan the built migrator image with Trivy
+        run: node scripts/scan-migrator-image.mjs "$AMCORE_API_MIGRATOR_IMAGE"
+
+      - name: Retain migrator Trivy report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: migrator-trivy-sarif
+          path: migrator-trivy-results.sarif
+          if-no-files-found: error
+
+      - name: Upload migrator vulnerability inventory
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: migrator-vulnerability-inventory
+          path: migrator-vuln-inventory.json
+          if-no-files-found: error
 
       - name: Upload migrator Trivy SARIF
         if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (!github.event.repository.private || vars.AMCORE_TRIVY_CODE_SCANNING == 'true')

@@ -87,7 +87,9 @@ If the repository allows rebase merges, CI runs the checks for a one-parent
 delivery because GitHub does not identify its merge method in this evidence.
 CI also checks the changed-file classification on main. If the current
 classification is unavailable or requires checks beyond the PR plan, CI runs
-the applicable main plan. A saved `full` mode can reuse a matching full PR.
+the applicable main plan. If the initial path filter fails, CI discards its
+outputs and uses the broad plan. If the final recheck fails after tests have
+been skipped, CI required fails. A saved `full` mode can reuse a matching full PR.
 When manual full execution is wired in, an explicit one-off full run always executes its plan.
 
 A direct push, missing evidence, changed base or untrusted CI change runs the
@@ -95,13 +97,15 @@ applicable checks on main immediately. Unknown impact selects a broad plan.
 The summary shows the reason. Missing baseline data can block a required
 comparison. Resolve the unavailable comparison before treating main as verified.
 
-Image smoke always runs both Trivy scans and retains their reports in the
-`image-trivy-sarif` artifact. External PRs retain the artifact only. Internal
+Image smoke saves each successful Trivy scan immediately in its own artifact.
+Find `runner-trivy-sarif` and `migrator-trivy-sarif` in the run. A later
+migrator failure leaves the runner report available. External PRs retain
+the artifacts only. Internal
 runs upload to Code Scanning in public repositories. In private repositories,
 set `AMCORE_TRIVY_CODE_SCANNING=true` only after confirming Code Scanning access.
 An enabled upload that fails stays visible. A credited main run links to the
 PR evidence, so it does not add new image SARIF results to the main branch's
-Code Scanning view. Use the PR artifact for the image reports.
+Code Scanning view. Open the credited PR run for the image reports.
 
 Standalone checks retain their own triggers. Workflow Lint independently
 checks the workflows on main. Gitleaks scans the delivered commit
