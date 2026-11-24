@@ -47,7 +47,17 @@ test('every required check of the main ruleset names a job in a tracked workflow
 test('selection preflight dominates preparation and exclusions have direct selector dependencies', () => {
   const jobs = ci.jobs
   const selector = jobs['ci-selection']
-  assert.equal(selector.permissions, undefined)
+  for (const job of [selector, jobs['ci-required']]) {
+    assert.deepEqual(job.permissions, {
+      contents: 'read',
+      actions: 'read',
+      'pull-requests': 'read',
+    })
+    const evidence = job.steps.find((step) => step.env?.CI_EVIDENCE_TOKEN)
+    assert.match(evidence.env.CI_EVIDENCE_TOKEN, /event_name == 'push'/)
+  }
+  assert.match(ci.concurrency.group, /github.run_id/)
+  assert.match(ci.concurrency['cancel-in-progress'], /event_name == 'pull_request'/)
   assert.equal(selector.steps.find((step) => step.id === 'filter').with.token, '')
   assert.equal(
     selector.steps.find((step) => step.id === 'filter').with['predicate-quantifier'],
@@ -57,7 +67,7 @@ test('selection preflight dominates preparation and exclusions have direct selec
   for (const [id, job] of Object.entries(jobs)) {
     if (id === 'ci-selection') continue
     assert.ok(reaches(id), `${id} must depend on preflight`)
-    if (!['ci-required', 'lint', 'typecheck', 'promtool'].includes(id)) {
+    if (id !== 'ci-required') {
       assert.ok(job.needs.includes('ci-selection'))
       assert.ok(job.if?.includes(`.effective, '${id}'`), id)
     }
@@ -66,6 +76,62 @@ test('selection preflight dominates preparation and exclusions have direct selec
     jobs['ci-required'].steps.find((step) => step.run).env.CI_PLAN,
     '${{ needs.ci-selection.outputs.plan }}'
   )
+})
+
+test('only the initial filter can recover from an action failure', () => {
+  const steps = ci.jobs['ci-selection'].steps
+  const preflight = steps.find(
+    (step) => step.name === 'Admit supported policy and source before filtering'
+  )
+  const filter = steps.find((step) => step.id === 'filter')
+  const plan = steps.find((step) => step.id === 'plan')
+  assert.ok(steps.indexOf(preflight) < steps.indexOf(filter))
+  assert.ok(steps.indexOf(filter) < steps.indexOf(plan))
+  assert.equal(preflight['continue-on-error'], undefined)
+  assert.equal(filter['continue-on-error'], true)
+  assert.equal(plan.if, undefined)
+  assert.equal(plan['continue-on-error'], undefined)
+  assert.equal(
+    plan.env.CI_FILTER_OUTPUTS,
+    "${{ steps.filter.outcome == 'success' && toJSON(steps.filter.outputs) || '{}' }}"
+  )
+  const recheck = ci.jobs['ci-required'].steps.find((step) => step.id === 'delivery-filter')
+  assert.equal(recheck['continue-on-error'], undefined)
+})
+
+test('credited pushes repeat classification and image smoke retains reports without Code Scanning', () => {
+  const gate = ci.jobs['ci-required']
+  const filter = gate.steps.find((step) => step.id === 'delivery-filter')
+  assert.match(filter.if, /verified-pr/)
+  assert.equal(filter.with.base, '${{ github.event.before }}')
+  assert.equal(filter.with.ref, '${{ github.sha }}')
+  assert.equal(
+    gate.steps.find((step) => step.run).env.CI_FILTER_OUTPUTS,
+    '${{ toJSON(steps.delivery-filter.outputs) }}'
+  )
+  const steps = ci.jobs['docker-image-smoke'].steps
+  for (const [image, path] of [
+    ['runner', 'trivy-results.sarif'],
+    ['migrator', 'migrator-trivy-results.sarif'],
+  ]) {
+    const artifact = steps.find((step) => step.name === `Retain ${image} Trivy report`)
+    assert.equal(artifact.if, undefined)
+    assert.equal(artifact.with.path, path)
+    assert.equal(artifact.with['if-no-files-found'], 'error')
+  }
+  for (const name of ['Upload Trivy SARIF', 'Upload migrator Trivy SARIF']) {
+    const upload = steps.find((step) => step.name === name)
+    assert.match(upload.if, /head.repo.full_name == github.repository/)
+    assert.match(
+      upload.if,
+      /!github.event.repository.private \|\| vars.AMCORE_TRIVY_CODE_SCANNING == 'true'/
+    )
+  }
+  const scans = parse(
+    readFileSync(new URL('../../.github/workflows/security-scans.yml', import.meta.url), 'utf8')
+  )
+  assert.match(scans.concurrency.group, /github.run_id/)
+  assert.match(scans.concurrency['cancel-in-progress'], /event_name == 'pull_request'/)
 })
 
 test('API aggregate admits applicability before evidence and keeps selected coverage validation', () => {

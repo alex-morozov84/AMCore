@@ -192,7 +192,7 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
   fork): `bash scripts/setup-repo-security.sh` — see
   `docs/operations/ci-security.md` → _Strict security setup after forking_. The
   security scripts need a Unix-like shell (macOS/Linux/WSL). Downstream update profiles
-  must use `--fork-updates` on every setup/rerun; an unflagged run restores squash-only.
+  must use `--fork-updates` on every setup/rerun; an unflagged strict-product run stops before changing settings.
 
 ## Code conventions
 

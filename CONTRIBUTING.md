@@ -115,7 +115,7 @@ cleanup. Use the managed command for focused checks as well as the full inventor
 
 Follow the [API E2E budget policy](docs/operations/ci-security.md#api-e2e-budget-policy)
 for layout measurements. Ordinary PRs use the
-[selected CI inventory](docs/operations/ci-security.md#conservative-web-selection)
+[selection modes](docs/operations/ci-security.md#selection-modes)
 without repeating initial three-sample admission. Do not repeat a passed full local run for review without
 changed covered behavior or a new testable hypothesis.
 
@@ -195,7 +195,8 @@ chore: unify github repository url
   or merge rules, but their own contributor docs become authoritative. Source-update
   PRs preserve true merge commits in every mode; never squash/rebase them. Eligible
   strict products run setup with `--fork-updates` on every reconciliation. See the
-  [fork update guide](docs/operations/updating-a-fork.md).
+  [fork update guide](docs/operations/updating-a-fork.md) and
+  [CI after delivery](docs/operations/ci-security.md#ci-after-delivery).
 - First-time `strict` repo-protection setup (these settings do not travel with a
   fork): `bash scripts/setup-repo-security.sh` — needs `gh` + `jq` and repo
   admin; see

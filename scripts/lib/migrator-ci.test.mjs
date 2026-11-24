@@ -21,8 +21,16 @@ test('runner scan remains unchanged while migrator gets independent coverage', (
   assert.match(migrator.run, /scan-migrator-image\.mjs/)
   assert.equal(migrator['continue-on-error'], undefined)
   const runnerUpload = steps.findIndex((step) => step.name === 'Upload Trivy SARIF')
-  assert.equal(runnerUpload, steps.indexOf(runner) + 1)
+  const runnerReport = steps.findIndex((step) => step.name === 'Retain runner Trivy report')
+  const migratorReport = steps.findIndex((step) => step.name === 'Retain migrator Trivy report')
+  const inventory = steps.findIndex(
+    (step) => step.name === 'Upload migrator vulnerability inventory'
+  )
+  assert.equal(runnerReport, steps.indexOf(runner) + 1)
+  assert.ok(runnerReport < runnerUpload)
   assert.ok(runnerUpload < steps.indexOf(migrator))
+  assert.equal(migratorReport, steps.indexOf(migrator) + 1)
+  assert.ok(migratorReport < inventory)
   assert.equal(steps[runnerUpload]['continue-on-error'], undefined)
   assert.equal(
     steps.find((step) => step.name === 'Upload migrator Trivy SARIF').with.category,

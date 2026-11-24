@@ -1,11 +1,12 @@
 import { execFileSync } from 'node:child_process'
 import { appendFileSync, existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { isDeepStrictEqual } from 'node:util'
-import { normalizeCiAreas } from './lib/ci-selection.mjs'
+import { classifyCiChange } from './lib/ci-classification.mjs'
 import { readSelectionSource } from './lib/ci-selection-source.mjs'
 import { requireBrowserTestOwner } from './e2e-ci-plan.mjs'
 import { inheritedBrowserChanges } from './lib/inherited-browser-changes.mjs'
+import { resolveDeliveryProof } from './lib/ci-delivery-proof.mjs'
+import { githubEvidence } from './lib/ci-delivery-api.mjs'
 import { coarseExecution } from './lib/ci-required.mjs'
 
 try {
@@ -26,21 +27,7 @@ try {
     const productFiles = acquired.changedFiles.filter((file) => !inherited.has(file))
     requireBrowserTestOwner(process.cwd(), productFiles, policy.role)
   }
-  let areas = {}
-  const classifierChanged = acquired.changedFiles.some((file) =>
-    /^(?:\.github\/(?:ci-paths\.yml|workflows\/|actions\/)|scripts\/(?:lib\/)?ci-)/.test(file)
-  )
-  let diffComplete = acquired.diffComplete && !classifierChanged
-  if (diffComplete) {
-    try {
-      const outputs = JSON.parse(process.env.CI_FILTER_OUTPUTS)
-      const all = JSON.parse(outputs.all_files ?? '[]')
-      diffComplete = isDeepStrictEqual([...all].sort(), acquired.changedFiles)
-      if (diffComplete) areas = normalizeCiAreas(outputs)
-    } catch {
-      diffComplete = false
-    }
-  }
+  const classification = classifyCiChange(acquired, process.env.CI_FILTER_OUTPUTS)
   for (const file of acquired.changedFiles)
     if (
       file.startsWith('apps/api/') &&
@@ -53,10 +40,28 @@ try {
   const inputs = {
     role: policy.role,
     mode: policy.mode,
-    areas,
-    diffComplete,
+    ...classification,
     integration: acquired.integration,
   }
+  const api = githubEvidence(process.env, policy.repository)
+  const delivery =
+    api && policy.event === 'push'
+      ? await resolveDeliveryProof(
+          process.cwd(),
+          {
+            ...acquired,
+            classification,
+            policy,
+            payload,
+            repositoryId: process.env.GITHUB_REPOSITORY_ID,
+          },
+          api
+        )
+      : policy.event === 'push'
+        ? { reason: 'GitHub evidence access is unavailable' }
+        : {}
+  if (delivery.credit) inputs.credit = delivery.credit
+  if (delivery.reason) console.error(`CI delivery: ${delivery.reason}; running applicable checks`)
   const execution = coarseExecution(inputs, policy.event)
   if (
     !/^\d+$/.test(process.env.GITHUB_RUN_ID ?? '') ||
@@ -75,13 +80,20 @@ try {
     ...execution,
   }
   const json = JSON.stringify(plan)
+  const credit = inputs.credit
+  const deliverySummary = credit
+    ? `Credited PR #${credit.pull}: [run ${credit.run}, attempt ${credit.attempt}](${process.env.GITHUB_SERVER_URL}/${policy.repository}/actions/runs/${credit.run}/attempts/${credit.attempt}).`
+    : (delivery.reason ?? '')
   if (process.env.GITHUB_OUTPUT) {
-    appendFileSync(process.env.GITHUB_OUTPUT, `plan=${json}\n`)
+    appendFileSync(
+      process.env.GITHUB_OUTPUT,
+      `plan=${json}\ncomparison-base=${acquired.baseExists ? acquired.source.base : ''}\n`
+    )
   }
   if (process.env.GITHUB_STEP_SUMMARY)
     appendFileSync(
       process.env.GITHUB_STEP_SUMMARY,
-      `## CI execution selection\nReason: ${execution.reason}. Selected groups: ${execution.effective.length}.\n\n\`\`\`json\n${json}\n\`\`\`\n`
+      `## CI execution selection\nReason: ${execution.reason}. Selected groups: ${execution.effective.length}.\n\n${deliverySummary}\n\n\`\`\`json\n${json}\n\`\`\`\n`
     )
   console.log(json)
 } catch (error) {

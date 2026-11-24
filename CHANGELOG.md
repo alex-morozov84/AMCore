@@ -24,6 +24,10 @@ versions they name. For current source-update instructions, see
 
 ### Fixed
 
+- Reuse verified PR test results after delivery. Run applicable CI checks for
+  unverified pushes, and preserve the selected product workflow during security
+  setup.
+
 - Preserve applicable browser checks when products merge AMCore updates that
   change inherited tests for disabled features. Make the affected API tests
   use the product's configured languages.
@@ -181,8 +185,8 @@ versions they name. For current source-update instructions, see
 - The shared `amcore-fork-update` agent skill orders the guide's creation and update
   steps and lists where an agent must stop. It adds no rule beyond the guide.
 - `setup-repo-security.sh --fork-updates` enables merge commits for initialized
-  downstream products while preserving other strict checks. AMCore stays squash-only.
-  Unflagged downstream setup warns that it restores squash-only settings.
+  strict products while preserving their other required checks. A strict product
+  setup without the flag stops before changing settings. AMCore stays squash-only.
 - Required Script contracts now rejects edits, removal or renaming of SQL migrations
   already present on a PR merge’s first parent. New migrations remain allowed;
   this check does not prove SQL safety or detect object collisions.
