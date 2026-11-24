@@ -138,12 +138,11 @@ workflow changes together with their plan and result checker on rollback.
 
 ### PR, post-merge and release evidence
 
-Keep the post-merge policy and separate security workflows until their live
-enforcement and output are verified. The PR result tests the event's merge
-checkout. The main push can have a different commit identity, even if its
-tree matches. A release still needs the published API, migrator and web
-image digests, their build provenance and staging evidence on those digests.
-A green PR is not evidence for an image built later or a deployment operation.
+The PR tests its merge checkout. After a squash, the commit ID changes.
+See [CI after delivery](#ci-after-delivery) for the conditions under which
+main credits the PR and for the independent security checks.
+A release needs the published API, migrator and web image digests, their
+build provenance and staging evidence for those exact digests.
 
 To roll back exclusions, switch the saved mode to `full` in a reviewed
 change.
@@ -379,8 +378,9 @@ against arbitrary future workload growth. Reassess capacity when the application
   policy. Its full JSON inventory includes all severities, packages and unfixed
   findings. Findings remain report-only;
   scanner errors, missing/malformed reports and mismatched image identity fail.
-  Each run creates fresh reports and checks SARIF findings against the JSON inventory.
-  The runner report uploads before the independent migrator scan starts.
+  Each image smoke job creates fresh reports and checks migrator SARIF findings against its JSON inventory.
+  The job saves the runner report before the migrator scan starts. After a credited
+  merge, open the PR run linked from **CI selection** on main for both reports.
   Runner category `trivy-image` and its existing secret coverage remain separate.
 - **boot-smoke** checks both exact production artifacts built in CI:
   - pass the fast in-image checks;

@@ -288,9 +288,12 @@ Do not resolve an ambiguous identity, permission or data conflict by taking an e
 
 Never edit, delete, rename or squash a migration after it reaches shared `main`/a release,
 or after applying it to a database you intend to retain. Unshared, unapplied work may still be corrected.
-The required **Script contracts** PR job compares existing migration paths/blobs with the merge commit's first parent.
-It rejects changes/removals and permits additions. It requires the default merge checkout with two parents and depth two.
-`HEAD` must equal `GITHUB_SHA`; an absent parent/tree fails. Push-only runs do not perform this history check.
+**Script contracts** compares migration files with the PR merge checkout's first parent.
+After a direct push to `main`, it compares them with the previous commit recorded in the push event.
+It accepts new migrations and rejects edits, renames or deletions of existing migrations.
+The workflow fetches the full history and verifies that `HEAD` matches `GITHUB_SHA`.
+A PR checkout must have both merge parents. A missing baseline on an existing branch fails the check.
+When CI credits a verified PR, the [main summary links to that PR's result](ci-security.md#ci-after-delivery).
 It does not detect two newly added migrations creating the same object or prove that SQL is safe.
 
 Before rollout, use owned disposable databases and a verified backup/restore procedure:
