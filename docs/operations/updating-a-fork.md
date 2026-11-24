@@ -143,19 +143,26 @@ Creating repositories, pushing code and changing settings require the product ow
    For an empty independent destination, push the explicit product branch to `main` (`git push origin product-start:main`).
    For a Fork, enable Actions, push `product-start` and open a PR into its matching `main`.
    The first PR uses the starter check mode. The product mode applies after merge.
-   Keep this PR limited to initialization. The owner controls the first merge.
-   Until then, keep write and merge access with the owner and leave auto-merge off.
-   After ordinary CI passes, run this check from a separate clean checkout of
-   the supported AMCore release. Use a GitHub CLI account that can read the Fork.
+   Keep this PR limited to initialization. Until the first merge, keep write
+   and merge access with the owner and turn off auto-merge.
 
-   ```sh
-   node scripts/verify-first-product-pr.mjs OWNER/PRODUCT PR_NUMBER
-   ```
+   1. Wait for ordinary CI to pass on the current PR.
+   2. From a separate clean checkout of the supported AMCore release, run
+      this command with a GitHub CLI account that can read the Fork:
 
-   Merge only after the command succeeds and its base and head SHAs still match
-   the PR. If either SHA changes, run the check again. If verification fails or
-   cannot run, stop. The command reads the PR without running its code.
-   This owner check is separate from GitHub's ordinary CI status.
+      ```sh
+      node scripts/verify-first-product-pr.mjs OWNER/PRODUCT PR_NUMBER
+      ```
+
+   3. Compare the verified base and head SHAs with the current PR.
+      Click **Merge** only when ordinary CI is green and both SHAs still match.
+
+   If a new commit changes either SHA, wait for CI and repeat the independent
+   check. If the command fails or GitHub cannot provide the data it needs, stop
+   and leave the PR open. The check does not execute PR code. GitHub can show
+   **Merge** before you run it. The owner must confirm the result before using
+   the button.
+
    Configure the selected protection mode and verify required CI before subsequent updates.
    Push only explicitly selected branches or product tags, never `--tags` or `--mirror`.
 
