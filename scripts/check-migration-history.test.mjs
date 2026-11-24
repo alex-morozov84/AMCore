@@ -90,7 +90,10 @@ test('refuses a head checkout, a mismatched SHA and non-PR invocation', (t) => {
   merge(f)
   assert.match(check(f.root, base).stderr, /HEAD differs/)
   assert.match(
-    check(f.root, f.git('rev-parse', 'HEAD'), { GITHUB_EVENT_NAME: 'push' }).stderr,
+    check(f.root, f.git('rev-parse', 'HEAD'), {
+      GITHUB_EVENT_NAME: 'push',
+      GITHUB_EVENT_PATH: undefined,
+    }).stderr,
     /Missing|path/
   )
 })

@@ -74,7 +74,6 @@ for (const role of ['upstream-starter', 'downstream-product']) {
       pull_requests: [{ number: 7, base: { sha: base } }],
     }
     const responses = {
-      '': { allow_rebase_merge: false },
       [`commits/${after}/pulls`]: [pull],
       [`actions/workflows/ci.yml/runs?event=pull_request&head_sha=${head}&per_page=20`]: {
         workflow_runs: [run],
@@ -92,17 +91,15 @@ for (const role of ['upstream-starter', 'downstream-product']) {
         parents: [{ sha: base }, { sha: head }],
       },
     }
+    const requests = []
     const api = async (key) => {
+      requests.push(key)
       assert.ok(key in responses, key)
       return responses[key]
     }
     const { credit } = await resolveDeliveryProof(root, context, api)
     assert.deepEqual(credit, { pull: 7, run: '42', attempt: '1' })
-    if (role === 'upstream-starter') {
-      responses[''].allow_rebase_merge = true
-      assert.equal((await resolveDeliveryProof(root, context, api)).credit, undefined)
-      responses[''].allow_rebase_merge = false
-    }
+    assert.ok(!requests.includes(''))
     run.pull_requests = []
     assert.deepEqual((await resolveDeliveryProof(root, context, api)).credit, credit)
     const push = {
@@ -141,6 +138,11 @@ for (const role of ['upstream-starter', 'downstream-product']) {
       )
     for (const [key, invalid] of [
       [`commits/${after}/pulls`, []],
+      ['actions/runs/42/artifacts?name=ci-pr-proof-1', { artifacts: [] }],
+      [
+        'actions/artifacts/17/zip',
+        { ...proof, plan: { ...plan, source: { ...plan.source, base: head } } },
+      ],
       ['actions/artifacts/17/zip', { ...proof, tree: head }],
       ['actions/artifacts/17/zip', { ...proof, plan: { ...plan, attempt: '2' } }],
       [
@@ -153,6 +155,18 @@ for (const role of ['upstream-starter', 'downstream-product']) {
       assert.equal((await resolveDeliveryProof(root, context, api)).credit, undefined)
       responses[key] = original
     }
+    const widerContext = {
+      ...context,
+      classification: { diffComplete: true, areas: { ...inputs.areas, email: true } },
+    }
+    const missingCoverage = await resolveDeliveryProof(root, widerContext, api)
+    assert.equal(missingCoverage.credit, undefined)
+    assert.ok(
+      coarseExecution(
+        { ...inputs, areas: widerContext.classification.areas },
+        'push'
+      ).effective.includes('test-email')
+    )
     if (role === 'upstream-starter') {
       const missingHead = 'e'.repeat(40)
       const history = `compare/${base}...${missingHead}?per_page=100`

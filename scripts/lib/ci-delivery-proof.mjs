@@ -148,8 +148,6 @@ export async function resolveDeliveryProof(root, context, api) {
     )
     if (pulls.length !== 1) throw new Error('No unique merged PR for this commit')
     const [pr] = pulls
-    if (parents.length === 1 && (await api('')).allow_rebase_merge !== false)
-      return { reason: 'one-parent delivery is ambiguous while rebase merge is available' }
     const integration = await prIntegration(root, source.base, pr.head.sha, api)
     const { workflow_runs: runs } = await api(
       `actions/workflows/ci.yml/runs?event=pull_request&head_sha=${pr.head.sha}&per_page=20`

@@ -83,8 +83,9 @@ PR only when GitHub associates the delivered commit with that PR and CI can
 verify the same base, tree, mode and applicable plan. The **CI required** job
 checks the decision. The summary links the credited run and attempt. Test
 families and their preparatory jobs stay skipped for verified delivery.
-If the repository allows rebase merges, CI runs the checks for a one-parent
-delivery because GitHub does not identify its merge method in this evidence.
+A squash can reuse the PR result. CI verifies that the previous main commit
+is the first parent of the delivered commit. A push of several commits in
+sequence runs the applicable checks.
 CI also checks the changed-file classification on main. If the current
 classification is unavailable or requires checks beyond the PR plan, CI runs
 the applicable main plan. If the initial path filter fails, CI discards its
