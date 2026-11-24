@@ -308,13 +308,14 @@ describe('Auth (e2e)', () => {
     })
 
     it('prefers an explicit body locale over Accept-Language', async () => {
+      const locale = SERVED_LOCALES.find((value) => value !== DEFAULT_LOCALE) ?? DEFAULT_LOCALE
       const response = await request(app.getHttpServer())
         .post('/auth/register')
-        .set('Accept-Language', 'en-US,en;q=0.9')
-        .send({ email: 'bodyru@example.com', password: 'StrongP@ss123', locale: 'ru' })
+        .set('Accept-Language', locale === DEFAULT_LOCALE ? 'de-DE' : DEFAULT_LOCALE)
+        .send({ email: 'body-locale@example.com', password: 'StrongP@ss123', locale })
         .expect(201)
 
-      expect(response.body.user.locale).toBe('ru')
+      expect(response.body.user.locale).toBe(locale)
     })
 
     it('falls back to the DB default for an unsupported Accept-Language', async () => {

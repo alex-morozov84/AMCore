@@ -59,10 +59,13 @@ For flexible private products:
    **No runner-minute estimate is available yet.** Record minutes per job and total per update PR,
    including retries and follow-up push runs. Public standard-runner billing of zero is not a private cost estimate.
 
-The starter test suites have been verified only with the default served locales
-(`en` and `ru`, default `en`) and Console settings (`path`, alias `admin`).
-A product that changes these settings may need to adapt inherited tests and their
-selection. This verification does not establish coverage for other settings.
+The starter's default checks use English and Russian, with English as the
+default and Console on a path. A pre-release update rehearsal also passed
+in two test products. One served only English, with product administration
+on a path and Console disabled. The other served only Russian, with product
+administration and Console on separate hosts. These results cover the
+rehearsed commits and settings. Verify your selected release, product settings
+and extensions in your own update PR.
 
 An initialized product's **Test capability extension** job prints a warning in its
 log and step summary, then succeeds without running the disposable fixture.
@@ -231,6 +234,17 @@ confirm Actions enablement and Dependabot state during the first actual run.
    ```
 
    Check the resulting PR URL and base repository before review. Require checks on the reviewed head.
+   Open the CI run for that head and check **CI selection** for the selected
+   test families. The **API E2E plan** job uploads
+   `api-e2e-attempt-<attempt>-plan`. Find each API suite's shard in its
+   `plan.json`. Open the corresponding **API E2E shard (…/…)** job and search
+   its log by suite filename.
+   For browser tests, open the assigned group from **Web E2E plan**, then search
+   **Run isolated E2E lane** by test title. Record one inherited test and one
+   product test, their results, and **CI required** from the same run and attempt.
+   If CI names a spec without an executor, see [test selection](ci-security.md#selection-modes).
+   Share test names and outcomes. Review and redact logs before sharing them.
+
    Deliver with a **merge commit**, never squash or rebase, in strict, flexible and custom modes alike.
    Use `-R OWNER/PRODUCT` on CLI delivery commands too. Squashing loses source ancestry and can repeat old conflicts.
 

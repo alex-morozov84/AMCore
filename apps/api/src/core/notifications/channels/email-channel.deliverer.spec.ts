@@ -133,7 +133,11 @@ describe('EmailChannelDeliverer', () => {
 
     expect(email.renderTemplate).toHaveBeenCalledWith(
       'notification',
-      expect.objectContaining({ title: 'Detailed x', body: 'Detailed body', locale: 'ru' }),
+      expect.objectContaining({
+        title: 'Detailed x',
+        body: 'Detailed body',
+        locale: coerceSupportedLocale('ru'),
+      }),
       'worker'
     )
     expect(email.sendPreparedNotification).toHaveBeenCalledWith(
@@ -165,7 +169,9 @@ describe('EmailChannelDeliverer', () => {
     })
     expect(email.renderTemplate).toHaveBeenCalledWith(
       'notification',
-      expect.objectContaining({ title: emailMessages.ru['notification.genericTitle'] }),
+      expect.objectContaining({
+        title: emailMessages[coerceSupportedLocale('ru')]['notification.genericTitle'],
+      }),
       'worker'
     )
   })

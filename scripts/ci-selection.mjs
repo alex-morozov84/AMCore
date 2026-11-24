@@ -5,6 +5,7 @@ import { isDeepStrictEqual } from 'node:util'
 import { normalizeCiAreas } from './lib/ci-selection.mjs'
 import { readSelectionSource } from './lib/ci-selection-source.mjs'
 import { requireBrowserTestOwner } from './e2e-ci-plan.mjs'
+import { inheritedBrowserChanges } from './lib/inherited-browser-changes.mjs'
 import { coarseExecution } from './lib/ci-required.mjs'
 
 try {
@@ -16,8 +17,15 @@ try {
   )
   const payload = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'))
   const acquired = readSelectionSource(process.cwd(), policy.event, payload, process.env.GITHUB_SHA)
-  if (policy.mode !== 'heavy-off')
-    requireBrowserTestOwner(process.cwd(), acquired.changedFiles, policy.role)
+  if (policy.mode !== 'heavy-off' && policy.role === 'downstream-product') {
+    const inherited = new Set(
+      acquired.integration
+        ? inheritedBrowserChanges(process.cwd(), acquired.source, acquired.changedFiles)
+        : []
+    )
+    const productFiles = acquired.changedFiles.filter((file) => !inherited.has(file))
+    requireBrowserTestOwner(process.cwd(), productFiles, policy.role)
+  }
   let areas = {}
   const classifierChanged = acquired.changedFiles.some((file) =>
     /^(?:\.github\/(?:ci-paths\.yml|workflows\/|actions\/)|scripts\/(?:lib\/)?ci-)/.test(file)

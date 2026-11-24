@@ -59,7 +59,7 @@ test('host-mode Overview panel renders real readiness, version and process role,
   await expect(
     consolePage.getByText(t.overviewDependencyLabelDatabase, { exact: true })
   ).toBeVisible()
-  await expect(consolePage.getByText(t.overviewDependencyLabelRedis)).toBeVisible()
+  await expect(consolePage.getByText(t.overviewDependencyLabelRedis, { exact: true })).toBeVisible()
   await expect(consolePage.getByText(t.overviewReadyTitle, { exact: true })).toBeVisible()
   await expect(consolePage.getByText(t.overviewFilesHealthy, { exact: true })).toBeVisible()
   // The stand uses the local driver, so the public-files row is off and says why.

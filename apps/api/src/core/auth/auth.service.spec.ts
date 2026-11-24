@@ -8,6 +8,7 @@ import {
   coerceSupportedLocale,
   DEFAULT_LOCALE,
   localePathPrefix,
+  parseSupportedLocale,
   SERVED_LOCALES,
 } from '@amcore/shared'
 
@@ -797,7 +798,7 @@ describe('AuthService', () => {
         name: mockUser.name,
         avatarUrl: null,
         phone: mockUser.phone,
-        locale: mockUser.locale,
+        locale: parseSupportedLocale(mockUser.locale),
         timezone: mockUser.timezone,
         createdAt: mockUser.createdAt.toISOString(),
         lastLoginAt: mockUser.lastLoginAt!.toISOString(),
