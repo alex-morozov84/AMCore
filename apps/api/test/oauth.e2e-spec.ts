@@ -227,12 +227,12 @@ describe('OAuth (e2e)', () => {
 
     // The login redirect must carry the locale the account actually ends up
     // with — not merely *some* locale. An `/(en|ru)/` assertion would pass
-    // against a hardcoded `/en`, so this drives the real Accept-Language path
-    // to `ru` and pins both the stored value and the redirect to it.
+    // against a hardcoded default path, so request the other served locale when available.
     it('redirects to the callback under the locale the new user was seeded with', async () => {
+      const locale = SERVED_LOCALES.find((value) => value !== DEFAULT_LOCALE) ?? DEFAULT_LOCALE
       const authorizeRes = await request(app.getHttpServer())
         .get('/auth/oauth/google')
-        .set('Accept-Language', 'ru-RU,ru;q=0.9')
+        .set('Accept-Language', locale)
         .expect(302)
 
       const state = new URL(authorizeRes.headers.location!).searchParams.get('state')!
@@ -247,9 +247,11 @@ describe('OAuth (e2e)', () => {
       const user = await prisma.user.findUnique({
         where: { emailCanonical: 'oauth-user@example.com' },
       })
-      expect(user?.locale).toBe('ru')
-      expect(res.headers.location).toContain(`${localePathPrefix('ru')}/auth/callback?ticket=`)
-      expect(res.headers.location).not.toContain('/en/')
+      expect(user?.locale).toBe(locale)
+      expect(new URL(res.headers.location!).pathname).toBe(
+        `${localePathPrefix(locale)}/auth/callback`
+      )
+      expect(new URL(res.headers.location!).searchParams.has('ticket')).toBe(true)
     })
 
     it('falls back to the DB default locale when authorize has no usable Accept-Language', async () => {

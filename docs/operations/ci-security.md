@@ -52,8 +52,21 @@ under the same product settings and retains every applicable base case.
 Real-stack tests and applicable host Console tests join the plan automatically.
 The mocked and server-mocked projects share the configured mocked job.
 It uses the source settings and prepares local HTTPS when a surface uses a
-separate host. A downstream PR that changes a spec without an assigned
-executor receives a diagnostic with the path.
+separate host.
+
+When a product merges an AMCore update, CI checks the Git history and contents
+of changed browser specs. An existing spec may pass the executor check without
+a configured lane when its base contents match the common AMCore ancestor and
+its merged contents match the incoming AMCore file. Verify the source and
+release SHA separately using [the update guide](updating-a-fork.md).
+With Console disabled, CI can accept an inherited change to its working-console
+specs. CI still requires both the Console page and its API to return 404 after
+an operator signs in.
+
+A new or product-modified spec needs an executor. If CI cannot assign one, it
+stops the plan and names the file. Check the spec's directory and prerequisites
+against the supported test groups. Keep the settings the product is intended
+to ship.
 See [Writing a browser test for the product settings](../frontend/testing.md#write-a-browser-test-for-the-product-settings).
 Selected browser cases must yield successful results from the same run
 and attempt. Skips use a named prerequisite that the planner verifies against the settings.

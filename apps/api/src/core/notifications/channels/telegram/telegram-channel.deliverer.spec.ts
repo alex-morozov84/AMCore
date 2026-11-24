@@ -125,7 +125,9 @@ describe('TelegramChannelDeliverer', () => {
     expect(result).toEqual({ status: 'delivered', providerMessageId: '42' })
     const [arg] = client.sendPreparedMessage.mock.calls[0]!
     expect(JSON.parse(arg).chat_id).toBe('999000')
-    expect(JSON.parse(arg).text).toContain(telegramGenericMessages.ru.title)
+    expect(JSON.parse(arg).text).toContain(
+      telegramGenericMessages[coerceSupportedLocale('ru')].title
+    )
   })
 
   it('renders detailed content only from the allowlisted projection (no payload leak)', async () => {

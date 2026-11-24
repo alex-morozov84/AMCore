@@ -24,6 +24,10 @@ versions they name. For current source-update instructions, see
 
 ### Fixed
 
+- Preserve applicable browser checks when products merge AMCore updates that
+  change inherited tests for disabled features. Make the affected API tests
+  use the product's configured languages.
+
 - Preserve the browser language preference during account registration through the Web API.
 
 - Use product settings for CI test selection and browser fixtures. Discover new
