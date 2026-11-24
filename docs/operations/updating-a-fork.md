@@ -154,7 +154,12 @@ Creating repositories, pushing code and changing settings require the product ow
       node scripts/verify-first-product-pr.mjs OWNER/PRODUCT PR_NUMBER
       ```
 
-   3. Compare the verified base and head SHAs with the current PR.
+   3. Read the current base and head SHAs and compare them with the command output.
+
+      ```sh
+      gh pr view PR_NUMBER -R OWNER/PRODUCT --json baseRefOid,headRefOid
+      ```
+
       Click **Merge** only when ordinary CI is green and both SHAs still match.
 
    If a new commit changes either SHA, wait for CI and repeat the independent
