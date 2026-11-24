@@ -19,26 +19,28 @@ api() {
     "$@"
 }
 
-upsert_ruleset() {
+plan_ruleset() {
   local owner=$1
   local repo=$2
   local file=$3
-  local name existing_id
+  local name existing_id live
 
   name=$(jq -r '.name' "$file")
   existing_id=$(
-    api "repos/$owner/$repo/rulesets" |
-      jq -r --arg name "$name" '[.[] | select(.source_type == "Repository" and .name == $name)][0].id // empty'
+    printf '%s\n' "$live_rulesets" |
+      jq -r --arg name "$name" '[.[] | select(.source_type == "Repository" and .name == $name)] | if length > 1 then error("Duplicate rulesets") else .[0].id // empty end'
   )
 
   if [[ -n $existing_id ]]; then
-    echo "setup-repo-security: updating ruleset '$name' ($existing_id)"
-    local live merged
     live=$(api "repos/$owner/$repo/rulesets/$existing_id")
-    merged=$(jq -e --slurpfile template "$file" '
+    jq -e --arg id "$existing_id" --slurpfile template "$file" '
       def editable: { name, target, enforcement, conditions, bypass_actors, rules };
       editable as $current | $template[0] as $policy |
-      if ($current.rules | type) != "array" then error("Invalid live ruleset") else
+      if ($current.rules | type) != "array" then error("Invalid live ruleset")
+      elif $current.enforcement != "active" or $current.target != $policy.target or
+        $current.conditions != $policy.conditions
+      then error("Resolve the inactive or differently scoped ruleset before setup: " + $policy.name)
+      else
         $current | .rules |= (
           map(select(.type != "required_linear_history" or $policy.target != "branch" or any($policy.rules[]; .type == "required_linear_history"))) |
           map(
@@ -47,22 +49,37 @@ upsert_ruleset() {
             elif .type == "required_status_checks" and any($policy.rules[]; .type == "required_status_checks") then
               .parameters.strict_required_status_checks_policy = true |
               .parameters.required_status_checks |= (
-                . as $checks |
-                (($policy.rules[] | select(.type == "required_status_checks").parameters.required_status_checks) +
-                  ($checks | map(. as $check | select(all($policy.rules[] |
-                    select(.type == "required_status_checks").parameters.required_status_checks[]; .context != $check.context)))))
+                . as $live |
+                ($policy.rules[] | select(.type == "required_status_checks").parameters.required_status_checks) as $required |
+                if any($required[]; . as $check |
+                    $check.integration_id != null and any($live[];
+                      .context == $check.context and .integration_id != null and .integration_id != $check.integration_id))
+                then error("Conflicting check publisher in " + $policy.name)
+                else
+                  ($required | map(. as $check |
+                    ($live | map(select(.context == $check.context)) | first // {}) + $check)) +
+                  ($live | map(. as $check | select(all($required[]; .context != $check.context))))
+                end
               )
             else . end
           ) as $rules |
           $rules + [$policy.rules[] | . as $rule | select(all($rules[]; .type != $rule.type))]
         )
-      end' <<<"$live")
-    api --method PUT "repos/$owner/$repo/rulesets/$existing_id" --input - <<<"$merged" >/dev/null
+      end | {id: $id, body: .}' <<<"$live"
     return
   fi
+  jq '{id: "", body: .}' "$file"
+}
 
-  echo "setup-repo-security: creating ruleset '$name'"
-  api --method POST "repos/$owner/$repo/rulesets" --input "$file" >/dev/null
+apply_ruleset() {
+  local plan=$1
+  local id
+  id=$(jq -r .id <<<"$plan")
+  if [[ -n $id ]]; then
+    jq .body <<<"$plan" | api --method PUT "repos/$owner/$repo/rulesets/$id" --input - >/dev/null
+  else
+    jq .body <<<"$plan" | api --method POST "repos/$owner/$repo/rulesets" --input - >/dev/null
+  fi
 }
 
 fork_updates=false
@@ -135,7 +152,7 @@ owner=${repo_full_name%/*}
 repo=${repo_full_name#*/}
 
 # Read the rulesets endpoint before changing any setting. A private plan may disallow it.
-api "repos/$owner/$repo/rulesets" >/dev/null
+live_rulesets=$(api "repos/$owner/$repo/rulesets")
 repo_settings=$(api "repos/$owner/$repo")
 visibility=$(jq -er '.visibility' <<<"$repo_settings")
 if [[ $fork_updates == true && $visibility == private ]]; then
@@ -146,6 +163,9 @@ if [[ $fork_updates == true && $visibility == private ]]; then
   printf '%s\n' "$private_policy" > "$main_ruleset"
 fi
 
+
+main_plan=$(plan_ruleset "$owner" "$repo" "$main_ruleset")
+tags_plan=$(plan_ruleset "$owner" "$repo" "$RULESET_DIR/tags-release.json")
 
 echo "setup-repo-security: applying security settings to $repo_full_name"
 
@@ -175,7 +195,16 @@ fi
 
 echo "setup-repo-security: ensured $merge_policy merges, dependency graph and vulnerability alerts"
 
-upsert_ruleset "$owner" "$repo" "$main_ruleset"
-upsert_ruleset "$owner" "$repo" "$RULESET_DIR/tags-release.json"
+apply_ruleset "$main_plan"
+apply_ruleset "$tags_plan"
+
+effective=$(api "repos/$owner/$repo/rules/branches/main")
+if ! jq -e --argjson plan "$main_plan" '
+  . as $effective | all($plan.body.rules[];
+    . as $rule | any($effective[]; .type == $rule.type and .parameters == $rule.parameters))
+' <<<"$effective" >/dev/null; then
+  echo "setup-repo-security: expected strict rules are not effective on main" >&2
+  exit 1
+fi
 
 echo "setup-repo-security: repository security settings are up to date"

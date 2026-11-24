@@ -54,10 +54,7 @@ function admitProof(root, context, pr, run, proof, checkout) {
     checkout.parents?.map((parent) => parent.sha).join(' ') !== `${source.base} ${pr.head.sha}`
   )
     throw new Error('Verified checkout or diff does not match delivery')
-  const integration =
-    checkout.parents[1].sha === context.deliveryParent
-      ? Boolean(git(root, 'rev-list', '--merges', `${source.base}..${pr.head.sha}`))
-      : false
+  const { integration } = context
   const identity = { source: plan.source, diffComplete: true, integration }
   validateExecutionPlan(plan, {
     ...identity,
@@ -67,7 +64,10 @@ function admitProof(root, context, pr, run, proof, checkout) {
     role: policy.role,
     mode: policy.mode,
   })
-  const baseline = coarseExecution({ ...plan.inputs, mode: policy.mode }, 'push')
+  const baseline = coarseExecution(
+    { ...context.classification, integration, role: policy.role, mode: policy.mode },
+    'push'
+  )
   if (baseline.effective.some((job) => !plan.effective.includes(job)))
     throw new Error('PR did not cover the applicable push plan')
   return { pull: pr.number, run: String(run.id), attempt: String(run.run_attempt) }
@@ -103,6 +103,26 @@ function matchingRun(run, context, pr) {
   )
 }
 
+async function prIntegration(root, base, head, api) {
+  try {
+    return Boolean(git(root, 'rev-list', '--merges', `${base}..${head}`))
+  } catch {
+    const comparison = await api(`compare/${base}...${head}?per_page=100`)
+    if (
+      !Array.isArray(comparison.commits) ||
+      comparison.total_commits !== comparison.commits.length ||
+      comparison.commits.some(
+        (commit) =>
+          !sha(commit.sha) ||
+          !Array.isArray(commit.parents) ||
+          commit.parents.some((parent) => !sha(parent.sha))
+      )
+    )
+      throw new Error('Incomplete PR history')
+    return comparison.commits.some((commit) => commit.parents.length > 1)
+  }
+}
+
 export async function resolveDeliveryProof(root, context, api) {
   const { source, policy, changedFiles, repositoryId, payload } = context
   if (
@@ -111,7 +131,8 @@ export async function resolveDeliveryProof(root, context, api) {
     payload.forced !== false ||
     payload.before !== source.base ||
     payload.after !== source.checkout ||
-    !context.diffComplete ||
+    !context.classification?.diffComplete ||
+    policy.fullOnce ||
     !id(repositoryId) ||
     !['normal', 'full'].includes(policy.mode) ||
     proofInputsChanged(changedFiles)
@@ -129,6 +150,7 @@ export async function resolveDeliveryProof(root, context, api) {
     const [pr] = pulls
     if (parents.length === 1 && (await api('')).allow_rebase_merge !== false)
       return { reason: 'one-parent delivery is ambiguous while rebase merge is available' }
+    const integration = await prIntegration(root, source.base, pr.head.sha, api)
     const { workflow_runs: runs } = await api(
       `actions/workflows/ci.yml/runs?event=pull_request&head_sha=${pr.head.sha}&per_page=20`
     )
@@ -157,14 +179,7 @@ export async function resolveDeliveryProof(root, context, api) {
         if (!sha(checkoutSha)) throw new Error('Invalid verified checkout')
         const checkout = await api(`git/commits/${checkoutSha}`)
         return {
-          credit: admitProof(
-            root,
-            { ...context, deliveryParent: parents[1] },
-            pr,
-            run,
-            proof,
-            checkout
-          ),
+          credit: admitProof(root, { ...context, integration }, pr, run, proof, checkout),
         }
       } catch {
         // A different successful run may have checked the actual delivery.

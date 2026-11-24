@@ -28,13 +28,17 @@ function checkHistory() {
   const parents = git('rev-list', '--parents', '-n', '1', 'HEAD').trim().split(' ').slice(1)
   if (event === 'pull_request' && parents.length !== 2)
     throw new Error('Expected two merge parents; checkout with fetch-depth: 2')
-  const base =
-    event === 'pull_request'
-      ? parents[0]
-      : JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')).before
+  const push =
+    event === 'push' ? JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')) : null
+  const base = push ? push.before : parents[0]
   if (typeof base !== 'string' || !/^[a-f0-9]{40}$/.test(base))
     throw new Error('Missing or invalid migration comparison base')
-  const baseline = migrationEntries(base)
+  const created =
+    /^0+$/.test(base) &&
+    push?.created === true &&
+    push.ref === 'refs/heads/main' &&
+    push.after === head
+  const baseline = created ? new Map() : migrationEntries(base)
   const candidate = migrationEntries(head)
   const changed = [...baseline].filter(([path, blob]) => candidate.get(path) !== blob)
   if (changed.length) {

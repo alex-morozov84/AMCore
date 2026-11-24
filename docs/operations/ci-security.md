@@ -6,18 +6,18 @@ of workflow self-hardening to keep the example forkable.
 
 ## Current Gates
 
-| Workflow                | Trigger                                         | Tooling                                                                                             | CI behavior                          |
-| ----------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| `codeql.yml`            | `push`, `pull_request`, weekly schedule, manual | CodeQL (`javascript-typescript`, `build-mode: none`)                                                | report-only, uploads SARIF           |
-| `dependency-review.yml` | `pull_request`                                  | GitHub Dependency Review                                                                            | blocking on `high+`                  |
-| `security-scans.yml`    | `push`, `pull_request`, weekly schedule         | gitleaks CLI, OSV-Scanner CLI                                                                       | gitleaks blocks; OSV is report-only  |
-| `ci.yml`                | `push`, `pull_request`                          | Route bundle budgets after the web build (`pnpm check:route-budgets`, Build job)                    | blocking                             |
-| `ci.yml`                | `push`, `pull_request`                          | Trivy CLI + boot-smoke                                                                              | Trivy report-only; boot-smoke blocks |
-| `ci.yml`                | `push`, `pull_request`                          | Observability contract — static (`scripts/observability-contract/`, folded into the `promtool` job) | blocking                             |
-| `ci.yml`                | `push`, `pull_request`                          | Observability contract — live (real Prometheus/Alertmanager/Grafana boot)                           | blocking                             |
-| `ci.yml`                | `push`, `pull_request`                          | Script contracts (`pnpm test:scripts`: tooling unit and contract tests, no Docker)                  | blocking                             |
-| `workflow-lint.yml`     | `push`, `pull_request`                          | actionlint, zizmor, action pin verifier                                                             | blocking                             |
-| `pr-title.yml`          | `pull_request`                                  | Conventional-Commits PR-title lint                                                                  | blocking (squash title = commit msg) |
+| Workflow                | Trigger                                 | Tooling                                                                                             | CI behavior                          |
+| ----------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `codeql.yml`            | `push`, `pull_request`, weekly schedule | CodeQL (`javascript-typescript`, `build-mode: none`)                                                | report-only, uploads SARIF           |
+| `dependency-review.yml` | `pull_request`                          | GitHub Dependency Review                                                                            | blocking on `high+`                  |
+| `security-scans.yml`    | `push`, `pull_request`, weekly schedule | gitleaks CLI, OSV-Scanner CLI                                                                       | gitleaks blocks; OSV is report-only  |
+| `ci.yml`                | `push`, `pull_request`                  | Route bundle budgets after the web build (`pnpm check:route-budgets`, Build job)                    | blocking                             |
+| `ci.yml`                | `push`, `pull_request`                  | Trivy CLI + boot-smoke                                                                              | Trivy report-only; boot-smoke blocks |
+| `ci.yml`                | `push`, `pull_request`                  | Observability contract — static (`scripts/observability-contract/`, folded into the `promtool` job) | blocking                             |
+| `ci.yml`                | `push`, `pull_request`                  | Observability contract — live (real Prometheus/Alertmanager/Grafana boot)                           | blocking                             |
+| `ci.yml`                | `push`, `pull_request`                  | Script contracts (`pnpm test:scripts`: tooling unit and contract tests, no Docker)                  | blocking                             |
+| `workflow-lint.yml`     | `push`, `pull_request`                  | actionlint, zizmor, action pin verifier                                                             | blocking                             |
+| `pr-title.yml`          | `pull_request`                          | Conventional-Commits PR-title lint                                                                  | blocking (squash title = commit msg) |
 
 ## Aggregate CI gate
 
@@ -85,11 +85,23 @@ checks the decision. The summary links the credited run and attempt. Test
 families and their preparatory jobs stay skipped for verified delivery.
 If the repository allows rebase merges, CI runs the checks for a one-parent
 delivery because GitHub does not identify its merge method in this evidence.
+CI also checks the changed-file classification on main. If the current
+classification is unavailable or requires checks beyond the PR plan, CI runs
+the applicable main plan. A saved `full` mode can reuse a matching full PR.
+When manual full execution is wired in, an explicit one-off full run always executes its plan.
 
 A direct push, missing evidence, changed base or untrusted CI change runs the
 applicable checks on main immediately. Unknown impact selects a broad plan.
 The summary shows the reason. Missing baseline data can block a required
 comparison. Resolve the unavailable comparison before treating main as verified.
+
+Image smoke always runs both Trivy scans and retains their reports in the
+`image-trivy-sarif` artifact. External PRs retain the artifact only. Internal
+runs upload to Code Scanning in public repositories. In private repositories,
+set `AMCORE_TRIVY_CODE_SCANNING=true` only after confirming Code Scanning access.
+An enabled upload that fails stays visible. A credited main run links to the
+PR evidence, so it does not add new image SARIF results to the main branch's
+Code Scanning view. Use the PR artifact for the image reports.
 
 Standalone checks retain their own triggers. Workflow Lint independently
 checks the workflows on main. Gitleaks scans the delivered commit
@@ -494,7 +506,8 @@ against arbitrary future workload growth. Reassess capacity when the application
   "Observability contract (static)" job above.
   The migration history check compares the PR checkout with its first parent.
   On an unverified push it compares with the event's previous commit. A missing
-  baseline or a changed or deleted shared migration fails the check. Additions
+  baseline on an existing branch or a changed or deleted shared migration fails
+  the check. The first creation of main has an empty previous inventory. Additions
   are allowed. Verify SQL safety and collisions between new migrations separately.
 
 **The observability-contract and script-contracts job contexts ("Observability
@@ -669,15 +682,18 @@ use the manual route there. Then:
 4. For an initialized downstream, apply `bash ./scripts/setup-repo-security.sh --fork-updates`
    (also needs `jq`). AMCore upstream runs the command without the flag.
 
-This enables native **secret scanning** + **push protection**, the **dependency
-graph** + Dependabot alerts + **Dependabot security updates** (auto-PRs that fix
+For public repositories this also enables native **secret scanning** and
+**push protection**. For private repositories, check availability and configure
+these separately if supported. The script enables the **dependency graph** + Dependabot alerts + **Dependabot security updates** (auto-PRs that fix
 vulnerable dependencies — the only channel that patches a vuln whose fix is a
 semver-major, since `dependabot.yml` ignores majors), and imports the **rulesets**
 for `main` (PR-only,
 **squash-only** upstream, or **squash + merge** with `--fork-updates`,
 required status checks, block force-push, restrict deletions) and for **release tags** (`refs/tags/v*` — block tag update and
 deletion, so published versions are immutable). It is the supported `strict`
-setup. It is safe to re-run. Existing owner bypasses and additional checks are preserved. The flag requires one canonical
+setup. It preserves owner bypasses and check publishers. If an existing ruleset is
+inactive, targets a different ref, or conflicts with a required publisher, setup
+stops before changing settings. After setup it verifies the effective rules on main. The flag requires one canonical
 `downstream-product` Mode field in PROJECT_CONTEXT.md. Unknown arguments and invalid
 flag/context combinations fail before any GitHub call. The main profile is rendered
 temporarily; tracked upstream rules stay unchanged. An unflagged strict product rerun refuses before mutation. Repeat the flag for reconciliation. Flexible and custom modes leave settings unchanged.

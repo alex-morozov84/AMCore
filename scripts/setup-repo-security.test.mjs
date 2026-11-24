@@ -51,11 +51,20 @@ if (args.includes('repos/example/product/rulesets') && !args.includes('--method'
   ]) : '[]');
 } else if (args.includes('repos/example/product') && !args.includes('--method')) {
   console.log(JSON.stringify({ visibility: process.env.MOCK_PRIVATE ? 'private' : 'public' }));
+} else if (args.includes('repos/example/product/rules/branches/main')) {
+  const calls = fs.readFileSync(process.env.MOCK_LOG, 'utf8').trim().split('\\n').map(JSON.parse);
+  const applied = calls.findLast(call => call.payload?.name === 'Protect main');
+  console.log(JSON.stringify(process.env.MOCK_INEFFECTIVE ? [] : applied.payload.rules));
 } else if (args.includes('repos/example/product/rulesets/11') && !args.includes('--method')) {
   const policy = JSON.parse(fs.readFileSync('.github/rulesets/main.json'));
+  if (process.env.MOCK_DISABLED) policy.enforcement = 'disabled';
+  if (process.env.MOCK_WRONG_SCOPE) policy.conditions.ref_name.include = ['refs/heads/other'];
   if (process.env.MOCK_CUSTOM_RULE) {
     policy.bypass_actors = [{ actor_id: 8, actor_type: 'Team', bypass_mode: 'always' }];
-    policy.rules.find(rule => rule.type === 'required_status_checks').parameters.required_status_checks.push({ context: 'Owner check' });
+    const checks = policy.rules.find(rule => rule.type === 'required_status_checks').parameters.required_status_checks;
+    checks.push({ context: 'Owner check', integration_id: 43 });
+    checks.find(check => check.context === 'Lint').integration_id = 29;
+    if (process.env.MOCK_WRONG_PUBLISHER) checks.find(check => check.context === 'CI required').integration_id = 99;
   }
   console.log(JSON.stringify(policy));
 } else if (args.includes('repos/example/product/rulesets/12') && !args.includes('--method')) {
@@ -161,7 +170,28 @@ test('strict reconciliation preserves owner bypass actors and extra checks', (t)
       .find((rule) => rule.type === 'required_status_checks')
       .parameters.required_status_checks.some((check) => check.context === 'Owner check')
   )
+  const checks = updated.rules.find((rule) => rule.type === 'required_status_checks').parameters
+    .required_status_checks
+  assert.equal(checks.find((check) => check.context === 'Lint').integration_id, 29)
+  assert.equal(checks.find((check) => check.context === 'Owner check').integration_id, 43)
   assert.ok(!updated.rules.some((rule) => rule.type === 'required_linear_history'))
+})
+
+test('refuses conflicting live strict settings before any mutation', (t) => {
+  const f = fixture(t, downstream)
+  for (const conflict of ['MOCK_DISABLED', 'MOCK_WRONG_SCOPE', 'MOCK_WRONG_PUBLISHER']) {
+    const result = f.run(['--fork-updates'], {
+      MOCK_EXISTING: '1',
+      MOCK_CUSTOM_RULE: '1',
+      [conflict]: '1',
+    })
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /inactive or differently scoped|Conflicting check publisher/)
+    assert.ok(result.calls.every((call) => !call.args.includes('--method')))
+  }
+  const result = f.run(['--fork-updates'], { MOCK_INEFFECTIVE: '1' })
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /not effective on main/)
 })
 
 test('private strict setup adds only core checks and preserves existing optional checks', (t) => {

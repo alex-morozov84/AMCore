@@ -110,6 +110,19 @@ test('push compares with the event baseline and rejects an edited shared migrati
   assert.match(result.stderr, /Shared migrations changed or disappeared/)
 })
 
+test('first main creation has no prior migrations but an unavailable existing base fails', (t) => {
+  const f = fixture(t)
+  const after = f.git('rev-parse', 'HEAD')
+  const eventPath = join(f.root, 'event.json')
+  const run = (fields) => {
+    writeFileSync(eventPath, JSON.stringify({ ref: 'refs/heads/main', after, ...fields }))
+    return check(f.root, after, { GITHUB_EVENT_NAME: 'push', GITHUB_EVENT_PATH: eventPath })
+  }
+  assert.equal(run({ before: '0'.repeat(40), created: true }).status, 0)
+  assert.notEqual(run({ before: '0'.repeat(40), created: false }).status, 0)
+  assert.notEqual(run({ before: '1'.repeat(40), created: false }).status, 0)
+})
+
 test('depth two works offline; depth one and missing parent objects fail closed', (t) => {
   const f = fixture(t)
   f.put(added, 'CREATE TABLE next(id int);\n')

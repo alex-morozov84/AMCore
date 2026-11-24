@@ -37,6 +37,7 @@ for (const role of ['upstream-starter', 'downstream-product']) {
       source,
       repositoryId: '9',
       diffComplete: true,
+      classification: { diffComplete: true, areas: inputs.areas },
       changedFiles: [],
       payload: { ref: 'refs/heads/main', before: base, after, forced: false },
       policy: { event: 'push', repository, role, mode: 'normal' },
@@ -126,6 +127,9 @@ for (const role of ['upstream-starter', 'downstream-product']) {
     assert.deepEqual(requireSelectedCi(skipped, push, identity).effective, [])
     assert.throws(() => requireSelectedCi(skipped, push, { ...identity, credit: undefined }))
     for (const mutation of [
+      { classification: { diffComplete: false, areas: {} } },
+      { classification: { diffComplete: true, areas: { unknown: true } } },
+      { policy: { ...context.policy, fullOnce: true } },
       { changedFiles: ['scripts/ci-selection.mjs'] },
       { payload: { ...context.payload, forced: true } },
       { policy: { ...context.policy, mode: 'full' } },
@@ -148,6 +152,32 @@ for (const role of ['upstream-starter', 'downstream-product']) {
       responses[key] = invalid
       assert.equal((await resolveDeliveryProof(root, context, api)).credit, undefined)
       responses[key] = original
+    }
+    if (role === 'upstream-starter') {
+      const missingHead = 'e'.repeat(40)
+      const history = `compare/${base}...${missingHead}?per_page=100`
+      const runList = `actions/workflows/ci.yml/runs?event=pull_request&head_sha=${missingHead}&per_page=20`
+      pull.head.sha = missingHead
+      run.head_sha = missingHead
+      responses[runList] = { workflow_runs: [run] }
+      const mergedInputs = { ...inputs, integration: true }
+      responses['actions/artifacts/17/zip'] = {
+        ...proof,
+        plan: {
+          ...plan,
+          source: { ...plan.source, head: missingHead },
+          inputs: mergedInputs,
+          ...coarseExecution(mergedInputs, 'pull_request'),
+        },
+      }
+      responses[`git/commits/${checkout}`].parents[1].sha = missingHead
+      responses[history] = {
+        total_commits: 1,
+        commits: [{ sha: missingHead, parents: [{ sha: head }, { sha: base }] }],
+      }
+      assert.deepEqual((await resolveDeliveryProof(root, context, api)).credit, credit)
+      responses[history].total_commits = 2
+      assert.equal((await resolveDeliveryProof(root, context, api)).credit, undefined)
     }
   })
 }

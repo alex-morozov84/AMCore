@@ -1,8 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { appendFileSync, existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { isDeepStrictEqual } from 'node:util'
-import { normalizeCiAreas } from './lib/ci-selection.mjs'
+import { classifyCiChange } from './lib/ci-classification.mjs'
 import { readSelectionSource } from './lib/ci-selection-source.mjs'
 import { requireBrowserTestOwner } from './e2e-ci-plan.mjs'
 import { inheritedBrowserChanges } from './lib/inherited-browser-changes.mjs'
@@ -28,21 +27,7 @@ try {
     const productFiles = acquired.changedFiles.filter((file) => !inherited.has(file))
     requireBrowserTestOwner(process.cwd(), productFiles, policy.role)
   }
-  let areas = {}
-  const classifierChanged = acquired.changedFiles.some((file) =>
-    /^(?:\.github\/(?:ci-paths\.yml|workflows\/|actions\/)|scripts\/(?:lib\/)?ci-)/.test(file)
-  )
-  let diffComplete = acquired.diffComplete && !classifierChanged
-  if (diffComplete) {
-    try {
-      const outputs = JSON.parse(process.env.CI_FILTER_OUTPUTS)
-      const all = JSON.parse(outputs.all_files ?? '[]')
-      diffComplete = isDeepStrictEqual([...all].sort(), acquired.changedFiles)
-      if (diffComplete) areas = normalizeCiAreas(outputs)
-    } catch {
-      diffComplete = false
-    }
-  }
+  const classification = classifyCiChange(acquired, process.env.CI_FILTER_OUTPUTS)
   for (const file of acquired.changedFiles)
     if (
       file.startsWith('apps/api/') &&
@@ -55,8 +40,7 @@ try {
   const inputs = {
     role: policy.role,
     mode: policy.mode,
-    areas,
-    diffComplete,
+    ...classification,
     integration: acquired.integration,
   }
   const api = githubEvidence(process.env, policy.repository)
@@ -66,6 +50,7 @@ try {
           process.cwd(),
           {
             ...acquired,
+            classification,
             policy,
             payload,
             repositoryId: process.env.GITHUB_REPOSITORY_ID,

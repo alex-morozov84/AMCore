@@ -78,6 +78,38 @@ test('selection preflight dominates preparation and exclusions have direct selec
   )
 })
 
+test('credited pushes repeat classification and image smoke retains reports without Code Scanning', () => {
+  const gate = ci.jobs['ci-required']
+  const filter = gate.steps.find((step) => step.id === 'delivery-filter')
+  assert.match(filter.if, /verified-pr/)
+  assert.equal(filter.with.base, '${{ github.event.before }}')
+  assert.equal(filter.with.ref, '${{ github.sha }}')
+  assert.equal(
+    gate.steps.find((step) => step.run).env.CI_FILTER_OUTPUTS,
+    '${{ toJSON(steps.delivery-filter.outputs) }}'
+  )
+  const steps = ci.jobs['docker-image-smoke'].steps
+  const artifact = steps.find((step) => step.name === 'Retain image scan reports')
+  assert.equal(artifact.if, undefined)
+  assert.deepEqual(artifact.with.path.trim().split('\n'), [
+    'trivy-results.sarif',
+    'migrator-trivy-results.sarif',
+  ])
+  for (const name of ['Upload Trivy SARIF', 'Upload migrator Trivy SARIF']) {
+    const upload = steps.find((step) => step.name === name)
+    assert.match(upload.if, /head.repo.full_name == github.repository/)
+    assert.match(
+      upload.if,
+      /!github.event.repository.private \|\| vars.AMCORE_TRIVY_CODE_SCANNING == 'true'/
+    )
+  }
+  const scans = parse(
+    readFileSync(new URL('../../.github/workflows/security-scans.yml', import.meta.url), 'utf8')
+  )
+  assert.match(scans.concurrency.group, /github.run_id/)
+  assert.match(scans.concurrency['cancel-in-progress'], /event_name == 'pull_request'/)
+})
+
 test('API aggregate admits applicability before evidence and keeps selected coverage validation', () => {
   const api = ci.jobs['api-e2e']
   assert.deepEqual(api.needs, ['ci-selection', 'api-e2e-plan', 'api-e2e-shards'])

@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { prProof, resolveDeliveryProof } from './lib/ci-delivery-proof.mjs'
+import { classifyCiChange } from './lib/ci-classification.mjs'
 import { githubEvidence } from './lib/ci-delivery-api.mjs'
 import { requireSelectedCi } from './lib/ci-required.mjs'
 import { readSelectionSource } from './lib/ci-selection-source.mjs'
@@ -26,7 +27,13 @@ try {
   if (plan.inputs?.credit && api) {
     const delivery = await resolveDeliveryProof(
       process.cwd(),
-      { ...identity, policy, payload, repositoryId },
+      {
+        ...identity,
+        policy,
+        payload,
+        repositoryId,
+        classification: classifyCiChange(identity, process.env.CI_FILTER_OUTPUTS),
+      },
       api
     )
     identity.credit = delivery.credit
