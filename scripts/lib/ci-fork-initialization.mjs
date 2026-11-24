@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { isDeepStrictEqual } from 'node:util'
 import { BRAND_ASSET_PATHS, BRAND_PATHS } from './brand-ownership.mjs'
 import { githubEvidence } from './ci-delivery-api.mjs'
-import { readSelectionSource } from './ci-selection-source.mjs'
+import { parseCiPolicy, parseCiRole } from './ci-policy.mjs'
 
 const upstream = 'alex-morozov84/AMCore'
 
@@ -43,11 +43,17 @@ function permittedContent(path, before, after) {
   )
 }
 
-export async function verifyForkInitialization(root, repository, payload, env) {
+export async function verifyForkInitialization(
+  root,
+  repository,
+  payload,
+  env,
+  evidence = githubEvidence
+) {
   const pr = payload.pull_request
   const evidenceEnv = { ...env, CI_EVIDENCE_TOKEN: env.CI_POLICY_TOKEN }
-  const current = githubEvidence(evidenceEnv, repository)
-  const canonical = githubEvidence(evidenceEnv, upstream)
+  const current = evidence(evidenceEnv, repository)
+  const canonical = evidence(evidenceEnv, upstream)
   const id = env.GITHUB_REPOSITORY_ID
   if (
     !current ||
@@ -60,20 +66,34 @@ export async function verifyForkInitialization(root, repository, payload, env) {
   )
     throw new Error('First product PR requires trusted fork metadata')
 
-  const { source, diffComplete, changedFiles } = readSelectionSource(
-    root,
-    'pull_request',
-    payload,
-    env.GITHUB_SHA
-  )
+  const source = { base: pr.base.sha, head: pr.head.sha, checkout: env.GITHUB_SHA }
   const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' })
+  if (
+    Object.values(source).some((sha) => !/^[a-f0-9]{40}$/.test(sha ?? '')) ||
+    git('show', '-s', '--format=%P', source.checkout).trim() !== `${source.base} ${source.head}`
+  )
+    throw new Error('First product PR requires the exact merge commit')
   const context = git('show', `${source.checkout}:PROJECT_CONTEXT.md`)
   const release = /^- \*\*initialized_from_amcore_version:\*\* (v\d+\.\d+\.\d+)$/m.exec(
     context
   )?.[1]
-  if (!release || !diffComplete)
-    throw new Error('First product PR requires a supported release base')
-
+  if (
+    !release ||
+    parseCiRole(context) !== 'downstream-product' ||
+    parseCiRole(git('show', `${source.base}:PROJECT_CONTEXT.md`)) !== 'upstream-starter'
+  )
+    throw new Error('First product PR requires a supported release base and product identity')
+  parseCiPolicy(git('show', `${source.checkout}:ci/product.json`))
+  const changedFiles = git(
+    'diff',
+    '--name-only',
+    '--no-renames',
+    '-z',
+    source.base,
+    source.checkout
+  )
+    .split('\0')
+    .filter(Boolean)
   const [fork, origin, published, base, main] = await Promise.all([
     current(''),
     canonical(''),
@@ -95,6 +115,17 @@ export async function verifyForkInitialization(root, repository, payload, env) {
     main.object?.sha !== source.base
   )
     throw new Error('First product PR is not based on the published AMCore release in this fork')
+
+  if (
+    git(
+      'ls-tree',
+      '--name-only',
+      source.base,
+      '--',
+      'scripts/verify-first-product-pr.mjs'
+    ).trim() !== 'scripts/verify-first-product-pr.mjs'
+  )
+    throw new Error('Published release predates supported fork initialization')
 
   for (const path of changedFiles) {
     const entry = (sha) => git('ls-tree', sha, '--', path).split(' ', 1)[0]

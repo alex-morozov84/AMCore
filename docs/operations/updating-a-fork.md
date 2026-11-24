@@ -48,16 +48,10 @@ For flexible private products:
 4. Record missing scanning, push protection and enforcement in the product contributor guide.
    Free private repositories lack branch/tag rulesets. Pro/Team can supply rulesets without the security add-ons.
    Require the available checks where supported. Otherwise review and tag discipline depend on your team.
-5. Budget CI before enabling it. Inherited jobs may exceed your private account's included allowance.
-   Select supported whole workflows through their Actions enable/disable state,
-   as in step 3, and align required checks with that selection. Do not select
-   individual `Test` dependencies by removing or skipping them in `ci.yml`.
-   Script contracts locks that dependency set and the guarded leaf commands
-   and conditions; `Test` rejects skipped dependencies.
-   Further coverage reductions need an explicit product policy and corresponding
-   contract changes; changing required checks alone does not change these contracts.
-   **No runner-minute estimate is available yet.** Record minutes per job and total per update PR,
-   including retries and follow-up push runs. Public standard-runner billing of zero is not a private cost estimate.
+5. Choose [automatic checks](ci-security.md#choose-automatic-checks-for-a-product)
+   to manage test coverage and spend. Use the measured example and check your
+   account's allowance. Disable a workflow as in step 3 only when its required
+   feature is unavailable.
 
 The starter's default checks use English and Russian, with English as the
 default and Console on a path. A pre-release update rehearsal also passed
@@ -149,7 +143,19 @@ Creating repositories, pushing code and changing settings require the product ow
    For an empty independent destination, push the explicit product branch to `main` (`git push origin product-start:main`).
    For a Fork, enable Actions, push `product-start` and open a PR into its matching `main`.
    The first PR uses the starter check mode. The product mode applies after merge.
-   Keep this PR limited to initialization.
+   Keep this PR limited to initialization. The owner controls the first merge.
+   Until then, keep write and merge access with the owner and leave auto-merge off.
+   After ordinary CI passes, run this check from a separate clean checkout of
+   the supported AMCore release. Use a GitHub CLI account that can read the Fork.
+
+   ```sh
+   node scripts/verify-first-product-pr.mjs OWNER/PRODUCT PR_NUMBER
+   ```
+
+   Merge only after the command succeeds and its base and head SHAs still match
+   the PR. If either SHA changes, run the check again. If verification fails or
+   cannot run, stop. The command reads the PR without running its code.
+   This owner check is separate from GitHub's ordinary CI status.
    Configure the selected protection mode and verify required CI before subsequent updates.
    Push only explicitly selected branches or product tags, never `--tags` or `--mirror`.
 
