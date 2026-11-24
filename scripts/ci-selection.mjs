@@ -6,6 +6,8 @@ import { normalizeCiAreas } from './lib/ci-selection.mjs'
 import { readSelectionSource } from './lib/ci-selection-source.mjs'
 import { requireBrowserTestOwner } from './e2e-ci-plan.mjs'
 import { inheritedBrowserChanges } from './lib/inherited-browser-changes.mjs'
+import { resolveDeliveryProof } from './lib/ci-delivery-proof.mjs'
+import { githubEvidence } from './lib/ci-delivery-api.mjs'
 import { coarseExecution } from './lib/ci-required.mjs'
 
 try {
@@ -57,6 +59,24 @@ try {
     diffComplete,
     integration: acquired.integration,
   }
+  const api = githubEvidence(process.env, policy.repository)
+  const delivery =
+    api && policy.event === 'push'
+      ? await resolveDeliveryProof(
+          process.cwd(),
+          {
+            ...acquired,
+            policy,
+            payload,
+            repositoryId: process.env.GITHUB_REPOSITORY_ID,
+          },
+          api
+        )
+      : policy.event === 'push'
+        ? { reason: 'GitHub evidence access is unavailable' }
+        : {}
+  if (delivery.credit) inputs.credit = delivery.credit
+  if (delivery.reason) console.error(`CI delivery: ${delivery.reason}; running applicable checks`)
   const execution = coarseExecution(inputs, policy.event)
   if (
     !/^\d+$/.test(process.env.GITHUB_RUN_ID ?? '') ||
@@ -75,13 +95,20 @@ try {
     ...execution,
   }
   const json = JSON.stringify(plan)
+  const credit = inputs.credit
+  const deliverySummary = credit
+    ? `Credited PR #${credit.pull}: [run ${credit.run}, attempt ${credit.attempt}](${process.env.GITHUB_SERVER_URL}/${policy.repository}/actions/runs/${credit.run}/attempts/${credit.attempt}).`
+    : (delivery.reason ?? '')
   if (process.env.GITHUB_OUTPUT) {
-    appendFileSync(process.env.GITHUB_OUTPUT, `plan=${json}\n`)
+    appendFileSync(
+      process.env.GITHUB_OUTPUT,
+      `plan=${json}\ncomparison-base=${acquired.baseExists ? acquired.source.base : ''}\n`
+    )
   }
   if (process.env.GITHUB_STEP_SUMMARY)
     appendFileSync(
       process.env.GITHUB_STEP_SUMMARY,
-      `## CI execution selection\nReason: ${execution.reason}. Selected groups: ${execution.effective.length}.\n\n\`\`\`json\n${json}\n\`\`\`\n`
+      `## CI execution selection\nReason: ${execution.reason}. Selected groups: ${execution.effective.length}.\n\n${deliverySummary}\n\n\`\`\`json\n${json}\n\`\`\`\n`
     )
   console.log(json)
 } catch (error) {

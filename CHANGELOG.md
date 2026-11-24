@@ -24,6 +24,10 @@ versions they name. For current source-update instructions, see
 
 ### Fixed
 
+- Reuse verified PR test results after delivery. Run applicable CI checks for
+  unverified pushes, and preserve the selected product workflow during security
+  setup.
+
 - Preserve applicable browser checks when products merge AMCore updates that
   change inherited tests for disabled features. Make the affected API tests
   use the product's configured languages.

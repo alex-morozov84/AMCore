@@ -176,8 +176,10 @@ bash scripts/setup-repo-security.sh --fork-updates
 
 This enables merge and squash, disables rebase, and removes required linear history from the rendered main ruleset.
 Other required checks and protections remain. Feature PRs may squash; source-update PRs must preserve merge parents.
-The script cannot enforce which method belongs to each PR. An unflagged rerun warns, then restores squash-only policy.
-Always repeat the flag when reconciling this profile. AMCore itself remains squash-only.
+The script cannot enforce which method belongs to each PR. Strict products must
+pass `--fork-updates` each time. An unflagged command stops before changing
+settings. Flexible and custom products manage their own protection. The script
+leaves their settings alone. AMCore itself remains squash-only.
 
 For a Fork's `product/v*` releases, add a separately named tag ruleset matching `refs/tags/product/v*`,
 with tag update and deletion blocked. The script's existing ruleset covers only `refs/tags/v*`.
@@ -244,6 +246,10 @@ confirm Actions enablement and Dependabot state during the first actual run.
    product test, their results, and **CI required** from the same run and attempt.
    If CI names a spec without an executor, see [test selection](ci-security.md#selection-modes).
    Share test names and outcomes. Review and redact logs before sharing them.
+   After delivery, open **CI selection** on product main. It links the successful
+   PR run when CI verifies the same base, code and settings. Otherwise it
+   explains why CI runs the applicable tests on main.
+   See [CI after delivery](ci-security.md#ci-after-delivery).
 
    Deliver with a **merge commit**, never squash or rebase, in strict, flexible and custom modes alike.
    Use `-R OWNER/PRODUCT` on CLI delivery commands too. Squashing loses source ancestry and can repeat old conflicts.

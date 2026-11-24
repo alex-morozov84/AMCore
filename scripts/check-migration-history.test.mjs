@@ -91,8 +91,23 @@ test('refuses a head checkout, a mismatched SHA and non-PR invocation', (t) => {
   assert.match(check(f.root, base).stderr, /HEAD differs/)
   assert.match(
     check(f.root, f.git('rev-parse', 'HEAD'), { GITHUB_EVENT_NAME: 'push' }).stderr,
-    /pull_request/
+    /Missing|path/
   )
+})
+
+test('push compares with the event baseline and rejects an edited shared migration', (t) => {
+  const f = fixture(t)
+  const before = f.git('rev-parse', 'HEAD')
+  f.put(migration, 'CREATE TABLE edited(id int);\n')
+  f.commit()
+  const eventPath = join(f.root, 'event.json')
+  writeFileSync(eventPath, JSON.stringify({ before }))
+  const result = check(f.root, f.git('rev-parse', 'HEAD'), {
+    GITHUB_EVENT_NAME: 'push',
+    GITHUB_EVENT_PATH: eventPath,
+  })
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /Shared migrations changed or disappeared/)
 })
 
 test('depth two works offline; depth one and missing parent objects fail closed', (t) => {
@@ -115,15 +130,15 @@ test('depth two works offline; depth one and missing parent objects fail closed'
   assert.equal(check(f.root, head).status, 1)
 })
 
-test('required Script contracts checks the default PR merge with depth two and no persisted credentials', () => {
+test('required Script contracts checks PR and push history without persisting credentials', () => {
   const workflow = parse(
     readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8')
   )
   const steps = workflow.jobs['script-contracts'].steps
   const checkout = steps.find((step) => step.name === 'Checkout')
-  assert.equal(checkout.with['fetch-depth'], 2)
+  assert.equal(checkout.with['fetch-depth'], 0)
   assert.equal(checkout.with['persist-credentials'], false)
   assert.equal(checkout.with.ref, undefined)
   const gate = steps.find((step) => step.run === 'node scripts/check-migration-history.mjs')
-  assert.equal(gate.if, "github.event_name == 'pull_request'")
+  assert.equal(gate.if, undefined)
 })

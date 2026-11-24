@@ -17,7 +17,7 @@ const source = new URL('../', import.meta.url)
 const readJson = (path) => JSON.parse(readFileSync(new URL(path, source), 'utf8'))
 const main = readJson('.github/rulesets/main.json')
 const tags = readJson('.github/rulesets/tags-release.json')
-const downstream = '- **Mode:** `downstream-product`\n'
+const downstream = '- **Mode:** `downstream-product`\n- **Workflow mode:** `strict`\n'
 
 function fixture(t, context = '- **Mode:** `upstream-starter`\n') {
   const root = mkdtempSync(join(tmpdir(), 'amcore-security-'))
@@ -49,6 +49,17 @@ if (args.includes('repos/example/product/rulesets') && !args.includes('--method'
     {id:11, name:'Protect main', source_type:'Repository'},
     {id:12, name:'Protect release tags', source_type:'Repository'}
   ]) : '[]');
+} else if (args.includes('repos/example/product') && !args.includes('--method')) {
+  console.log(JSON.stringify({ visibility: process.env.MOCK_PRIVATE ? 'private' : 'public' }));
+} else if (args.includes('repos/example/product/rulesets/11') && !args.includes('--method')) {
+  const policy = JSON.parse(fs.readFileSync('.github/rulesets/main.json'));
+  if (process.env.MOCK_CUSTOM_RULE) {
+    policy.bypass_actors = [{ actor_id: 8, actor_type: 'Team', bypass_mode: 'always' }];
+    policy.rules.find(rule => rule.type === 'required_status_checks').parameters.required_status_checks.push({ context: 'Owner check' });
+  }
+  console.log(JSON.stringify(policy));
+} else if (args.includes('repos/example/product/rulesets/12') && !args.includes('--method')) {
+  console.log(fs.readFileSync('.github/rulesets/tags-release.json', 'utf8'));
 } else console.log('{}');
 `,
     { mode: 0o755 }
@@ -83,7 +94,6 @@ function assertProfile(result, allowMerge) {
     allow_squash_merge: true,
     allow_merge_commit: allowMerge,
     allow_rebase_merge: false,
-    delete_branch_on_merge: true,
     security_and_analysis: {
       secret_scanning: { status: 'enabled' },
       secret_scanning_push_protection: { status: 'enabled' },
@@ -98,7 +108,12 @@ function assertProfile(result, allowMerge) {
       'merge',
     ]
   }
-  assert.deepEqual(payloads, [expected, tags])
+  assert.deepEqual(
+    payloads.map(({ bypass_actors: actors, ...policy }) =>
+      actors == null ? policy : { ...policy, bypass_actors: actors }
+    ),
+    [expected, tags]
+  )
   for (const call of result.calls.filter((call) => call.input && call.input !== '-')) {
     if (allowMerge && call.payload.name === main.name) assert.equal(existsSync(call.input), false)
   }
@@ -118,15 +133,55 @@ test('downstream opt-in derives merge profile without changing source rules; rer
   )
 })
 
-test('downstream default warns before any network request and restores squash-only', (t) => {
+test('unflagged strict and flexible/custom settings cause no remote calls', (t) => {
+  const strict = fixture(t, downstream).run()
+  assert.equal(strict.status, 1)
+  assert.match(strict.stderr, /must use --fork-updates/)
+  assert.deepEqual(strict.calls, [])
+  for (const mode of ['flexible', 'custom']) {
+    const result = fixture(t, downstream.replace('`strict`', `\`${mode}\``)).run(['--fork-updates'])
+    assert.equal(result.status, 0)
+    assert.match(result.stdout, /settings unchanged/)
+    assert.deepEqual(result.calls, [])
+  }
+})
+
+test('strict reconciliation preserves owner bypass actors and extra checks', (t) => {
+  const result = fixture(t, downstream).run(['--fork-updates'], {
+    MOCK_EXISTING: '1',
+    MOCK_CUSTOM_RULE: '1',
+  })
+  assert.equal(result.status, 0, result.stderr)
+  const updated = result.calls.find(
+    (call) => call.args.includes('PUT') && call.args.includes('repos/example/product/rulesets/11')
+  ).payload
+  assert.equal(updated.bypass_actors[0].actor_id, 8)
+  assert.ok(
+    updated.rules
+      .find((rule) => rule.type === 'required_status_checks')
+      .parameters.required_status_checks.some((check) => check.context === 'Owner check')
+  )
+  assert.ok(!updated.rules.some((rule) => rule.type === 'required_linear_history'))
+})
+
+test('private strict setup adds only core checks and preserves existing optional checks', (t) => {
   const f = fixture(t, downstream)
-  const result = f.run()
-  assertProfile(result, false)
-  assert.match(result.stderr, /WARNING.*restores squash-only/)
-  // The auth refusal still receives the warning; no API mutation can precede it.
-  writeFileSync(join(f.root, 'bin/gh'), '#!/bin/sh\nexit 1\n', { mode: 0o755 })
-  const refused = f.run()
-  assert.match(refused.stderr, /WARNING[\s\S]*gh auth status failed/)
+  const initial = f.run(['--fork-updates'], { MOCK_PRIVATE: '1' })
+  assert.equal(initial.status, 0, initial.stderr)
+  const patch = initial.calls.find((call) => call.args.includes('PATCH')).payload
+  assert.equal(patch.security_and_analysis, undefined)
+  const checks = (result) =>
+    result.calls
+      .find((call) => call.payload?.name === main.name)
+      .payload.rules.find((rule) => rule.type === 'required_status_checks')
+      .parameters.required_status_checks.map(({ context }) => context)
+  assert.ok(checks(initial).includes('CI required'))
+  assert.ok(!checks(initial).includes('Analyze'))
+  assert.ok(!checks(initial).includes('Dependency review'))
+  const repeated = f.run(['--fork-updates'], { MOCK_PRIVATE: '1', MOCK_EXISTING: '1' })
+  assert.equal(repeated.status, 0, repeated.stderr)
+  assert.ok(checks(repeated).includes('Analyze'))
+  assert.ok(checks(repeated).includes('Dependency review'))
 })
 
 test('bad flags and ambiguous/non-product contexts refuse before any gh call', (t) => {
@@ -156,7 +211,7 @@ test('API failure is not silently downgraded and the temporary ruleset is remove
   const f = fixture(t, downstream)
   const result = f.run(['--fork-updates'], { MOCK_FAIL: 'repos/example/product/rulesets' })
   assert.equal(result.status, 1)
-  assert.equal(result.calls.filter((call) => call.args.includes('PATCH')).length, 1)
+  assert.equal(result.calls.filter((call) => call.args.includes('PATCH')).length, 0)
   const files = spawnSync('ls', ['-A', join(f.root, 'temp')], { encoding: 'utf8' })
   assert.equal(files.stdout, '')
 })

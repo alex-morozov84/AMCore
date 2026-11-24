@@ -38,11 +38,8 @@ async function plannedCases() {
   if (!isDeepStrictEqual(collection.settings, await sourceSettings(root)))
     throw new Error('Browser collection differs from checkout settings')
   const cases = configuredBrowserCases(root, identity, collection)
-  const fixture =
-    selection.event !== 'push' && selection.proposed?.web === 'runtime'
-      ? consoleFixture(root)
-      : undefined
-  if (selection.event === 'pull_request') {
+  const fixture = selection.proposed?.web === 'runtime' ? consoleFixture(root) : undefined
+  if (selection.event === 'pull_request' || process.env.AMCORE_CONFIGURED_BASE_COLLECTION) {
     const base = JSON.parse(await readFile(process.env.AMCORE_CONFIGURED_BASE_COLLECTION, 'utf8'))
     requireConfiguredBaseCases(
       { ...identity, source: selection.source.base },

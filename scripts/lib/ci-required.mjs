@@ -1,4 +1,4 @@
-import { isIndependentWebChange, selectCiGroups } from './ci-selection.mjs'
+import { selectCiGroups } from './ci-selection.mjs'
 
 export const requiredCiJobs = Object.freeze([
   'lint',
@@ -42,26 +42,7 @@ export function requireCompleteCi(results) {
 /** Translate policy groups into the jobs that actually exist. */
 export function coarseExecution(inputs, event) {
   const proposed = selectCiGroups(inputs)
-  if (event === 'push' && inputs.mode !== 'heavy-off') {
-    const narrow = isIndependentWebChange(inputs)
-    const omitted = narrow
-      ? [
-          'test-capability',
-          'test-notification-ai',
-          'api-e2e-plan',
-          'api-e2e-shards',
-          'docker-image-smoke',
-          'observability-contract-live',
-        ]
-      : []
-    return {
-      proposed: { ...proposed, web: 'runtime' },
-      reason: narrow ? 'independent-web' : 'broad',
-      effective: requiredCiJobs.filter(
-        (job) => !omitted.includes(job) && !['test-email', 'deployment-version'].includes(job)
-      ),
-    }
-  }
+  if (inputs.credit && event === 'push') return { proposed, reason: 'verified-pr', effective: [] }
   const web = proposed.web !== 'none'
   const selected = {
     lint: true,
@@ -132,11 +113,17 @@ export function validateExecutionPlan(plan, identity) {
   if (
     !inputs ||
     Object.keys(inputs).sort().join() !==
-      ['role', 'mode', 'areas', 'diffComplete', 'integration'].sort().join() ||
+      [
+        ...['role', 'mode', 'areas', 'diffComplete', 'integration'],
+        ...(identity.credit ? ['credit'] : []),
+      ]
+        .sort()
+        .join() ||
     (inputs.diffComplete && !identity.diffComplete) ||
     inputs.integration !== identity.integration ||
     inputs.role !== identity.role ||
-    inputs.mode !== identity.mode
+    inputs.mode !== identity.mode ||
+    JSON.stringify(inputs.credit) !== JSON.stringify(identity.credit)
   )
     throw new Error('CI execution admission inputs disagree')
   const expected = coarseExecution(inputs, identity.event)

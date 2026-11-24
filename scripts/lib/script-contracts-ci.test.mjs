@@ -47,7 +47,17 @@ test('every required check of the main ruleset names a job in a tracked workflow
 test('selection preflight dominates preparation and exclusions have direct selector dependencies', () => {
   const jobs = ci.jobs
   const selector = jobs['ci-selection']
-  assert.equal(selector.permissions, undefined)
+  for (const job of [selector, jobs['ci-required']]) {
+    assert.deepEqual(job.permissions, {
+      contents: 'read',
+      actions: 'read',
+      'pull-requests': 'read',
+    })
+    const evidence = job.steps.find((step) => step.env?.CI_EVIDENCE_TOKEN)
+    assert.match(evidence.env.CI_EVIDENCE_TOKEN, /event_name == 'push'/)
+  }
+  assert.match(ci.concurrency.group, /github.run_id/)
+  assert.match(ci.concurrency['cancel-in-progress'], /event_name == 'pull_request'/)
   assert.equal(selector.steps.find((step) => step.id === 'filter').with.token, '')
   assert.equal(
     selector.steps.find((step) => step.id === 'filter').with['predicate-quantifier'],
@@ -57,7 +67,7 @@ test('selection preflight dominates preparation and exclusions have direct selec
   for (const [id, job] of Object.entries(jobs)) {
     if (id === 'ci-selection') continue
     assert.ok(reaches(id), `${id} must depend on preflight`)
-    if (!['ci-required', 'lint', 'typecheck', 'promtool'].includes(id)) {
+    if (id !== 'ci-required') {
       assert.ok(job.needs.includes('ci-selection'))
       assert.ok(job.if?.includes(`.effective, '${id}'`), id)
     }

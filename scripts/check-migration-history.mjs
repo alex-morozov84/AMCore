@@ -1,5 +1,6 @@
-// PR merge checkout: preserve every migration already present on its first parent.
+// Preserve migrations from the PR first parent or the push baseline.
 import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 
 const git = (...args) =>
   execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
@@ -18,15 +19,22 @@ function migrationEntries(ref) {
 }
 
 function checkHistory() {
-  if (process.argv.length !== 2 || process.env.GITHUB_EVENT_NAME !== 'pull_request') {
-    throw new Error('Run without arguments on a pull_request synthetic merge checkout')
+  const event = process.env.GITHUB_EVENT_NAME
+  if (process.argv.length !== 2 || !['pull_request', 'push'].includes(event)) {
+    throw new Error('Run without arguments on a pull_request or push checkout')
   }
   const head = git('rev-parse', '--verify', 'HEAD').trim()
   if (head !== process.env.GITHUB_SHA) throw new Error('HEAD differs from GITHUB_SHA')
   const parents = git('rev-list', '--parents', '-n', '1', 'HEAD').trim().split(' ').slice(1)
-  if (parents.length !== 2)
+  if (event === 'pull_request' && parents.length !== 2)
     throw new Error('Expected two merge parents; checkout with fetch-depth: 2')
-  const baseline = migrationEntries(parents[0]) // Missing parent/tree is a hard failure.
+  const base =
+    event === 'pull_request'
+      ? parents[0]
+      : JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')).before
+  if (typeof base !== 'string' || !/^[a-f0-9]{40}$/.test(base))
+    throw new Error('Missing or invalid migration comparison base')
+  const baseline = migrationEntries(base)
   const candidate = migrationEntries(head)
   const changed = [...baseline].filter(([path, blob]) => candidate.get(path) !== blob)
   if (changed.length) {

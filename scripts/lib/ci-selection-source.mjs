@@ -51,5 +51,11 @@ export function readSelectionSource(root, event, payload, sha) {
         .filter(Boolean)
         .sort()
     : []
-  return { source: { head, base, checkout }, diffComplete, integration, changedFiles }
+  return {
+    source: { head, base, checkout },
+    diffComplete,
+    integration,
+    changedFiles,
+    baseExists: Boolean(baseExists),
+  }
 }

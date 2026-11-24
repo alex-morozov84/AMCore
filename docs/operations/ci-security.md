@@ -32,8 +32,7 @@ logic. Selected API E2E still requires complete artifacts and natural exits.
 
 The ordinary PR workflow reads the role from `PROJECT_CONTEXT.md` and the
 saved mode from `ci/product.json` (version 1). Missing policy means `normal`.
-A PR uses the base mode and validates the proposed mode. Main pushes keep
-the existing broad plan and its independent Web exception. The proposed mode
+A PR uses the base mode and validates the proposed mode. The proposed mode
 takes effect on the next push after merge. An ordinary PR cannot change the
 repository role.
 
@@ -76,6 +75,37 @@ to a reviewed experimental base. Then test the settings change. A base
 that still collects a case as mandatory cannot authorize its omission.
 API E2E retention checks suite files. Review changes to assertions inside a
 suite file as ordinary test changes.
+
+### CI after delivery
+
+CI tests a PR against its base. On main, **CI selection** credits a successful
+PR only when GitHub associates the delivered commit with that PR and CI can
+verify the same base, tree, mode and applicable plan. The **CI required** job
+checks the decision. The summary links the credited run and attempt. Test
+families and their preparatory jobs stay skipped for verified delivery.
+If the repository allows rebase merges, CI runs the checks for a one-parent
+delivery because GitHub does not identify its merge method in this evidence.
+
+A direct push, missing evidence, changed base or untrusted CI change runs the
+applicable checks on main immediately. Unknown impact selects a broad plan.
+The summary shows the reason. Missing baseline data can block a required
+comparison. Resolve the unavailable comparison before treating main as verified.
+
+Standalone checks retain their own triggers. Workflow Lint independently
+checks the workflows on main. Gitleaks scans the delivered commit
+range. CodeQL can publish findings for main even when its PR workflow skipped a
+fork. Scorecard reports repository posture. There is no scheduled full test
+run by default. A release still verifies the chosen commit and the images
+produced from it. See [the fork update guide](updating-a-fork.md).
+
+Private repositories consume the owner's included or paid Actions minutes.
+Check the live plan and rules before choosing strict. With no supported branch
+protection, main CI can report a failed direct push after it lands. It cannot
+prevent that push. Keep the available independent scans. Confirm PR protection
+and the chosen merge methods in GitHub after setup. For a new private strict
+profile, the script omits CodeQL and Dependency Review from the required list
+until the owner verifies those features. It preserves existing required checks.
+Verify branch rules and scan availability in the repository settings.
 
 ### Review changes to CI itself
 
@@ -462,12 +492,10 @@ against arbitrary future workload growth. Reassess capacity when the application
   keeps this job, the root `test:scripts` script and the ruleset entry consistent. It
   does **not** cover the public/private-path ratchet — that is the separate
   "Observability contract (static)" job above.
-  On PRs it also runs `node scripts/check-migration-history.mjs` against the default
-  synthetic merge checkout (`fetch-depth: 2`, credentials not persisted). HEAD must
-  match GITHUB_SHA and have two parents with the first-parent tree available. Existing
-  migration SQL paths/blobs must remain identical; additions are allowed. A mismatch
-  fails this required job. Push runs do not perform the history comparison; the guard
-  does not prove SQL safety or detect collisions between new migrations.
+  The migration history check compares the PR checkout with its first parent.
+  On an unverified push it compares with the event's previous commit. A missing
+  baseline or a changed or deleted shared migration fails the check. Additions
+  are allowed. Verify SQL safety and collisions between new migrations separately.
 
 **The observability-contract and script-contracts job contexts ("Observability
 contract (static)", "Observability contract (live)", "Script contracts") are listed
@@ -649,12 +677,10 @@ for `main` (PR-only,
 **squash-only** upstream, or **squash + merge** with `--fork-updates`,
 required status checks, block force-push, restrict deletions) and for **release tags** (`refs/tags/v*` — block tag update and
 deletion, so published versions are immutable). It is the supported `strict`
-setup. It is **idempotent** — safe to re-run (it also removes the retired
-`Protect develop` ruleset if present). The flag requires one canonical
+setup. It is safe to re-run. Existing owner bypasses and additional checks are preserved. The flag requires one canonical
 `downstream-product` Mode field in PROJECT_CONTEXT.md. Unknown arguments and invalid
 flag/context combinations fail before any GitHub call. The main profile is rendered
-temporarily; tracked upstream rules stay unchanged. An unflagged downstream rerun
-warns before mutation and restores squash-only policy. Repeat the flag for reconciliation.
+temporarily; tracked upstream rules stay unchanged. An unflagged strict product rerun refuses before mutation. Repeat the flag for reconciliation. Flexible and custom modes leave settings unchanged.
 
 A Fork using `product/v*` release tags needs its own separately named tag ruleset,
 with the same update/deletion protection for `refs/tags/product/v*`. Setup only

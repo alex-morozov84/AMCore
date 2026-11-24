@@ -349,53 +349,25 @@ test('all scopes reject lost selected work, unexpected execution and forged admi
   }
 })
 
-test('main pushes keep the old broad plan and the old independent Web exception', () => {
+test('unverified push selects applicable checks; verified delivery repeats none', () => {
   const inputs = {
     role: 'upstream-starter',
     mode: 'normal',
-    areas: { docs: true },
+    areas: { api: true, email: true, deployment: true },
     diffComplete: true,
     integration: false,
   }
-  const broad = coarseExecution(inputs, 'push')
-  const formerCombined = 'test-unit-redis'
-  const previousBroad = [
-    'lint',
-    'typecheck',
-    'build',
-    formerCombined,
-    'test-capability',
-    'test-notification-ai',
-    'test',
-    'api-e2e-plan',
-    'api-e2e-shards',
-    'api-e2e',
-    'script-contracts',
-    'docker-image-smoke',
-    'web-e2e-plan',
-    'web-e2e-lanes',
-    'web-e2e',
-    'promtool',
-    'observability-contract-live',
-    'storybook',
-  ]
-  const normalize = (jobs) =>
-    jobs
-      .filter((job) => job !== 'test-redis')
-      .map((job) => (job === 'test-unit' && jobs.includes('test-redis') ? formerCombined : job))
-      .sort()
-  assert.deepEqual(normalize(broad.effective), [...previousBroad].sort())
-  const omitted = [
-    'test-capability',
-    'test-notification-ai',
-    'api-e2e-plan',
-    'api-e2e-shards',
-    'docker-image-smoke',
-    'observability-contract-live',
-  ]
-  assert.deepEqual(
-    normalize(coarseExecution({ ...inputs, areas: { ui: true } }, 'push').effective),
-    previousBroad.filter((job) => !omitted.includes(job)).sort()
+  const push = coarseExecution(inputs, 'push')
+  assert.deepEqual(push, coarseExecution(inputs, 'pull_request'))
+  assert.ok(push.effective.includes('test-email'))
+  assert.ok(push.effective.includes('deployment-version'))
+  assert.ok(
+    coarseExecution({ ...inputs, diffComplete: false }, 'push').effective.includes(
+      'script-contracts'
+    )
   )
-  assert.equal(coarseExecution(inputs, 'pull_request').effective.includes('api-e2e-plan'), false)
+  assert.deepEqual(
+    coarseExecution({ ...inputs, credit: { pull: 1, run: '2', attempt: '1' } }, 'push').effective,
+    []
+  )
 })
