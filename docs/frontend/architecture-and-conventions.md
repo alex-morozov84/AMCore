@@ -181,6 +181,12 @@ trigger/title/description/confirm/cancel shape, it moved to
 same reasoning applies to a shared hook in `shared/lib`/`shared/hooks` when
 the duplicated logic, not just the markup, is what repeats.
 
+Before writing a general-purpose React hook, check whether AMCore already has
+one. If it does not, look for a suitable hook in [ReactUse](https://reactuse.org/).
+Use a ready-made hook when it meets the caller's requirements and reduces the
+code we need to maintain. Check server rendering and client startup behavior
+for hooks that read browser state.
+
 This is reuse, not speculative design, and does not relax the rest of this
 guide's "don't build for a future that isn't here yet" stance: do not
 generalize a pattern that has exactly one consumer today on the theory that
