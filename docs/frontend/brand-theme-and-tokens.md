@@ -215,14 +215,10 @@ command tries to roll the tree back and its message says whether the rollback
 completed; see "Recover from a failure" below. Dry runs, cancelled prompts, and
 plans with no changes never start a transaction.
 
-`init:brand` builds desired-state facts, claims them against explicit ownership
-seams, applies narrow structural operations, and writes one composed operation plan
-in one filesystem transaction. Brand identity fields, JSON paths, TypeScript nodes,
-and the five asset destinations are claimed explicitly; missing or ambiguous
-anchors fail before mutation. There is no compatibility executor or sequential
-second mutation pass. Before it writes, the command requires a clean Git working tree and
-refuses when an `ai/` folder exists (that marks the AMCore maintainer checkout). It then
-asks you to confirm the plan (`--yes`, or the interactive prompt); `--dry-run` never writes.
+`init:brand` prepares writes to fixed brand paths and applies them in one
+filesystem transaction. If the command cannot identify a field unambiguously,
+it stops before writing. To apply the plan, use a clean Git working tree in a
+checkout without an `ai/` folder. Confirm at the prompt or pass `--yes`.
 
 For a complete product-administration setup, see the
 [adoption guide](../product-admin/adoption.md). Install changed manifests and
@@ -279,7 +275,13 @@ Run it again whenever a value must change. Pass only the flags to change, with `
 first. A plan with no changes writes nothing. Commit or stash your own work first: after it
 prints the plan and before it asks for confirmation, the command refuses to write into a tree
 with uncommitted changes (the message starts with "working tree is not clean"). Untracked files
-that Git does not ignore count as changes; ignored files do not. `--dry-run` works in any tree.
+that Git does not ignore count as changes. The command checks the tree and the
+planned destinations again before writing. If a destination changed after the
+plan appeared, run the command again and review the fresh diff.
+
+When replacing a PNG, the destination must already be a regular file. If it is
+missing, restore the starter PNG before running the command again. An installed
+PNG with matching bytes and permissions needs no write.
 
 #### Recover from a failure
 
