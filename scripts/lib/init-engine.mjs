@@ -1,6 +1,6 @@
 // Shared engine for the Track 10 init tooling (ADR-071): common flags,
 // plan+diff printing, and the apply orchestration (safety guards -> confirm
-// -> one filesystem transaction -> verify). Both CLIs hand a completely
+// -> one filesystem transaction -> verify). The CLI hands a completely
 // materialized plan to `runInitCommand` before anything is written.
 import { parseArgs } from 'node:util'
 import * as clack from '@clack/prompts'
@@ -101,6 +101,10 @@ export async function runInitCommand({
     }
   }
 
+  if (plan.assertFresh) {
+    plan.assertFresh()
+    assertCleanGitTree(cwd)
+  }
   applyFilesystem({ root: cwd, operations: plan.operationsForApply() })
   console.log(`\nApplied ${changed.length} change(s).`)
   reportVerification(verify(cwd))

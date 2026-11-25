@@ -77,6 +77,9 @@ export function createFixtureRepo() {
     `${JSON.stringify({ meta: { title: 'AMCore', description: 'Стартовый шаблон.' } }, null, 2)}\n`
   )
 
+  write(root, 'apps/web/public/logo-dark.png', fakePng(32, 32))
+  write(root, 'apps/web/public/icons/icon-192x192.png', fakePng(192, 192))
+
   git(root, ['init', '--quiet', '--initial-branch=main'])
   // Snapshot tests include .git; no detached maintenance may mutate the fixture.
   git(root, ['config', '--local', 'maintenance.auto', 'false'])
@@ -93,7 +96,10 @@ export function createFixtureRepo() {
     'fixture',
   ])
 
-  return { root, cleanup: () => rmSync(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }) }
+  return {
+    root,
+    cleanup: () => rmSync(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }),
+  }
 }
 
 export function git(root, args) {

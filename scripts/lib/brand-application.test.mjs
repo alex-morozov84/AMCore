@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, test } from 'node:test'
 
 import { prepareBrandInit } from './brand-init-plan.mjs'
-import { applyFilesystemTransaction } from './filesystem-transaction.mjs'
+import {
+  applyFilesystemTransaction,
+  filesystemTransactionJournalPath,
+} from './filesystem-transaction.mjs'
 import { filesystemSnapshot } from './filesystem-transaction-test-helpers.mjs'
 import { runInitCommand } from './init-engine.mjs'
 import { createFixtureRepo, git } from './test-fixture.mjs'
@@ -34,7 +37,10 @@ test('brand change applies to a copy of the real working tree', () => {
 
 test('fixture disables automatic Git maintenance locally', () => {
   fixture = createFixtureRepo()
-  assert.equal(git(fixture.root, ['config', '--local', '--bool', 'maintenance.auto']).trim(), 'false')
+  assert.equal(
+    git(fixture.root, ['config', '--local', '--bool', 'maintenance.auto']).trim(),
+    'false'
+  )
   assert.equal(git(fixture.root, ['config', '--local', '--int', 'gc.auto']).trim(), '0')
 })
 
@@ -80,3 +86,41 @@ test('injected brand apply failure restores the complete filesystem snapshot', (
   )
   assert.deepEqual(filesystemSnapshot(fixture.root), before)
 })
+
+for (const commit of [false, true]) {
+  test(`confirmation refuses a ${commit ? 'committed' : 'uncommitted'} change to the reviewed file`, async () => {
+    fixture = createFixtureRepo()
+    const target = path.join(fixture.root, 'PROJECT_CONTEXT.md')
+    const { operationPlan } = prepareBrandInit(fixture.root, { productName: 'Acme' })
+    const updated = readFileSync(target, 'utf8').replace('Product:** AMCore', 'Product:** Other')
+
+    await assert.rejects(
+      runInitCommand({
+        cwd: fixture.root,
+        flags: {},
+        operationPlan,
+        requestConfirmation: () => {
+          writeFileSync(target, updated)
+          if (commit) {
+            git(fixture.root, ['add', 'PROJECT_CONTEXT.md'])
+            git(fixture.root, [
+              '-c',
+              'user.name=test',
+              '-c',
+              'user.email=test@example.com',
+              'commit',
+              '-m',
+              'edit identity',
+            ])
+          }
+          return true
+        },
+        verify: () => assert.fail('verification must not run'),
+      }),
+      /Brand destination changed.*fresh plan/
+    )
+
+    assert.equal(readFileSync(target, 'utf8'), updated)
+    assert.equal(existsSync(filesystemTransactionJournalPath(fixture.root)), false)
+  })
+}

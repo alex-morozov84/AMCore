@@ -15,7 +15,6 @@ export const OWNERSHIP_CODES = Object.freeze({
   OUTSIDE_ROOT: 'whole-feature-file-outside-root',
   MISSING_SEAM: 'missing-declared-seam',
   DYNAMIC_REFERENCE: 'unresolved-dynamic-reference',
-  RESIDUAL: 'projection-residual',
 })
 
 export function ownershipError(code, detail, paths = []) {
