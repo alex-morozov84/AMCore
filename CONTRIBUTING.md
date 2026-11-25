@@ -253,7 +253,8 @@ Use the [backend conventions](docs/backend/architecture-and-conventions.md),
 For product-admin placement changes, validate the physical routes and generated
 edge mapping as described in [placement and sessions](docs/product-admin/placement-and-sessions.md).
 
-CI runs the same checks on push; fixing any failures before opening a PR saves time.
+CI selects checks for the pull request. After delivery, CI can credit a
+matching successful PR. See [CI after delivery](docs/operations/ci-security.md#ci-after-delivery).
 
 ## Changelog & releases
 
