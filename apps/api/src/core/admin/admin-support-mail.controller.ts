@@ -12,7 +12,7 @@ import {
   SystemRole,
 } from '@amcore/shared'
 
-import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { PRIVATE_NO_STORE_HEADERS, SchemaResponse } from '../../common/schemas/schema-response.js'
 import { RATE_LIMIT_POLICIES, RateLimit } from '../../infrastructure/throttling/index.js'
 import { Auth } from '../auth/decorators/auth.decorator.js'
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
@@ -39,23 +39,9 @@ import { SupportMailDispatch } from './support-mail/support-mail-dispatch.servic
 @ApiResponse({ status: 401, description: 'Personal bearer JWT required; API keys rejected' })
 @ApiResponse({
   status: 403,
-  description: 'Current SUPER_ADMIN/live session required; new sends can require STEP_UP_REQUIRED',
+  description: 'Current SUPER_ADMIN role and live session required',
 })
 @ApiResponse({ status: 404, description: 'User or actor-bound attempt not found' })
-@ApiResponse({
-  status: 409,
-  description: 'Target ineligible or recipient/policy changed; reconfirm',
-})
-@ApiResponse({ status: 410, description: 'Preparation or receipt expired' })
-@ApiResponse({
-  status: 429,
-  description: 'Recipient/actor/cooldown/preparation limit; no automatic send retry',
-})
-@ApiResponse({
-  status: 503,
-  description:
-    'Storage, transport or bounded capacity unavailable; a lost response never proves no effect',
-})
 export class AdminSupportMailController {
   constructor(
     private readonly service: SupportMailService,
@@ -64,13 +50,15 @@ export class AdminSupportMailController {
 
   @Get()
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiOperation({
     summary: 'Read support-mail eligibility and the operator’s latest results; never sends',
   })
   @SchemaResponse({
     type: SupportMailStatusDto,
     status: 200,
-    description: 'Eligibility, freshness and own latest attempts',
+    description:
+      'Eligibility, freshness and own latest attempts. An unavailable quota observation disables the action in this response.',
   })
   status(
     @CurrentUser() actor: RequestPrincipal,
@@ -80,7 +68,17 @@ export class AdminSupportMailController {
   }
 
   @Post('prepare')
+  @ApiResponse({ status: 409, description: 'SUPPORT_MAIL_NOT_ELIGIBLE: the target is ineligible.' })
+  @ApiResponse({
+    status: 429,
+    description: 'SUPPORT_MAIL_LIMIT: too many outstanding preparations.',
+  })
+  @ApiResponse({
+    status: 503,
+    description: 'Transport or preparation capacity unavailable before issuance.',
+  })
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 201, headers: PRIVATE_NO_STORE_HEADERS })
   @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
   @ApiOperation({ summary: 'Prepare a bound support-mail confirmation; no token issuance or send' })
   @SchemaResponse({
@@ -97,8 +95,28 @@ export class AdminSupportMailController {
   }
 
   @Post(':attemptId/send')
+  @ApiResponse({
+    status: 403,
+    description:
+      'Current SUPER_ADMIN and live session required. A new send requires recent authentication (STEP_UP_REQUIRED).',
+  })
+  @ApiResponse({
+    status: 409,
+    description:
+      'SUPPORT_MAIL_BINDING_CHANGED or SUPPORT_MAIL_NOT_ELIGIBLE: reconfirm the recipient.',
+  })
+  @ApiResponse({ status: 410, description: 'SUPPORT_MAIL_ATTEMPT_EXPIRED: the attempt expired.' })
+  @ApiResponse({
+    status: 429,
+    description: 'The recipient, actor, or cooldown limit refused a new send.',
+  })
+  @ApiResponse({
+    status: 503,
+    description: 'Transport or bounded capacity unavailable before claim.',
+  })
   @HttpCode(200)
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
   @ApiParam({ name: 'attemptId', description: 'Server-issued UUID from preparation' })
   @ApiOperation({
@@ -120,7 +138,12 @@ export class AdminSupportMailController {
   }
 
   @Get(':attemptId')
+  @ApiResponse({
+    status: 410,
+    description: 'SUPPORT_MAIL_ATTEMPT_EXPIRED: the receipt is past its read window.',
+  })
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiParam({ name: 'attemptId', description: 'Server-issued UUID from preparation' })
   @ApiOperation({
     summary: 'Read the current operator’s saved support-mail result; no send or quota',
@@ -128,7 +151,8 @@ export class AdminSupportMailController {
   @SchemaResponse({
     type: SupportMailReceiptDto,
     status: 200,
-    description: 'Bound receipt, readable for 24 hours after claim',
+    description:
+      'Bound receipt, readable for 24 hours after claim. A prepared attempt has unconfirmed evidence and no issued token.',
   })
   receipt(
     @CurrentUser() actor: RequestPrincipal,

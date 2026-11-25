@@ -51,9 +51,6 @@ class AcknowledgedDto extends createSchemaDto(publicationAcknowledgedSchema) {}
 @ApiBadRequestResponse({ description: 'Invalid strict command or unexpected query' })
 @ApiForbiddenResponse({ description: 'Mixed credentials or invalid private browser transport' })
 @ApiUnauthorizedResponse({ description: 'Invalid continuation or signed pending proof' })
-@ApiConflictResponse({
-  description: 'Exact publication changed or expired; never adopt another family',
-})
 @ApiTooManyRequestsResponse({ description: 'Restricted publication validator budget exceeded' })
 @ApiServiceUnavailableResponse({
   description: 'Publication cannot be confirmed; retain pending state',
@@ -70,6 +67,9 @@ export class MfaPublicationController {
   ) {}
 
   @Post('acknowledge')
+  @ApiConflictResponse({
+    description: 'Exact publication changed or expired; never adopt another family',
+  })
   @RequestContextPolicy({ kind: 'personal' })
   @ApiOperation({
     summary:
@@ -88,7 +88,11 @@ export class MfaPublicationController {
   @ApiOperation({
     summary: 'Read only this issuance status after a lost response; never return credentials',
   })
-  @SchemaResponse({ type: PublicationStatusDto, status: 200 })
+  @SchemaResponse({
+    type: PublicationStatusDto,
+    status: 200,
+    description: 'Publication state, including changed; no credentials',
+  })
   status(
     @Body({ schema: OperationInput.schema }) body: OperationInput,
     @Req() req: Request
@@ -105,7 +109,11 @@ export class MfaPublicationController {
     summary:
       'Retire only this still-current unpublished candidate; never revoke a newer or published family',
   })
-  @SchemaResponse({ type: PublicationStatusDto, status: 200 })
+  @SchemaResponse({
+    type: PublicationStatusDto,
+    status: 200,
+    description: 'Publication state, including changed; no credentials',
+  })
   retire(
     @Body({ schema: OperationInput.schema }) body: OperationInput,
     @Req() req: Request

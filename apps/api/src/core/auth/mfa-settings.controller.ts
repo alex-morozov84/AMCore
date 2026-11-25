@@ -4,6 +4,7 @@ import {
   ApiBearerAuth,
   ApiForbiddenResponse,
   ApiOperation,
+  ApiResponse,
   ApiServiceUnavailableResponse,
   ApiTags,
   ApiUnauthorizedResponse,
@@ -47,6 +48,7 @@ export class MfaSettingsController {
   @ApiUnauthorizedResponse({ description: 'Current session authority is invalid' })
   @ApiForbiddenResponse({ description: 'Mixed credentials' })
   @ApiServiceUnavailableResponse({ description: 'Authority storage unavailable' })
+  @ApiResponse({ status: 404, description: 'The user no longer exists after authentication.' })
   async read(
     @CurrentUser() principal: RequestPrincipal,
     @Req() req: Request

@@ -8,7 +8,7 @@ import {
   SystemRole,
 } from '@amcore/shared'
 
-import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { PRIVATE_NO_STORE_HEADERS, SchemaResponse } from '../../common/schemas/schema-response.js'
 import { RATE_LIMIT_POLICIES, RateLimit } from '../../infrastructure/throttling/index.js'
 import { Auth } from '../auth/decorators/auth.decorator.js'
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
@@ -39,6 +39,7 @@ export class AdminStorageSettingController {
 
   @Get()
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiOperation({
     summary: 'Read saved interval and responding API applied state; not fleet confirmation',
   })
@@ -53,6 +54,7 @@ export class AdminStorageSettingController {
 
   @Patch()
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @RequireFreshAuth()
   @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
   @ApiOperation({ summary: 'Save interval; null resets to each process deployment baseline' })

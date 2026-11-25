@@ -1,11 +1,15 @@
+import { isDeepStrictEqual } from 'node:util'
+
 import type { OpenAPIObject } from '@nestjs/swagger'
+
+import { addCommonError, httpExceptionSchema } from './common-error-openapi.js'
 
 const METHODS = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head'] as const
 const UNAVAILABLE_CODE = 'SERVICE_UNAVAILABLE'
 
 type Operation = NonNullable<OpenAPIObject['paths'][string]['get']>
 type ResponseObject = NonNullable<NonNullable<Operation['responses']>[string]>
-type Described = { description: string; content?: Record<string, { schema?: unknown }> }
+type Described = Exclude<ResponseObject, { $ref: string }>
 
 /** OAuth steps that use Redis for their one-time state or ticket. The provider list does not. */
 function isOAuthRedisStep(path: string): boolean {
@@ -41,7 +45,11 @@ export function addAuthUnavailableResponses(document: OpenAPIObject): void {
       const operation = item?.[method]
       if (!operation) continue
       const oauth = isOAuthRedisStep(path)
-      const protectedOperation = (operation.security?.length ?? 0) > 0
+      const protectedOperation = operation.security?.some(
+        (requirement) => 'bearer' in requirement || 'apiKeyBearer' in requirement
+      )
+      if (protectedOperation && !operation.responses['401'])
+        addCommonError(document, operation, '401', 'A valid bearer credential is required.')
       if (!oauth && !protectedOperation) continue
       const additions = [
         ...(protectedOperation ? [{ marker: ADMISSION_503_MARKER, text: ADMISSION_503 }] : []),
@@ -57,51 +65,56 @@ function mergeUnavailable(
   existing: ResponseObject | undefined,
   additions: { marker: string; text: string }[]
 ): ResponseObject {
-  const base = existing ? inline(document, existing) : unavailableResponse('')
-  const added = additions.filter(({ marker }) => !base.description.includes(marker))
-  const description = [base.description, ...added.map(({ text }) => text)].filter(Boolean).join(' ')
-  allowUnavailableCode(base)
-  return { ...base, description } as ResponseObject
-}
+  const base = existing ? resolveResponse(document, existing) : undefined
+  if (existing && !base) return existing
+  const added = additions.filter(({ marker }) => !base?.description.includes(marker))
+  if (base && !added.length) return base
+  const description = [base?.description, ...added.map(({ text }) => text)]
+    .filter(Boolean)
+    .join(' ')
+  const json = base?.content?.['application/json']
+  const schema = json?.schema
+  const common = unavailableJson.schema
+  const sharedError =
+    schema && '$ref' in schema && schema.$ref === '#/components/schemas/HttpExceptionResponse'
+  const merged = !schema
+    ? base
+      ? httpExceptionSchema
+      : common
+    : sharedError ||
+        isDeepStrictEqual(schema, common) ||
+        isDeepStrictEqual(schema, httpExceptionSchema)
+      ? schema
+      : { anyOf: [schema, common] }
 
-/** A `$ref` response becomes an inline copy; an unresolvable one is replaced by the plain case. */
-function inline(document: OpenAPIObject, response: ResponseObject): Described {
-  if (!('$ref' in response)) return structuredClone(response) as Described
-  const name = response.$ref.split('/').at(-1)
-  const target = name ? document.components?.responses?.[name] : undefined
-  return target && !('$ref' in target)
-    ? (structuredClone(target) as Described)
-    : unavailableResponse('')
-}
-
-/** Where an operation restricts `errorCode` to an enum, its own codes stay and ours is added. */
-function allowUnavailableCode(response: Described): void {
-  for (const media of Object.values(response.content ?? {})) {
-    const schema = media.schema as { properties?: { errorCode?: { enum?: string[] } } } | undefined
-    const codes = schema?.properties?.errorCode?.enum
-    if (Array.isArray(codes) && !codes.includes(UNAVAILABLE_CODE)) codes.push(UNAVAILABLE_CODE)
-  }
-}
-
-function unavailableResponse(description: string): Described {
   return {
+    ...base,
     description,
-    content: {
-      'application/json': {
-        schema: {
-          type: 'object',
-          required: ['statusCode', 'message', 'timestamp', 'path', 'method', 'errorCode'],
-          properties: {
-            statusCode: { type: 'integer', enum: [503] },
-            message: { type: 'string' },
-            timestamp: { type: 'string', format: 'date-time' },
-            path: { type: 'string' },
-            method: { type: 'string' },
-            correlationId: { type: 'string' },
-            errorCode: { type: 'string', enum: [UNAVAILABLE_CODE] },
-          },
-        },
-      },
-    },
+    content: { ...base?.content, 'application/json': { ...json, schema: merged } },
   }
+}
+
+function resolveResponse(document: OpenAPIObject, response: ResponseObject): Described | undefined {
+  if (!('$ref' in response)) return response
+  const prefix = '#/components/responses/'
+  if (!response.$ref.startsWith(prefix)) return undefined
+  const name = response.$ref.slice(prefix.length).replaceAll('~1', '/').replaceAll('~0', '~')
+  const target = document.components?.responses?.[name]
+  return target && !('$ref' in target) ? structuredClone(target) : undefined
+}
+
+const unavailableJson = {
+  schema: {
+    type: 'object' as const,
+    required: ['statusCode', 'message', 'timestamp', 'path', 'method', 'errorCode'],
+    properties: {
+      statusCode: { type: 'integer', enum: [503] },
+      message: { type: 'string' },
+      timestamp: { type: 'string', format: 'date-time' },
+      path: { type: 'string' },
+      method: { type: 'string' },
+      correlationId: { type: 'string' },
+      errorCode: { type: 'string', enum: [UNAVAILABLE_CODE] },
+    },
+  },
 }

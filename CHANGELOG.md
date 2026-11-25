@@ -27,6 +27,9 @@ versions they name. For current source-update instructions, see
 
 ### Fixed
 
+- Correct the API reference for authentication, request parameters, response schemas,
+  and errors. Keep the HTTP contract unchanged.
+
 - Reuse verified PR test results after delivery. Run applicable CI checks for
   unverified pushes, and preserve the selected product workflow during security
   setup.

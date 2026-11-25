@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common'
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
+import { ApiExtension, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import {
   HealthCheck,
   HealthCheckResult,
@@ -9,6 +9,8 @@ import {
 
 import { AuthType } from '@amcore/shared'
 
+import { httpExceptionSchema } from '../bootstrap/common-error-openapi.js'
+import { OPENAPI_RATE_LIMIT } from '../bootstrap/rate-limit-openapi.js'
 import { Auth } from '../core/auth/decorators/auth.decorator.js'
 import { EnvService } from '../env/env.service.js'
 import { SkipRateLimit } from '../infrastructure/throttling/index.js'
@@ -21,6 +23,7 @@ import { ReadinessCheckService } from './readiness-check.service.js'
 @Controller('health')
 @Auth(AuthType.None)
 @SkipRateLimit()
+@ApiExtension(OPENAPI_RATE_LIMIT, false)
 export class HealthController {
   constructor(
     private readonly readiness: ReadinessCheckService,
@@ -32,11 +35,15 @@ export class HealthController {
   ) {}
 
   @Get()
-  @HealthCheck()
   @ApiResponse({ status: 500, description: 'Unexpected health provider failure' })
   @ApiOperation({ summary: 'General health summary (alias of readiness)' })
   @ApiResponse({ status: 200, description: 'Service is healthy and ready to accept traffic' })
-  @ApiResponse({ status: 503, description: 'Service is not ready to accept traffic' })
+  @ApiResponse({
+    status: 503,
+    description: 'Service is not ready to accept traffic',
+    schema: httpExceptionSchema,
+  })
+  @HealthCheck()
   check(): Promise<HealthCheckResult> {
     return this.readiness.check()
   }
@@ -61,11 +68,15 @@ export class HealthController {
    * ```
    */
   @Get('startup')
-  @HealthCheck()
   @ApiResponse({ status: 500, description: 'Unexpected health provider failure' })
   @ApiOperation({ summary: 'Startup probe (Kubernetes startupProbe)' })
   @ApiResponse({ status: 200, description: 'Application started successfully' })
-  @ApiResponse({ status: 503, description: 'Application not ready yet' })
+  @ApiResponse({
+    status: 503,
+    description: 'Application not ready yet',
+    schema: httpExceptionSchema,
+  })
+  @HealthCheck()
   startup(): Promise<HealthCheckResult> {
     // Critical dependencies that must be available before app starts
     return this.health.check([
@@ -100,11 +111,11 @@ export class HealthController {
    * ```
    */
   @Get('ready')
-  @HealthCheck()
   @ApiResponse({ status: 500, description: 'Unexpected health provider failure' })
   @ApiOperation({ summary: 'Readiness probe (Kubernetes readinessProbe)' })
   @ApiResponse({ status: 200, description: 'Service is ready to accept traffic' })
-  @ApiResponse({ status: 503, description: 'Service is not ready' })
+  @ApiResponse({ status: 503, description: 'Service is not ready', schema: httpExceptionSchema })
+  @HealthCheck()
   ready(): Promise<HealthCheckResult> {
     return this.readiness.check()
   }
@@ -130,11 +141,15 @@ export class HealthController {
    * ```
    */
   @Get('live')
-  @HealthCheck()
   @ApiResponse({ status: 500, description: 'Unexpected health provider failure' })
   @ApiOperation({ summary: 'Liveness probe (Kubernetes livenessProbe)' })
   @ApiResponse({ status: 200, description: 'Service is alive' })
-  @ApiResponse({ status: 503, description: 'Service should be restarted' })
+  @ApiResponse({
+    status: 503,
+    description: 'Service should be restarted',
+    schema: httpExceptionSchema,
+  })
+  @HealthCheck()
   live(): Promise<HealthCheckResult> {
     // Simple check: process is running
     // No external dependencies - keep it FAST!

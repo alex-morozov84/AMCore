@@ -3,7 +3,11 @@ import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@ne
 
 import { AuthType, type RequestPrincipal, SystemRole } from '@amcore/shared'
 
-import { SchemaResponse } from '../../../common/schemas/schema-response.js'
+import { ApiQuerySchema } from '../../../common/schemas/api-query-schema.js'
+import {
+  PRIVATE_NO_STORE_HEADERS,
+  SchemaResponse,
+} from '../../../common/schemas/schema-response.js'
 import { EnvService } from '../../../env/env.service.js'
 import { RATE_LIMIT_POLICIES, RateLimit } from '../../../infrastructure/throttling/index.js'
 import { Auth } from '../../auth/decorators/auth.decorator.js'
@@ -30,25 +34,6 @@ import { AdministrationService } from './administration.service.js'
   status: 403,
   description: 'Current personal SUPER_ADMIN required; writes require fresh authentication',
 })
-@ApiResponse({ status: 404, description: 'Organization, intent or selected member unavailable' })
-@ApiResponse({
-  status: 409,
-  description:
-    'Stale identity/revision/ACL, managed invite, terminal intent or operation conflict; inspect before retry',
-})
-@ApiResponse({
-  status: 429,
-  description: 'Shared invitation quota or privileged HTTP rate limit; Retry-After supplied',
-})
-@ApiResponse({
-  status: 500,
-  description: 'Canonical ADMIN template not initialized; no automatic permission repair',
-})
-@ApiResponse({
-  status: 503,
-  description:
-    'Mail not configured, admission unavailable, busy or commit unconfirmed; preserve operation identity',
-})
 export class AdministrationController {
   constructor(
     private readonly service: AdministrationService,
@@ -58,7 +43,13 @@ export class AdministrationController {
     return { principal, freshWindowSeconds: this.env.get('STEP_UP_MAX_AGE_SECONDS') }
   }
   @Get('attention')
+  @ApiResponse({
+    status: 500,
+    description: 'SYSTEM_NOT_INITIALIZED: the canonical ADMIN role is unavailable.',
+  })
+  @ApiQuerySchema(Dto.AdministratorAttentionQueryDto.schema)
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiOperation({
     summary: 'List all organizations without an ADMIN or with unfinished managed ADMIN invitations',
     description:
@@ -73,7 +64,17 @@ export class AdministrationController {
     return this.service.attention(query, this.operator(principal))
   }
   @Get(':orgId/administration')
+  @ApiResponse({
+    status: 404,
+    description: 'PROVISIONING_ORGANIZATION_UNAVAILABLE: the organization no longer exists.',
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'SYSTEM_NOT_INITIALIZED: the canonical ADMIN role is unavailable.',
+  })
+  @ApiQuerySchema(Dto.AdministratorSummaryQueryDto.schema)
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiOperation({
     summary: 'Inspect current canonical ADMINs and unfinished administrator invitations',
     description:
@@ -90,7 +91,13 @@ export class AdministrationController {
     return this.service.summary(id, query, this.operator(principal))
   }
   @Get(':orgId/administrator-invitations/:invitationId')
+  @ApiResponse({
+    status: 404,
+    description:
+      'ADMIN_INVITATION_NOT_FOUND: the invitation is absent or belongs to another organization.',
+  })
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiOperation({ summary: 'Inspect a managed additional ADMIN invitation without sending email' })
   @ApiParam({ name: 'orgId', description: 'Organization ID' })
   @ApiParam({
@@ -106,7 +113,12 @@ export class AdministrationController {
     return this.service.progress(orgId, parseInvitationOperationId(id), this.operator(principal))
   }
   @Get(':orgId/administrator-operations/:operationId')
+  @ApiResponse({
+    status: 409,
+    description: 'ADMIN_OPERATION_OWNED_BY_OTHER. An absent retained result is reported in 200.',
+  })
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiOperation({
     summary: 'Recover this operator’s committed administrator command',
     description:
@@ -123,7 +135,22 @@ export class AdministrationController {
     return this.service.lookup(orgId, parseInvitationOperationId(id), this.operator(principal))
   }
   @Post(':orgId/administrator-invitations')
+  @ApiResponse({
+    status: 409,
+    description:
+      'The invitation or operation conflicts. ADMIN_MEMBER_ASSIGNMENT_REQUIRED directs an existing member to explicit assignment.',
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'SYSTEM_NOT_INITIALIZED: the canonical ADMIN role is unavailable.',
+  })
+  @ApiResponse({
+    status: 503,
+    description:
+      'The command is busy, its commit is unconfirmed, or required mail is unavailable. Preserve the operation identity.',
+  })
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 201, headers: PRIVATE_NO_STORE_HEADERS })
   @RequireFreshAuth()
   @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
   @ApiOperation({
@@ -142,8 +169,28 @@ export class AdministrationController {
     return this.service.command(orgId, { kind: 'create', input }, this.operator(principal))
   }
   @Post(':orgId/administrator-invitations/:invitationId/reissue')
+  @ApiResponse({
+    status: 404,
+    description:
+      'ADMIN_INVITATION_NOT_FOUND: the invitation is absent or belongs to another organization.',
+  })
+  @ApiResponse({
+    status: 409,
+    description:
+      'The invitation or operation conflicts. ADMIN_MEMBER_ASSIGNMENT_REQUIRED directs an existing member to explicit assignment.',
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'SYSTEM_NOT_INITIALIZED: the canonical ADMIN role is unavailable.',
+  })
+  @ApiResponse({
+    status: 503,
+    description:
+      'The command is busy, its commit is unconfirmed, or required mail is unavailable. Preserve the operation identity.',
+  })
   @HttpCode(200)
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @RequireFreshAuth()
   @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
   @ApiOperation({
@@ -168,8 +215,28 @@ export class AdministrationController {
     )
   }
   @Post(':orgId/administrator-invitations/:invitationId/replace-recipient')
+  @ApiResponse({
+    status: 404,
+    description:
+      'ADMIN_INVITATION_NOT_FOUND: the invitation is absent or belongs to another organization.',
+  })
+  @ApiResponse({
+    status: 409,
+    description:
+      'The invitation or operation conflicts. ADMIN_MEMBER_ASSIGNMENT_REQUIRED directs an existing member to explicit assignment.',
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'SYSTEM_NOT_INITIALIZED: the canonical ADMIN role is unavailable.',
+  })
+  @ApiResponse({
+    status: 503,
+    description:
+      'The command is busy, its commit is unconfirmed, or required mail is unavailable. Preserve the operation identity.',
+  })
   @HttpCode(200)
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @RequireFreshAuth()
   @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
   @ApiOperation({
@@ -194,8 +261,27 @@ export class AdministrationController {
     )
   }
   @Post(':orgId/administrator-invitations/:invitationId/cancel')
+  @ApiResponse({
+    status: 404,
+    description:
+      'ADMIN_INVITATION_NOT_FOUND: the invitation is absent or belongs to another organization.',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'The invitation state, generation, or operation intent changed.',
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'SYSTEM_NOT_INITIALIZED: the canonical ADMIN role is unavailable.',
+  })
+  @ApiResponse({
+    status: 503,
+    description:
+      'The command is busy or its commit is unconfirmed. Preserve the operation identity.',
+  })
   @HttpCode(200)
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @RequireFreshAuth()
   @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
   @ApiOperation({
@@ -220,8 +306,22 @@ export class AdministrationController {
     )
   }
   @Post(':orgId/administrators')
+  @ApiResponse({
+    status: 409,
+    description: 'The target account, member identity, ACL revision, or operation intent changed.',
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'SYSTEM_NOT_INITIALIZED: the canonical ADMIN role is unavailable.',
+  })
+  @ApiResponse({
+    status: 503,
+    description:
+      'The command is busy or its commit is unconfirmed. Preserve the operation identity.',
+  })
   @HttpCode(200)
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @RequireFreshAuth()
   @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
   @ApiOperation({

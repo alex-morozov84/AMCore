@@ -18,6 +18,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiProduces,
+  ApiResponse,
   ApiTags,
 } from '@nestjs/swagger'
 import type { Response } from 'express'
@@ -35,7 +36,7 @@ import { Auth } from '../../auth/decorators/auth.decorator.js'
 import { CurrentUser } from '../../auth/decorators/current-user.decorator.js'
 import { AiArtifactResponseDto } from '../dto/ai.dto.js'
 
-import { AI_ARTIFACT_UPLOAD_HARD_LIMIT_BYTES } from './ai-artifact.constants.js'
+import { AI_ARTIFACT_ALLOWED_MIME_TYPES, AI_ARTIFACT_UPLOAD_HARD_LIMIT_BYTES } from './ai-artifact.constants.js'
 import { AiArtifactDownloadService } from './ai-artifact-download.service.js'
 import {
   AiArtifactUploadService,
@@ -73,6 +74,10 @@ export class AiArtifactsController {
       required: ['file'],
     },
   })
+  @ApiResponse({ status: 400, description: 'Missing file, unsupported type, or invalid file.' })
+  @ApiResponse({ status: 404, description: 'The conversation does not exist or is not owned by the caller.' })
+  @ApiResponse({ status: 409, description: 'The conversation state does not allow an upload.' })
+  @ApiResponse({ status: 413, description: 'The upload exceeds the transport or file-type size limit.' })
   @SchemaResponse({ type: AiArtifactResponseDto, status: 201, description: 'Artifact stored' })
   uploadArtifact(
     @CurrentUser('sub') userId: string,
@@ -85,16 +90,26 @@ export class AiArtifactsController {
   @Get(':id/artifacts/:artifactId')
   // No `@SchemaResponse`: the body is a binary stream (StreamableFile), not a JSON DTO — so the global
   // SchemaResponseInterceptor passes it through (matches the metrics-scrape passthrough precedent).
-  @ApiProduces('application/octet-stream')
+  @ApiProduces(...AI_ARTIFACT_ALLOWED_MIME_TYPES, 'application/octet-stream')
   @ApiHeader({
     name: AI_OPERATOR_REASON_HEADER,
     required: false,
     description: 'Reason / ticket ref — required for a cross-user SUPER_ADMIN operator download.',
   })
   @ApiOperation({ summary: 'Download an artifact (owner or SUPER_ADMIN operator)' })
+  @ApiResponse({ status: 400, description: 'Missing or invalid operator reason for cross-user access.' })
+  @ApiResponse({ status: 404, description: 'The conversation, artifact, or its bytes are unavailable to the caller.' })
+  @ApiResponse({ status: 500, description: 'Storage or the mandatory access audit failed before download.' })
   @ApiOkResponse({
     description: 'The artifact bytes, served as an attachment (never a URL).',
     schema: { type: 'string', format: 'binary' },
+    headers: {
+      'Content-Disposition': { schema: { type: 'string' } },
+      'Content-Length': { schema: { type: 'integer', minimum: 0 } },
+      'X-Content-Type-Options': { schema: { type: 'string', enum: ['nosniff'] } },
+      ETag: { description: 'Present when available from storage.', schema: { type: 'string' } },
+      'Last-Modified': { description: 'HTTP date when available from storage.', schema: { type: 'string' } },
+    },
   })
   downloadArtifact(
     @CurrentUser() principal: RequestPrincipal,

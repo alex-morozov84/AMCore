@@ -56,8 +56,33 @@ export class NotificationStreamController {
       'expiry (bounded by a hard server cap); the client refreshes and reconnects.',
   })
   @ApiResponse({
+    status: 401,
+    description: 'The bearer credential is invalid, has no usable expiry, or has expired.',
+    content: {
+      'application/json': { schema: { $ref: '#/components/schemas/HttpExceptionResponse' } },
+    },
+  })
+  @ApiResponse({
+    status: 429,
+    description:
+      'The account has too many concurrent streams (NOTIFICATIONS_REALTIME_MAX_PER_USER). This refusal does not supply Retry-After.',
+  })
+  @ApiResponse({
+    status: 503,
+    description:
+      'Server stream capacity has been reached before opening the stream (SERVICE_UNAVAILABLE).',
+    content: {
+      'application/json': { schema: { $ref: '#/components/schemas/HttpExceptionResponse' } },
+    },
+  })
+  @ApiResponse({
     status: 200,
     description: 'A text/event-stream of disposable notification hints.',
+    headers: {
+      'Cache-Control': { schema: { type: 'string', enum: [SSE_HEADERS['Cache-Control']] } },
+      Connection: { schema: { type: 'string', enum: [SSE_HEADERS.Connection] } },
+      'X-Accel-Buffering': { schema: { type: 'string', enum: [SSE_HEADERS['X-Accel-Buffering']] } },
+    },
     content: { 'text/event-stream': { schema: { type: 'string' } } },
   })
   stream(

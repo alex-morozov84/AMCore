@@ -34,7 +34,7 @@ import {
 } from './organization-context/request-context-policy.js'
 
 class LogoutInput extends createSchemaDto(browserLogoutReceiptInputSchema) {}
-class LookupInput extends createSchemaDto(browserLogoutReceiptLookupSchema) {}
+class BrowserLogoutReceiptLookupInput extends createSchemaDto(browserLogoutReceiptLookupSchema) {}
 class ClaimInput extends createSchemaDto(browserReturnProofSchema) {}
 const Outcome = createSchemaDto(browserLogoutReceiptResultSchema, 'BrowserLogoutReceiptResult')
 function binding(
@@ -88,7 +88,7 @@ export class BrowserLogoutReceiptController {
   })
   @SchemaResponse({ type: Outcome, status: 200 })
   status(
-    @Body({ schema: LookupInput.schema }) body: LookupInput,
+    @Body({ schema: BrowserLogoutReceiptLookupInput.schema }) body: BrowserLogoutReceiptLookupInput,
     @Req() req: Request
   ): ReturnType<BrowserLogoutReceiptService['resolve']> {
     return this.receipts.resolve(binding(req), body)

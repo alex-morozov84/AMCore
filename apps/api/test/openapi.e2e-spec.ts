@@ -3,6 +3,8 @@ import { type OpenAPIObject } from '@nestjs/swagger'
 
 import { ADMIN_ORGANIZATION_SORT_FIELDS, ADMIN_USER_SORT_FIELDS } from '@amcore/shared'
 
+import { addAuthUnavailableResponses } from '../src/bootstrap/auth-unavailable-openapi'
+import { addRateLimitResponses } from '../src/bootstrap/rate-limit-openapi'
 import { ADR_034_APIKEY_ALLOWLIST } from '../src/core/auth/decorators/adr-034-api-key-allowlist'
 import { addQueueBoardOperation, buildApiDocument } from '../src/swagger.config'
 
@@ -468,15 +470,16 @@ describe('OpenAPI success surface (e2e)', () => {
       for (const status of ['400', '413', '415']) expect(operation.responses[status]).toBeDefined()
   })
 
-  it('documents the X-Correlation-Id response header on every response', () => {
+  it('documents correlation headers and preserves early board exceptions', () => {
     expect(document.components?.headers?.CorrelationId).toBeDefined()
     const missing = Object.entries(document.paths).flatMap(([path, item]) =>
       HTTP_METHODS.flatMap((method) =>
         Object.entries(item?.[method]?.responses ?? {})
           .filter(
-            ([, response]) =>
+            ([status, response]) =>
               !!response &&
               !('$ref' in response) &&
+              !(path === '/admin/queues' && ['400', '405'].includes(status)) &&
               (response.headers?.['X-Correlation-Id'] as { $ref?: string } | undefined)?.$ref !==
                 '#/components/headers/CorrelationId'
           )
@@ -484,6 +487,46 @@ describe('OpenAPI success surface (e2e)', () => {
       )
     )
     expect(missing).toEqual([])
+    const board = document.paths['/admin/queues']?.get
+    const boardResponses = Object.entries(board?.responses ?? {}).filter(([status]) =>
+      ['400', '405'].includes(status)
+    )
+    expect(boardResponses.map(([, response]) => response)).toEqual(
+      boardResponses.map(() =>
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            'X-Correlation-Id': {
+              description: 'May be absent on an early rejection.',
+              schema: { type: 'string' },
+            },
+          }),
+        })
+      )
+    )
+  })
+
+  it('keeps scrape credentials and probe routes outside the shared guard profiles', () => {
+    const metrics = document.paths['/metrics']?.get
+    expect(metrics?.security).toEqual(expect.arrayContaining([{}, { metricsBearer: [] }]))
+    expect(metrics?.responses).toHaveProperty('401')
+    expect(metrics?.responses).toHaveProperty('404')
+    expect(JSON.stringify(metrics?.responses['503'] ?? '')).not.toContain(
+      'admission could not finish'
+    )
+    for (const path of [
+      '/metrics',
+      '/health',
+      '/health/startup',
+      '/health/ready',
+      '/health/live',
+      '/admin/queues',
+    ]) {
+      expect(document.paths[path]?.get?.responses).not.toHaveProperty('429')
+    }
+    expect(document.paths['/auth/me']?.get?.responses).toHaveProperty('401')
+    expect(document.paths['/auth/me']?.get?.responses['429']).toMatchObject({
+      headers: { 'Retry-After': { schema: { type: 'integer', minimum: 1 } } },
+    })
   })
 
   it('documents TeamAccess/record-field failures and permission assignment branches', () => {
@@ -788,13 +831,16 @@ describe('OpenAPI success surface (e2e)', () => {
         const op = (
           item as Record<
             string,
-            { security?: unknown[]; responses?: Record<string, Response> } | undefined
+            | { security?: Record<string, string[]>[]; responses?: Record<string, Response> }
+            | undefined
           >
         )[method]
         if (!op) continue
         const oauthStep =
           /\/auth\/oauth(\/|$)/.test(path) && !path.endsWith('/auth/oauth/providers')
-        const protectedOp = (op.security?.length ?? 0) > 0
+        const protectedOp = op.security?.some(
+          (requirement) => 'bearer' in requirement || 'apiKeyBearer' in requirement
+        )
         const described = op.responses?.['503']
         const key = `${method} ${path}`
         if (!oauthStep && !protectedOp) {
@@ -812,11 +858,6 @@ describe('OpenAPI success surface (e2e)', () => {
           violations.push(`${key}: 503 does not document the admission case`)
         if (oauthStep && !described.description?.includes(oauthStepMarker))
           violations.push(`${key}: 503 does not document the OAuth Redis case`)
-        for (const media of Object.values(described.content ?? {})) {
-          const codes = media.schema?.properties?.errorCode?.enum
-          if (codes && !codes.includes('SERVICE_UNAVAILABLE'))
-            violations.push(`${key}: errorCode enum omits SERVICE_UNAVAILABLE`)
-        }
         if (
           /ORGANIZATION_CREATION_UNCONFIRMED|failure counters could not be checked/.test(
             described.description ?? ''
@@ -939,8 +980,170 @@ describe('OpenAPI success surface (e2e)', () => {
     expect(operation?.security).not.toContainEqual({ apiKeyBearer: [] })
   })
 
+  it.each([
+    ['get', '/notifications', ['400']],
+    ['get', '/ai/runs', ['400']],
+    ['get', '/ai/runs/{id}', ['404', '410']],
+    ['get', '/admin/ai/assistants', ['400']],
+    ['post', '/admin/ai/assistants', ['409']],
+    ['get', '/admin/ai/assistants/{id}', ['404']],
+    ['patch', '/admin/ai/assistants/{id}', ['404']],
+    ['post', '/admin/ai/assistants/{slug}/versions', ['404', '409']],
+    ['post', '/api-keys', ['403']],
+    ['get', '/organizations/{orgId}/role-definitions', ['404']],
+    ['get', '/ai/conversations/{id}/messages', ['400']],
+    ['get', '/admin/api-keys', ['500', '503']],
+  ] as const)('documents subject-specific failures for %s %s', (method, path, statuses) => {
+    const responses = document.paths[path]?.[method]?.responses ?? {}
+    expect(Object.keys(responses)).toEqual(expect.arrayContaining(statuses))
+  })
+
+  it.each([
+    '/organizations/{orgId}/members',
+    '/organizations/{orgId}/members/{userId}/roles',
+    '/organizations/{orgId}/role-definitions',
+  ])('documents Unicode search and offset limits on %s', (path) => {
+    const description = document.paths[path]?.get?.description
+    expect(description).toContain('100 Unicode code points')
+    expect(description).toContain('pagination offset is bounded')
+  })
+
+  it('keeps the two lookup input shapes distinct', () => {
+    const schemas = document.components?.schemas
+    expect(schemas?.MfaSettingsStartLookupInput).toMatchObject({
+      required: ['operationId', 'purpose'],
+      properties: {
+        operationId: expect.any(Object),
+        purpose: expect.any(Object),
+        startNotAfter: expect.any(Object),
+      },
+    })
+    expect(schemas?.BrowserLogoutReceiptLookupInput).toMatchObject({
+      required: ['operationId', 'returnEntryId', 'receiptSecret'],
+      properties: {
+        operationId: expect.any(Object),
+        returnEntryId: expect.any(Object),
+        receiptSecret: expect.any(Object),
+      },
+    })
+    expect(JSON.stringify(schemas?.MfaSettingsStartLookupInput)).not.toContain('receiptSecret')
+    expect(JSON.stringify(schemas?.BrowserLogoutReceiptLookupInput)).not.toContain('purpose')
+  })
+
+  it.each(['RoleDefinitionDetailDto_Output', 'SaveRoleDefinitionResponseDto_Output'])(
+    'owns the recursive references for %s',
+    (owner) => {
+      const schemas = document.components?.schemas ?? {}
+      const root = JSON.stringify(schemas[owner] ?? {})
+      const refs = [...root.matchAll(/#\/components\/schemas\/([^" ]+)/g)].map((match) => match[1]!)
+      expect(refs.length).toBeGreaterThan(0)
+      for (const ref of refs) {
+        expect(ref.startsWith(owner + '__')).toBe(true)
+        expect(schemas[ref]).toBeDefined()
+      }
+      expect(
+        Object.keys(schemas).some(
+          (name) =>
+            name.startsWith(owner + '__') &&
+            JSON.stringify(schemas[name]).includes('#/components/schemas/' + name + '"')
+        )
+      ).toBe(true)
+    }
+  )
+
+  it('preserves narrow inline and referenced error variants during guard merging', () => {
+    const domain = {
+      type: 'object' as const,
+      required: ['domainDetail', 'errorCode'],
+      properties: { domainDetail: { type: 'string' }, errorCode: { enum: ['DOMAIN_REFUSED'] } },
+    }
+    const narrow = { $ref: '#/components/schemas/DomainError' }
+    const response = {
+      description: 'Domain refusal',
+      headers: { 'X-Domain': { schema: { type: 'string' as const } } },
+      content: {
+        'application/json': { schema: narrow },
+        'text/plain': { schema: { type: 'string' as const } },
+      },
+    }
+    const inline = {
+      description: 'Inline refusal',
+      content: { 'application/json': { schema: domain } },
+    }
+    const named = { $ref: '#/components/responses/DomainError' }
+    const unresolved = { $ref: '#/components/responses/Unresolved' }
+    const fixture = {
+      ...document,
+      components: { schemas: { DomainError: domain }, responses: { DomainError: response } },
+      paths: {
+        '/inline': { get: { security: [{ bearer: [] }], responses: { '503': inline } } },
+        '/reference': {
+          get: { security: [{ bearer: [] }], responses: { '503': named, '429': named } },
+        },
+        '/unresolved': { get: { security: [{ bearer: [] }], responses: { '503': unresolved } } },
+      },
+    } satisfies OpenAPIObject
+    const expected = structuredClone(fixture.components)
+    addAuthUnavailableResponses(fixture)
+    addRateLimitResponses(fixture)
+    const admission = expect.objectContaining({
+      properties: expect.objectContaining({
+        errorCode: { type: 'string', enum: ['SERVICE_UNAVAILABLE'] },
+      }),
+    })
+    expect(fixture.paths['/inline'].get.responses['503']).toMatchObject({
+      content: { 'application/json': { schema: { anyOf: [domain, admission] } } },
+    })
+    expect(fixture.paths['/reference'].get.responses['503']).toMatchObject({
+      headers: response.headers,
+      content: {
+        'application/json': { schema: { anyOf: [narrow, admission] } },
+        'text/plain': response.content['text/plain'],
+      },
+    })
+    expect(fixture.paths['/reference'].get.responses['429']).toMatchObject({
+      headers: response.headers,
+      content: {
+        'application/json': {
+          schema: { anyOf: [narrow, { $ref: '#/components/schemas/HttpExceptionResponse' }] },
+        },
+      },
+    })
+    expect(fixture.paths['/unresolved'].get.responses['503']).toEqual(unresolved)
+    expect(fixture.components.schemas.DomainError).toEqual(expected.schemas.DomainError)
+    expect(fixture.components.responses).toEqual(expected.responses)
+  })
+
   it('documents the command input byte-limit refusal', () => {
     const operation = document.paths['/admin/background-work/commands']?.post
+    const accepted = operation?.responses['202']
+    const completed = operation?.responses['200']
+    expect(accepted).toMatchObject({
+      content: {
+        'application/json': {
+          schema: { $ref: '#/components/schemas/BackgroundWorkReceiptDto_Output' },
+        },
+      },
+    })
+    expect(document.components?.schemas?.BackgroundWorkReceiptDto_Output).toMatchObject({
+      properties: Object.fromEntries(
+        [
+          'commandId',
+          'workId',
+          'operation',
+          'state',
+          'unknownCount',
+          'createdAt',
+          'reason',
+          'revision',
+          'targets',
+        ].map((name) => [name, expect.any(Object)])
+      ),
+    })
+    expect(accepted).toHaveProperty(
+      'content',
+      completed && 'content' in completed ? completed.content : undefined
+    )
     expect(operation?.responses).toHaveProperty('413')
     const catalogue = document.paths['/admin/background-work/works']?.get
     expect(catalogue?.responses?.['200']).toHaveProperty(
@@ -1243,6 +1446,143 @@ describe('OpenAPI success surface (e2e)', () => {
         expect(operation.responses?.[status]).toBeDefined()
       }
     }
+  })
+
+  it.each([
+    [
+      '/admin/organizations/attention',
+      {
+        page: { type: 'integer', default: 1, maximum: 10000 },
+        limit: { default: 20, maximum: 50 },
+        search: { maxLength: 100 },
+      },
+    ],
+    [
+      '/admin/organizations/{orgId}/administration',
+      { adminPage: { default: 1 }, invitationPage: { default: 1 }, limit: { maximum: 50 } },
+    ],
+    ['/notifications', { cursor: { maxLength: 512 }, limit: { type: 'integer', default: 20 } }],
+    [
+      '/ai/conversations/{id}/messages',
+      { cursor: { type: 'integer', minimum: 0 }, limit: { default: 20 } },
+    ],
+    [
+      '/ai/runs',
+      { conversationId: { maxLength: 64 }, cursor: { maxLength: 512 }, limit: { default: 20 } },
+    ],
+    ['/ai/approvals', { status: { enum: ['pending', 'approved', 'rejected', 'expired'] } }],
+    [
+      '/admin/ai/assistants',
+      {
+        slug: { type: 'string' },
+        version: { enum: ['latest', 'all'], default: 'latest' },
+        page: { default: 1 },
+        limit: { default: 20 },
+      },
+    ],
+  ] as const)('documents the query fields for %s', (path, expected) => {
+    const query =
+      document.paths[path]?.get?.parameters?.filter(
+        (parameter) => 'in' in parameter && parameter.in === 'query'
+      ) ?? []
+    expect(query).toHaveLength(Object.keys(expected).length)
+    for (const [name, schema] of Object.entries(expected)) {
+      expect(query).toContainEqual(
+        expect.objectContaining({
+          name,
+          required: false,
+          schema: expect.objectContaining(schema),
+        })
+      )
+    }
+  })
+
+  it.each(['/health', '/health/startup', '/health/ready', '/health/live'])(
+    'documents the HTTP error envelope on %s',
+    (path) => {
+      expect(document.paths[path]?.get?.responses['503']).toMatchObject({
+        content: {
+          'application/json': {
+            schema: {
+              required: expect.arrayContaining(['statusCode', 'message', 'path']),
+              properties: { details: expect.any(Object) },
+            },
+          },
+        },
+      })
+    }
+  )
+
+  it.each(['/ai/runs/{id}/stream', '/notifications/stream'])(
+    'documents stream admission failures and SSE headers on %s',
+    (path) => {
+      const responses = document.paths[path]?.get?.responses
+      expect(responses?.['200']).toMatchObject({
+        content: { 'text/event-stream': { schema: { type: 'string' } } },
+        headers: {
+          'Cache-Control': { schema: { enum: ['no-cache, no-transform'] } },
+          'X-Accel-Buffering': { schema: { enum: ['no'] } },
+          Connection: { schema: { enum: ['keep-alive'] } },
+        },
+      })
+      expect(responses?.['429']).toMatchObject({
+        description: expect.stringContaining('does not supply Retry-After'),
+        headers: { 'Retry-After': expect.any(Object) },
+      })
+      expect(responses?.['503']).toMatchObject({
+        description: expect.stringContaining('stream capacity'),
+        content: { 'application/json': expect.any(Object) },
+      })
+    }
+  )
+
+  it.each([
+    ['/auth/refresh', '200'],
+    ['/auth/logout', '204'],
+  ])('documents cookie updates and service failures on %s', (path, success) => {
+    const responses = document.paths[path]?.post?.responses
+    expect(responses?.[success]).toMatchObject({
+      headers: { 'Set-Cookie': expect.any(Object) },
+    })
+    expect(responses?.['503']).toMatchObject({
+      description: expect.stringContaining('DATABASE_POOL_TIMEOUT'),
+      headers: { 'Retry-After': { schema: { enum: [1] } } },
+    })
+    expect(responses?.['503']).toMatchObject({
+      description: expect.stringContaining('frontend placement'),
+    })
+  })
+
+  it.each([
+    ['get', '/admin/users'],
+    ['get', '/admin/organizations'],
+    ['post', '/admin/cleanup'],
+    ['get', '/admin/ai/assistants'],
+    ['post', '/admin/ai/assistants'],
+    ['get', '/admin/ai/assistants/{id}'],
+    ['patch', '/admin/ai/assistants/{id}'],
+    ['post', '/admin/ai/assistants/{slug}/versions'],
+  ] as const)('documents role rejection for %s %s', (method, path) => {
+    expect(document.paths[path]?.[method]?.responses['403']).toMatchObject({
+      description: expect.stringContaining('SUPER_ADMIN'),
+    })
+  })
+
+  it('documents the Apple callback form and rejects undeclared cookie scheme names', () => {
+    const callback = document.paths['/auth/oauth/{provider}/callback']?.post
+    expect(callback?.requestBody).toMatchObject({
+      content: {
+        'application/x-www-form-urlencoded': {
+          schema: { required: ['code', 'state'], properties: { user: { type: 'string' } } },
+        },
+      },
+    })
+    expect(callback?.responses?.['302']).toHaveProperty('headers.Location')
+    expect(document.paths['/auth/refresh']?.post?.security).toEqual([{ cookie: [] }])
+    expect(document.paths['/auth/oauth/exchange']?.post?.security).toEqual([{ cookie: [] }])
+    expect(document.paths['/auth/logout']?.post?.security).toEqual(
+      expect.arrayContaining([{ cookie: [] }, {}])
+    )
   })
 
   it('documents a multipart/form-data request body with a binary file field for both upload operations', () => {

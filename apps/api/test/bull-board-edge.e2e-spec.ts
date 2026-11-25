@@ -55,6 +55,7 @@ describe('queue board — early responses of the mount (production order)', () =
       .set('Access-Control-Request-Method', 'PUT')
     expect(res.status).toBe(405)
     expect(res.headers.allow).toBe('GET, HEAD')
+    expect(res.headers['x-correlation-id']).toBeUndefined()
     expect(res.headers['access-control-allow-methods']).toBeUndefined()
     expectBoardHeaders(res.headers)
   })

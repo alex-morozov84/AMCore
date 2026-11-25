@@ -50,6 +50,8 @@ export class MfaSessionFlowController {
   @RequestContextPolicy({ kind: 'personal' })
   @ApiOperation({
     summary: 'Start a restricted operation on only the original authenticated family',
+    description:
+      'Native requests use the bearer token. Trusted browser requests also require the original browser binding. A previously recorded or expired flow can return restart_required in 200.',
   })
   @SchemaResponse({ type: SessionFlowResult, status: 200 })
   @ApiBadRequestResponse({ description: 'Invalid strict command or unexpected query' })

@@ -28,7 +28,11 @@ export class TelegramController {
 
   @Post('link')
   @ApiOperation({ summary: 'Issue a one-time Telegram deep-link' })
-  @SchemaResponse({ type: TelegramLinkResponseDto, status: 201, description: 'Deep-link issued' })
+  @SchemaResponse({
+    type: TelegramLinkResponseDto,
+    status: 201,
+    description: 'One-time deep link and its expiry',
+  })
   issueLink(@CurrentUser('sub') userId: string): Promise<TelegramLinkResponse> {
     return this.linkService.issueLink(userId)
   }
@@ -47,7 +51,7 @@ export class TelegramController {
   @Delete('connection')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Unlink Telegram (cancels its pending deliveries)' })
-  @ApiNoContentResponse({ description: 'Telegram unlinked' })
+  @ApiNoContentResponse({ description: 'Telegram unlinked, or already disconnected' })
   async unlink(@CurrentUser('sub') userId: string): Promise<void> {
     await this.linkService.unlink(userId)
   }

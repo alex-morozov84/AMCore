@@ -97,6 +97,13 @@ Request validation uses the native pipe directly.
 `buildApiDocument()` passes `schemaOpenApiConverter` to Swagger. It uses Zod's
 input/output JSON Schema conversion and preserves named DTO components:
 `ThingDto` for requests and `ThingDto_Output` for responses.
+Recursive definitions in named components are stored under names scoped to their
+DTO. For a flat query DTO whose fields Swagger cannot expand, use
+`@ApiQuerySchema(Dto.schema)` on the handler. Keep explicit `@ApiQuery` for
+special wire formats such as one JSON string. Pass a list of field names when
+you only need to document a subset of the flat query. Keep the same Zod schema in
+`@Query({ schema: Dto.schema })` for runtime validation.
+
 Unrepresentable JSON transformations use Zod's `any` conversion; runtime validation
 still uses the complete shared schema. Do not replace a runtime contract with its
 documentation projection.
@@ -105,6 +112,13 @@ Run API typecheck and the schema unit fixtures for changes to this seam. The
 return-type fixture checks a valid return and the specific compilation diagnostic
 for an invalid return. The OpenAPI E2E suite checks the public route inventory,
 success bodies, security, multipart requests and component references.
+
+Keep common admission and request-limit responses in the document builder. Use
+local Swagger responses for errors raised by the operation. When a response has
+several causes, describe each cause and which one supplies any optional header.
+For example, the request limiter can send `Retry-After` on an SSE request.
+A refusal caused by too many open streams for that account does not send it.
+Once an SSE connection opens, an interruption closes the stream.
 
 NestJS 12 and the API use ESM on the declared Node floor.
 See [API build and ESM runtime](api-build.md). Jest remains the existing

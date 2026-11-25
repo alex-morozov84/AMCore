@@ -14,7 +14,9 @@ import {
 } from '@nestjs/common'
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiConflictResponse,
+  ApiConsumes,
   ApiCookieAuth,
   ApiForbiddenResponse,
   ApiHeader,
@@ -118,6 +120,10 @@ export class OAuthController {
   }
 
   @Get(':provider')
+  @ApiResponse({
+    status: 400,
+    description: 'The OAuth provider is unknown or unavailable for this request.',
+  })
   @Auth(AuthType.None)
   @ApiHeader({ name: 'X-Invitation-Continuation', required: false })
   @ApiHeader({ name: 'X-Invitation-Attempt-Id', required: false })
@@ -131,7 +137,17 @@ export class OAuthController {
     description:
       'JSON-encoded finite product-admin destination. Only trusted frontend-bound state retains it; arbitrary URLs are not accepted.',
   })
-  @ApiResponse({ status: 302, description: 'Redirect to the provider authorization URL' })
+  @ApiResponse({
+    status: 302,
+    description: 'Redirect to the provider authorization URL',
+    headers: {
+      Location: { schema: { type: 'string', format: 'uri' } },
+      'Set-Cookie': {
+        schema: { type: 'string' },
+        description: 'Sets the provider state binding cookie.',
+      },
+    },
+  })
   async authorize(
     @Param('provider') provider: string,
     @Req() req: Request,
@@ -159,6 +175,10 @@ export class OAuthController {
   }
 
   @Get(':provider/link')
+  @ApiResponse({
+    status: 400,
+    description: 'The OAuth provider is unknown or unavailable for this request.',
+  })
   @Auth(AuthType.Bearer)
   @ApiBearerAuth()
   @ApiForbiddenResponse({
@@ -173,7 +193,17 @@ export class OAuthController {
     description:
       'Successful protected linking advances the security version and revokes prior sessions and continuations atomically. The callback redirects to sign-in without issuing replacement credentials.',
   })
-  @ApiResponse({ status: 302, description: 'Redirect to the provider authorization URL' })
+  @ApiResponse({
+    status: 302,
+    description: 'Redirect to the provider authorization URL',
+    headers: {
+      Location: { schema: { type: 'string', format: 'uri' } },
+      'Set-Cookie': {
+        schema: { type: 'string' },
+        description: 'Sets the provider state binding cookie.',
+      },
+    },
+  })
   async link(
     @Param('provider') provider: string,
     @CurrentUser() principal: RequestPrincipal,
@@ -203,10 +233,31 @@ export class OAuthController {
    * state/provider-code consumption so the GET transport stays exact.
    */
   @Get(':provider/callback')
+  @ApiResponse({
+    status: 400,
+    description: 'Missing callback fields, OAUTH_STATE_INVALID, or OAUTH_EMAIL_REQUIRED.',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'OAUTH_EMAIL_UNVERIFIED, STEP_UP_REQUIRED, or PUBLIC_SIGNUP_DISABLED.',
+  })
+  @ApiResponse({ status: 404, description: 'This provider uses the other callback transport.' })
+  @ApiResponse({
+    status: 409,
+    description: 'OAUTH_ACCOUNT_ALREADY_LINKED or EMAIL_ALREADY_EXISTS.',
+  })
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Handle OAuth provider callback (redirect/query providers)' })
   @ApiResponse({
     status: 302,
+    headers: {
+      Location: { schema: { type: 'string', format: 'uri' } },
+      'Set-Cookie': {
+        schema: { type: 'string' },
+        description:
+          'Clears the provider state binding cookie. Some sign-in branches also set refresh_token.',
+      },
+    },
     description: 'Redirect to the frontend callback, linked-accounts page or required new sign-in',
   })
   async callbackGet(
@@ -231,10 +282,47 @@ export class OAuthController {
    * provider check runs BEFORE `user` is parsed or any state is consumed.
    */
   @Post(':provider/callback')
+  @ApiResponse({
+    status: 400,
+    description: 'Missing callback fields, OAUTH_STATE_INVALID, or OAUTH_EMAIL_REQUIRED.',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'OAUTH_EMAIL_UNVERIFIED, STEP_UP_REQUIRED, or PUBLIC_SIGNUP_DISABLED.',
+  })
+  @ApiResponse({ status: 404, description: 'This provider uses the other callback transport.' })
+  @ApiResponse({
+    status: 409,
+    description: 'OAUTH_ACCOUNT_ALREADY_LINKED or EMAIL_ALREADY_EXISTS.',
+  })
   @Auth(AuthType.None)
+  @ApiConsumes('application/x-www-form-urlencoded')
+  @ApiBody({
+    required: true,
+    schema: {
+      type: 'object',
+      required: ['code', 'state'],
+      properties: {
+        code: { type: 'string', minLength: 1 },
+        state: { type: 'string', minLength: 1 },
+        user: {
+          type: 'string',
+          description: 'JSON-encoded profile supplied by Apple on first authorization',
+        },
+      },
+    },
+  })
   @ApiOperation({ summary: 'Handle OAuth provider form_post callback (Apple)' })
   @ApiResponse({
     status: 302,
+    headers: {
+      Location: { schema: { type: 'string', format: 'uri' } },
+      'Set-Cookie': {
+        schema: { type: 'string' },
+        description:
+          'Clears the provider state binding cookie. Some sign-in branches also set refresh_token.',
+      },
+    },
     description: 'Redirect to the frontend callback, linked-accounts page or required new sign-in',
   })
   async callbackPost(
@@ -390,7 +478,7 @@ export class OAuthController {
   @Post('exchange')
   @Auth(AuthType.None)
   @UseGuards(OriginCheckGuard)
-  @ApiCookieAuth('refresh_token')
+  @ApiCookieAuth('cookie')
   @ApiOperation({ summary: 'Exchange OAuth login ticket for access token' })
   @SchemaResponses(
     {
@@ -405,6 +493,23 @@ export class OAuthController {
         'Restricted OAuth identity continuation; protected accounts require local password and factor',
     }
   )
+  @ApiResponse({ status: 401, description: 'OAUTH_TICKET_INVALID or INVALID_CREDENTIALS.' })
+  @ApiResponse({
+    status: 429,
+    description: 'The protected OAuth sign-in attempt limit was reached.',
+  })
+  @ApiServiceUnavailableResponse({
+    description: 'API/web placement disagreement or MFA authority unavailable.',
+  })
+  @ApiResponse({
+    status: 200,
+    headers: {
+      'Set-Cookie': {
+        schema: { type: 'string' },
+        description: 'Present when a completed exchange rotates refresh_token.',
+      },
+    },
+  })
   async exchange(
     @Body({ schema: OAuthExchangeDto.schema }) dto: OAuthExchangeDto,
     @Req() req: Request,

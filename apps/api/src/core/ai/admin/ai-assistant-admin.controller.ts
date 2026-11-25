@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common'
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 
 import {
   type AiAssistantListResponse,
@@ -9,6 +9,7 @@ import {
   SystemRole,
 } from '@amcore/shared'
 
+import { ApiQuerySchema } from '../../../common/schemas/api-query-schema.js'
 import { SchemaResponse } from '../../../common/schemas/schema-response.js'
 import { RATE_LIMIT_POLICIES, RateLimit } from '../../../infrastructure/throttling/index.js'
 import { Auth } from '../../auth/decorators/auth.decorator.js'
@@ -35,6 +36,7 @@ import {
  */
 @ApiTags('admin')
 @ApiBearerAuth()
+@ApiResponse({ status: 403, description: 'Current SUPER_ADMIN role required' })
 @Controller('admin/ai/assistants')
 @Auth(AuthType.Bearer)
 @SystemRoles(SystemRole.SuperAdmin)
@@ -42,6 +44,8 @@ export class AiAssistantAdminController {
   constructor(private readonly service: AiAssistantAdminService) {}
 
   @Get()
+  @ApiQuerySchema(AiAssistantListQueryDto.schema)
+  @ApiResponse({ status: 400, description: 'Invalid assistant list query.' })
   @ApiOperation({ summary: 'List assistants (latest-per-slug by default) — SUPER_ADMIN only' })
   @SchemaResponse({
     type: AiAssistantListResponseDto,
@@ -53,6 +57,7 @@ export class AiAssistantAdminController {
   }
 
   @Get(':id')
+  @ApiResponse({ status: 404, description: 'The assistant version does not exist.' })
   @ApiOperation({ summary: 'Fetch one assistant version — SUPER_ADMIN only' })
   @SchemaResponse({ type: AiAssistantResponseDto, status: 200, description: 'Assistant' })
   get(@Param('id') id: string): Promise<AiAssistantResponse> {
@@ -60,6 +65,8 @@ export class AiAssistantAdminController {
   }
 
   @Post()
+  @ApiResponse({ status: 403, description: 'Current SUPER_ADMIN role and recent authentication required' })
+  @ApiResponse({ status: 409, description: 'An assistant with this slug already exists.' })
   @ApiOperation({ summary: 'Create a new assistant (version 1) — SUPER_ADMIN only' })
   @RequireFreshAuth()
   @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
@@ -72,6 +79,9 @@ export class AiAssistantAdminController {
   }
 
   @Post(':slug/versions')
+  @ApiResponse({ status: 403, description: 'Current SUPER_ADMIN role and recent authentication required' })
+  @ApiResponse({ status: 404, description: 'The assistant slug does not exist.' })
+  @ApiResponse({ status: 409, description: 'The next version was published concurrently.' })
   @ApiOperation({ summary: 'Publish a new immutable assistant version — SUPER_ADMIN only' })
   @RequireFreshAuth()
   @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
@@ -85,7 +95,10 @@ export class AiAssistantAdminController {
   }
 
   @Patch(':id')
+  @ApiResponse({ status: 403, description: 'Current SUPER_ADMIN role and recent authentication required' })
+  @ApiResponse({ status: 404, description: 'The assistant version does not exist.' })
   @ApiOperation({ summary: 'Update assistant enabled/displayName in place — SUPER_ADMIN only' })
+  @ApiResponse({ status: 400, description: 'Provide at least one of enabled or displayName.' })
   @RequireFreshAuth()
   @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
   @SchemaResponse({ type: AiAssistantResponseDto, status: 200, description: 'Updated assistant' })

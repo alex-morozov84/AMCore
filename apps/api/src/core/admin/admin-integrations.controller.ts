@@ -14,7 +14,7 @@ import {
 } from '@amcore/shared'
 
 import { AppException } from '../../common/exceptions/index.js'
-import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { PRIVATE_NO_STORE_HEADERS, SchemaResponse } from '../../common/schemas/schema-response.js'
 import { RATE_LIMIT_POLICIES, RateLimit } from '../../infrastructure/throttling/index.js'
 import { Auth } from '../auth/decorators/auth.decorator.js'
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
@@ -59,6 +59,7 @@ export class AdminIntegrationsController {
 
   @Get()
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiOperation({
     summary: 'Read the safe state of registered integrations — live SUPER_ADMIN bearer only',
     description:
@@ -77,8 +78,10 @@ export class AdminIntegrationsController {
   }
 
   @Post(':id/probe/prepare')
+  @ApiResponse({ status: 400, description: 'Invalid integration identifier.' })
   @HttpCode(200)
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
   @ApiOperation({
     summary: 'Issue a single-use attempt id and the masked recipient for an operator test',
@@ -99,8 +102,10 @@ export class AdminIntegrationsController {
   }
 
   @Post(':id/probe')
+  @ApiResponse({ status: 400, description: 'Invalid integration identifier or attempt body.' })
   @HttpCode(200)
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @RequireFreshAuth()
   @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
   @ApiOperation({
@@ -120,7 +125,17 @@ export class AdminIntegrationsController {
       'INTEGRATION_NO_VERIFIED_ADDRESS or INTEGRATION_MOCK_IN_PRODUCTION',
   })
   @ApiResponse({ status: 410, description: 'INTEGRATION_ATTEMPT_EXPIRED; prepare again' })
-  @ApiResponse({ status: 429, description: 'Cooldown, hourly limit or another test in flight' })
+  @ApiResponse({
+    status: 429,
+    description: 'Cooldown, hourly limit or another test in flight',
+    headers: {
+      'Retry-After': {
+        description:
+          'Seconds when the request limiter, quota check, or probe supplies an interval.',
+        schema: { type: 'integer', minimum: 1 },
+      },
+    },
+  })
   @ApiResponse({
     status: 503,
     description:
@@ -139,7 +154,9 @@ export class AdminIntegrationsController {
   }
 
   @Get(':id/probe/:attemptId')
+  @ApiResponse({ status: 400, description: 'Invalid integration or attempt identifier.' })
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiOperation({
     summary: "Read the stored receipt of the acting operator's own attempt",
     description:
@@ -148,7 +165,7 @@ export class AdminIntegrationsController {
   })
   @ApiParam({ name: 'id', description: 'Integration id from the list' })
   @ApiParam({ name: 'attemptId', description: 'Attempt id from prepare' })
-  @ApiResponse({ status: 404, description: 'Unknown, expired or foreign attempt' })
+  @ApiResponse({ status: 404, description: 'No retained attempt belonging to the caller' })
   @SchemaResponse({ type: ProbeReceiptDto, status: 200, description: 'Receipt of the attempt' })
   receipt(
     @Param('id', { schema: integrationIdSchema }) id: string,

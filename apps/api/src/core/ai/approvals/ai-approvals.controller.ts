@@ -25,7 +25,8 @@ import {
 
 import { type AiApprovalListResponse, type AiApprovalResponse, AuthType } from '@amcore/shared'
 
-import { SchemaResponse } from '../../../common/schemas/schema-response.js'
+import { ApiQuerySchema } from '../../../common/schemas/api-query-schema.js'
+import { PRIVATE_NO_STORE_HEADERS, SchemaResponse } from '../../../common/schemas/schema-response.js'
 import { Auth } from '../../auth/decorators/auth.decorator.js'
 import { CurrentUser } from '../../auth/decorators/current-user.decorator.js'
 import {
@@ -51,7 +52,9 @@ export class AiApprovalsController {
   constructor(private readonly approvals: AiApprovalService) {}
 
   @Get()
+  @ApiQuerySchema(AiApprovalListQueryDto.schema)
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiResponse({
     status: 200,
     standardSchema: AiApprovalListResponseDto.schema,
@@ -77,6 +80,7 @@ export class AiApprovalsController {
 
   @Post(':id/decision')
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiResponse({
     status: 200,
     standardSchema: AiApprovalResponseDto.schema,

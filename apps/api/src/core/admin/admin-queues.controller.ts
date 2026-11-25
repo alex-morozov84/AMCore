@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 
 import { type AdminQueuesResponse, AuthType, SystemRole } from '@amcore/shared'
 
-import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { PRIVATE_NO_STORE_HEADERS, SchemaResponse } from '../../common/schemas/schema-response.js'
 import { Auth } from '../auth/decorators/auth.decorator.js'
 import { SystemRoles } from '../auth/decorators/system-roles.decorator.js'
 
@@ -25,6 +25,7 @@ export class AdminQueuesController {
 
   @Get()
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiOperation({
     summary: 'Read-only background queue summary — live SUPER_ADMIN bearer only',
     description:

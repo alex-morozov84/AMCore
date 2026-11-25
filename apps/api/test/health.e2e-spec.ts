@@ -53,7 +53,14 @@ describe('Health (e2e)', () => {
       })
       try {
         const response = await request(app.getHttpServer()).get(path).expect(503)
-        expect(response.body.statusCode).toBe(503)
+        expect(response.body).toMatchObject({
+          statusCode: 503,
+          message: expect.any(String),
+          method: 'GET',
+          path,
+          timestamp: expect.any(String),
+        })
+        expect(response.body).not.toHaveProperty('status')
       } finally {
         spy.mockRestore()
       }

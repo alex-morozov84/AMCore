@@ -10,8 +10,11 @@ import { EnvService } from '../src/env/env.service'
 import { MetricsService } from '../src/infrastructure/observability/metrics.service'
 import { ObservabilityModule } from '../src/infrastructure/observability/observability.module'
 
+const metricsConfig = { enabled: true, token: '<metrics-probe-token>' as string | undefined }
 const metrics = {
-  enabled: true,
+  get enabled(): boolean {
+    return metricsConfig.enabled
+  },
   contentType: 'text/plain; version=0.0.4; charset=utf-8',
   metrics: async () => 'probe_metric 1\n',
   inFlightLabels: (method: string) => ({ method, role: 'web' }),
@@ -36,9 +39,9 @@ class ProbeController {
       useValue: {
         get: (key: string) =>
           key === 'METRICS_ENABLED'
-            ? true
+            ? metricsConfig.enabled
             : key === 'METRICS_AUTH_TOKEN'
-              ? '<metrics-probe-token>'
+              ? metricsConfig.token
               : undefined,
       },
     },
@@ -68,6 +71,8 @@ for (const [name, makeAdapter] of [
       if (app) await app.close()
     })
     beforeEach(() => {
+      metricsConfig.enabled = true
+      metricsConfig.token = '<metrics-probe-token>'
       metrics.incHttpInFlight.mockClear()
       metrics.decHttpInFlight.mockClear()
       metrics.observeHttpRequest.mockClear()
@@ -114,6 +119,19 @@ for (const [name, makeAdapter] of [
       expect(parts(contentType)).toEqual(parts(metrics.contentType))
       expect(metrics.incHttpInFlight).not.toHaveBeenCalled()
     })
+    it('serves exposition without credentials when a scrape token is unset', async () => {
+      metricsConfig.token = undefined
+      const result = await request(app.getHttpServer()).get('/api/v1/metrics')
+      expect(result.status).toBe(200)
+      expect(result.text).toBe('probe_metric 1\n')
+    })
+
+    it('returns 404 when exposition is disabled', async () => {
+      metricsConfig.enabled = false
+      const result = await request(app.getHttpServer()).get('/api/v1/metrics')
+      expect(result.status).toBe(404)
+    })
+
     it('rejects missing scrape credentials without counting scraping', async () => {
       expect((await request(app.getHttpServer()).get('/api/v1/metrics')).status).toBe(401)
       expect(metrics.incHttpInFlight).not.toHaveBeenCalled()

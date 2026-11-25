@@ -24,6 +24,17 @@ const SAFE_TYPE = /^(image\/(png|jpeg|webp|gif|avif)|application\/pdf|text\/plai
 /** A stored Cache-Control is echoed only when it is plain directives (no CR/LF injection). */
 const SAFE_CACHE_CONTROL = /^[A-Za-z0-9=, -]{1,200}$/
 
+const FILE_TYPES = [
+  'application/octet-stream',
+  'application/pdf',
+  'image/avif',
+  'image/gif',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'text/plain',
+]
+
 interface PublicFile {
   stream: Readable
   metadata: FileMetadata
@@ -73,11 +84,18 @@ export class StoragePublicController {
         description: 'Stored directives, or no-store',
         schema: { type: 'string' },
       },
+      'Content-Disposition': { schema: { type: 'string', enum: ['attachment'] } },
+      'Content-Length': { schema: { type: 'integer', minimum: 0 } },
+      'Cross-Origin-Resource-Policy': { schema: { type: 'string', enum: ['cross-origin'] } },
+      'X-Content-Type-Options': { schema: { type: 'string', enum: ['nosniff'] } },
+      'Content-Security-Policy': {
+        schema: { type: 'string', enum: ["sandbox; default-src 'none'"] },
+      },
       ETag: { description: 'Object version when the driver knows it', schema: { type: 'string' } },
     },
-    content: {
-      'application/octet-stream': { schema: { type: 'string', format: 'binary' } },
-    },
+    content: Object.fromEntries(
+      FILE_TYPES.map((type) => [type, { schema: { type: 'string', format: 'binary' } }])
+    ),
   })
   @ApiResponse({
     status: 404,
