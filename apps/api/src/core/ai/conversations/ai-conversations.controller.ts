@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common'
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 
 import { type AiConversationResponse, AuthType } from '@amcore/shared'
 
@@ -37,6 +37,11 @@ export class AiConversationsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Fetch one owned AI conversation' })
+  @ApiResponse({
+    status: 404,
+    description: 'The conversation does not exist or is not owned by the caller.',
+    content: { 'application/json': { schema: { $ref: '#/components/schemas/HttpExceptionResponse' } } },
+  })
   @SchemaResponse({ type: AiConversationResponseDto, status: 200, description: 'Conversation' })
   get(
     @CurrentUser('sub') userId: string,

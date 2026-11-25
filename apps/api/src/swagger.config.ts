@@ -1,9 +1,12 @@
 import type { INestApplication } from '@nestjs/common'
 import { DocumentBuilder, type OpenAPIObject, SwaggerModule } from '@nestjs/swagger'
 
+import { BULL_BOARD_CONTENT_SECURITY_POLICY } from '@amcore/shared'
+
 import { addAuthUnavailableResponses } from './bootstrap/auth-unavailable-openapi.js'
 import { addCorrelationHeader } from './bootstrap/correlation-openapi.js'
 import { addParserResponses } from './bootstrap/parser-openapi.js'
+import { addRateLimitResponses } from './bootstrap/rate-limit-openapi.js'
 import { schemaOpenApiConverter } from './common/schemas/schema-openapi.js'
 import { BULL_BOARD_MOUNT } from './infrastructure/queue/dashboard/bull-board-mount-state.js'
 
@@ -48,8 +51,33 @@ export function buildSwaggerConfig(): Omit<OpenAPIObject, 'paths'> {
       },
       'apiKeyBearer'
     )
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        description:
+          'Dedicated scrape token required when enabled metrics have METRICS_AUTH_TOKEN configured.',
+      },
+      'metricsBearer'
+    )
     .addCookieAuth('refresh_token')
     .build()
+}
+
+const boardErrorContent = {
+  'application/json': {
+    schema: {
+      type: 'object' as const,
+      required: ['error'],
+      properties: {
+        error: {
+          type: 'object',
+          required: ['key'],
+          properties: { key: { type: 'string' } },
+        },
+      },
+    },
+  },
 }
 
 /**
@@ -78,21 +106,51 @@ export function addQueueBoardOperation(
         'Raw job payloads, return values, error text, stack traces and logs are not displayed; a job ' +
         'shows its id, name and times and, for a queue with a reviewed projection, a few identifiers ' +
         '(template, locale and user id for email; notification id; AI run id). Errors carry only a ' +
-        'fixed translation key.',
+        'fixed translation key when a body is present. Admission refusals use an empty body.',
       security: [{ bearer: [] }, { cookie: [] }],
       responses: {
         '200': {
           description: 'The board page',
           content: { 'text/html': { schema: { type: 'string' } } },
+          headers: {
+            'Cache-Control': { schema: { type: 'string', enum: ['private, no-store'] } },
+            'Content-Security-Policy': {
+              schema: { type: 'string', enum: [BULL_BOARD_CONTENT_SECURITY_POLICY] },
+            },
+            'X-Content-Type-Options': { schema: { type: 'string', enum: ['nosniff'] } },
+            'Referrer-Policy': { schema: { type: 'string', enum: ['no-referrer'] } },
+            'X-Frame-Options': { schema: { type: 'string', enum: ['DENY'] } },
+            'Cross-Origin-Resource-Policy': { schema: { type: 'string', enum: ['same-origin'] } },
+          },
         },
-        '400': { description: 'The render context header of a bearer request is invalid' },
+        '400': {
+          description:
+            'Invalid bearer render context (empty) or malformed request path (fixed error key).',
+          content: boardErrorContent,
+          headers: {
+            'X-Correlation-Id': {
+              description: 'May be absent on an early rejection.',
+              schema: { type: 'string' },
+            },
+          },
+        },
         '401': { description: 'No valid credential, or an API key was sent' },
+        '409': { description: 'The selected session changed. Empty response.' },
         '403': { description: 'SUPER_ADMIN required' },
         '405': {
           description: 'Only GET and HEAD are served',
-          headers: { Allow: { schema: { type: 'string' } } },
+          headers: {
+            Allow: { schema: { type: 'string', enum: ['GET, HEAD'] } },
+            'X-Correlation-Id': {
+              description: 'May be absent on an early rejection.',
+              schema: { type: 'string' },
+            },
+          },
         },
-        '500': { description: 'The page could not be rendered (fixed error body, no detail)' },
+        '500': {
+          description: 'The page could not be rendered (fixed error body, no detail)',
+          content: boardErrorContent,
+        },
         '503': { description: 'Access could not be verified' },
       },
     },
@@ -111,6 +169,7 @@ export function buildApiDocument(app: INestApplication, pathPrefix: string): Ope
   })
   addParserResponses(document)
   addAuthUnavailableResponses(document)
+  addRateLimitResponses(document)
   addQueueBoardOperation(document, BULL_BOARD_MOUNT, pathPrefix)
   addCorrelationHeader(document)
   return document

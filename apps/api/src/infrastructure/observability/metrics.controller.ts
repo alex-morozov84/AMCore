@@ -1,10 +1,12 @@
 import { Controller, Get, HttpStatus, Res, UseGuards } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
-import { ApiOkResponse, ApiProduces } from '@nestjs/swagger'
+import { ApiExtension, ApiOkResponse, ApiProduces, ApiResponse, ApiSecurity } from '@nestjs/swagger'
 import type { Response } from 'express'
 
 import { AuthType } from '@amcore/shared'
 
+import { httpExceptionSchema } from '../../bootstrap/common-error-openapi.js'
+import { OPENAPI_RATE_LIMIT } from '../../bootstrap/rate-limit-openapi.js'
 import { AppException } from '../../common/exceptions/index.js'
 import { Auth } from '../../core/auth/decorators/auth.decorator.js'
 // Import the decorator file directly, NOT the `infrastructure/throttling`
@@ -21,6 +23,7 @@ import { MetricsAuthGuard } from './metrics-auth.guard.js'
 @Controller(METRICS_ROUTE)
 @Auth(AuthType.None)
 @SkipRateLimit()
+@ApiExtension(OPENAPI_RATE_LIMIT, false)
 @UseGuards(MetricsAuthGuard)
 export class MetricsController {
   constructor(
@@ -30,6 +33,18 @@ export class MetricsController {
 
   @Get()
   @ApiProduces('text/plain')
+  @ApiSecurity({})
+  @ApiSecurity('metricsBearer')
+  @ApiResponse({
+    status: 401,
+    description: 'METRICS_AUTH_INVALID: the configured scrape token is missing or invalid',
+    content: { 'application/json': { schema: httpExceptionSchema } },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'NOT_FOUND: metrics are disabled',
+    content: { 'application/json': { schema: httpExceptionSchema } },
+  })
   @ApiOkResponse({
     description: 'Prometheus metrics exposition',
     schema: { type: 'string' },

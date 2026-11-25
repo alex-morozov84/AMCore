@@ -9,6 +9,7 @@ import {
 } from '@amcore/shared'
 
 import { BadRequestException } from '../../../common/exceptions/index.js'
+import { ApiQuerySchema } from '../../../common/schemas/api-query-schema.js'
 import { SchemaResponse } from '../../../common/schemas/schema-response.js'
 import { Auth } from '../../auth/decorators/auth.decorator.js'
 import { CurrentUser } from '../../auth/decorators/current-user.decorator.js'
@@ -70,7 +71,9 @@ export class AiRunsController {
   }
 
   @Get()
+  @ApiQuerySchema(AiRunListQueryDto.schema)
   @ApiOperation({ summary: 'Cursor-paginated list of owned AI runs' })
+  @ApiResponse({ status: 400, description: 'Invalid query parameters or unreadable run cursor.' })
   @SchemaResponse({ type: AiRunPageDto, status: 200, description: 'Run page' })
   async list(
     @CurrentUser('sub') userId: string,
@@ -90,6 +93,7 @@ export class AiRunsController {
     description:
       'Returns durable state and bounded reason/error codes. Execution may refuse model_snapshot_legacy_unsupported, model_snapshot_invalid, model_binding_changed, assistant_binding_changed, provider_retry_restriction_invalid or provider_retry_after_exceeds_horizon. Retry restrictions and provider receipts are internal and are not exposed by this response.',
   })
+  @ApiResponse({ status: 404, description: 'The run does not exist or is not owned by the caller.' })
   @SchemaResponse({ type: AiRunResponseDto, status: 200, description: 'Run' })
   @ApiArchivedRunResponse()
   get(@CurrentUser('sub') userId: string, @Param('id') id: string): Promise<AiRunResponse> {

@@ -26,7 +26,7 @@ import {
   ApiHeader,
   ApiNoContentResponse,
   ApiOperation,
-  ApiQuery,
+  ApiResponse,
   ApiSecurity,
   ApiServiceUnavailableResponse,
   ApiTags,
@@ -40,7 +40,6 @@ import {
   type AvatarResponse,
   coerceSupportedLocale,
   type MessageResponse,
-  PAGINATION,
   type PasswordLoginPending,
   type PasswordLoginResponse,
   type ProfileResponse,
@@ -52,6 +51,7 @@ import {
 
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js'
 import { ApiProtectionUnavailable, AppException } from '../../common/exceptions/index.js'
+import { ApiQuerySchema } from '../../common/schemas/api-query-schema.js'
 import { SchemaResponse } from '../../common/schemas/schema-response.js'
 import { SchemaResponses } from '../../common/schemas/schema-responses.js'
 import {
@@ -102,6 +102,11 @@ import { TokenService } from './token.service.js'
 // Multipart hard stop for the avatar upload. Set above AVATAR_VALIDATION.maxSize
 // (2 MB) so the FileValidationPipe produces the clean 413 for files between the
 // preset limit and this cap; this cap is the absolute anti-DoS backstop.
+const POOL_TIMEOUT_HEADER = {
+  description: 'Present only for DATABASE_POOL_TIMEOUT.',
+  schema: { type: 'integer', enum: [1] },
+}
+
 const AVATAR_UPLOAD_HARD_LIMIT_BYTES = 6 * 1024 * 1024
 
 // Sessions wire shape lives in `@amcore/shared`
@@ -148,6 +153,18 @@ export class AuthController {
   }
 
   @Post('register')
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input or INVITE_INVALID_OR_EXPIRED for a mismatched invitation.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'AUTH_HANDOFF_INVALID: the handoff proof is incomplete or invalid.',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'PUBLIC_SIGNUP_DISABLED or invalid trusted frontend proof.',
+  })
   @ApiRegistrationPublication()
   @Auth(AuthType.None)
   @ApiHeader({ name: 'X-Invitation-Auth-Attempt-Id', required: false })
@@ -163,6 +180,19 @@ export class AuthController {
     type: PasswordLoginResponseDto,
     status: 201,
     description: 'User registered; browser credentials await exact publication',
+  })
+  @ApiResponse({
+    status: 201,
+    headers: {
+      'Set-Cookie': {
+        schema: { type: 'string' },
+        description: 'Sets refresh_token for the new session.',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'EMAIL_ALREADY_EXISTS or AUTH_CONTEXT_CHANGED during browser publication.',
   })
   async register(
     @Body({ schema: RegisterDto.schema }) dto: RegisterDto,
@@ -230,6 +260,16 @@ export class AuthController {
     description:
       'Login protection unavailable; no new session or step-up refresh is issued. A sent counter update may already have executed.',
   })
+  @ApiResponse({
+    status: 200,
+    headers: {
+      'Set-Cookie': {
+        schema: { type: 'string' },
+        description: 'Sets refresh_token for the new session.',
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'INVALID_CREDENTIALS or AUTH_HANDOFF_INVALID.' })
   async login(
     @Body({ schema: LoginDto.schema }) dto: LoginDto,
     @Req() req: Request,
@@ -285,12 +325,29 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @Auth(AuthType.None)
   @UseGuards(OriginCheckGuard)
-  @ApiCookieAuth('refresh_token')
-  @ApiOperation({ summary: 'Logout user' })
+  @ApiCookieAuth('cookie')
+  @ApiSecurity({})
+  @ApiOperation({ summary: 'Logout user; the refresh cookie is optional' })
   @ApiNoContentResponse({ description: 'Logged out' })
   @ApiConflictResponse({
     description:
       'SESSION_CHANGED: browser generation or selected family changed; no fallback logout',
+  })
+  @ApiResponse({
+    status: 204,
+    headers: { 'Set-Cookie': { schema: { type: 'string' }, description: 'Clears refresh_token.' } },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'AUTH_CONTEXT_CHANGED: browser binding is required for the received context.',
+  })
+  @ApiServiceUnavailableResponse({
+    description:
+      'SERVICE_UNAVAILABLE for frontend placement or DATABASE_POOL_TIMEOUT when revoking a session.',
+    headers: { 'Retry-After': POOL_TIMEOUT_HEADER },
+    content: {
+      'application/json': { schema: { $ref: '#/components/schemas/HttpExceptionResponse' } },
+    },
   })
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<void> {
     const refreshToken = req.cookies?.refresh_token
@@ -314,11 +371,29 @@ export class AuthController {
   @Post('refresh')
   @Auth(AuthType.None)
   @UseGuards(OriginCheckGuard, RefreshTokenGuard)
-  @ApiCookieAuth('refresh_token')
+  @ApiCookieAuth('cookie')
   @ApiOperation({ summary: 'Refresh access token' })
   @SchemaResponse({ type: RefreshResponseDto, status: 200, description: 'Access token refreshed' })
   @ApiConflictResponse({
     description: 'SESSION_CHANGED: current family, account version or browser binding changed',
+  })
+  @ApiResponse({
+    status: 200,
+    headers: {
+      'Set-Cookie': { schema: { type: 'string' }, description: 'Sets the rotated refresh_token.' },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid refresh cookie or unfinished invitation handoff.',
+  })
+  @ApiServiceUnavailableResponse({
+    description:
+      'SERVICE_UNAVAILABLE for frontend placement or unavailable MFA refresh authority. DATABASE_POOL_TIMEOUT when the database pool is exhausted.',
+    headers: { 'Retry-After': POOL_TIMEOUT_HEADER },
+    content: {
+      'application/json': { schema: { $ref: '#/components/schemas/HttpExceptionResponse' } },
+    },
   })
   async refresh(
     @Req() req: Request,
@@ -386,6 +461,7 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update current user profile' })
   @SchemaResponse({ type: ProfileResponseDto, status: 200, description: 'Updated user profile' })
+  @ApiResponse({ status: 404, description: 'The current user no longer exists.' })
   async updateProfile(
     @CurrentUser('sub') userId: string,
     @Body({ schema: UpdateProfileDto.schema }) dto: UpdateProfileDto
@@ -416,6 +492,14 @@ export class AuthController {
       required: ['file'],
     },
   })
+  @ApiResponse({
+    status: 400,
+    description: 'Missing file, unsupported image content, or invalid dimensions.',
+  })
+  @ApiResponse({ status: 413, description: 'The avatar exceeds an upload size limit.' })
+  @ApiServiceUnavailableResponse({
+    description: 'AVATAR_LOCKED: another avatar change holds the lock.',
+  })
   @SchemaResponse({ type: AvatarResponseDto, status: 201, description: 'Avatar stored' })
   async uploadAvatar(
     @CurrentUser('sub') userId: string,
@@ -430,6 +514,9 @@ export class AuthController {
   @Auth(AuthType.Bearer)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete current user avatar' })
+  @ApiServiceUnavailableResponse({
+    description: 'The avatar change cannot proceed under the current lock or account state.',
+  })
   @ApiNoContentResponse({ description: 'Avatar removed' })
   async deleteAvatar(@CurrentUser('sub') userId: string): Promise<void> {
     await this.avatarService.removeAvatar(userId)
@@ -468,6 +555,10 @@ export class AuthController {
     description:
       'Login protection unavailable; no new session or step-up refresh is issued. A sent counter update may already have executed.',
   })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid bearer session or INVALID_CREDENTIALS for the supplied password.',
+  })
   async stepUp(
     @CurrentUser() principal: RequestPrincipal,
     @Body({ schema: StepUpDto.schema }) dto: StepUpDto,
@@ -488,24 +579,10 @@ export class AuthController {
   // user-agent / IP-derived metadata (recon surface); revoking sessions from a
   // leaked low-scope API key would let an attacker evict the legitimate user.
   @Get('sessions')
+  @ApiQuerySchema(PaginationQueryDto.schema, ['page', 'limit'])
   @Auth(AuthType.Bearer)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all active sessions' })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    type: Number,
-    minimum: 1,
-    example: PAGINATION.DEFAULT_PAGE,
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    minimum: 1,
-    maximum: PAGINATION.MAX_LIMIT,
-    example: PAGINATION.DEFAULT_LIMIT,
-  })
   @ApiHeader({
     name: 'accept-language',
     required: false,
@@ -538,6 +615,7 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Revoke specific session' })
   @ApiNoContentResponse({ description: 'Session revoked' })
+  @ApiResponse({ status: 404, description: 'No matching session belonging to the current user.' })
   async revokeSession(
     @CurrentUser('sub') userId: string,
     @Param('sessionId') sessionId: string
@@ -550,7 +628,9 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Revoke all sessions except current' })
-  @ApiNoContentResponse({ description: 'Other sessions revoked' })
+  @ApiNoContentResponse({
+    description: 'Other sessions revoked, or no change when no refresh cookie was provided',
+  })
   @ApiConflictResponse({
     description:
       'SESSION_CHANGED: the retained refresh family is no longer current or belongs to another user',
@@ -574,7 +654,16 @@ export class AuthController {
   @Post('forgot-password')
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Request password reset email' })
-  @SchemaResponse({ type: MessageResponseDto, status: 200, description: 'Reset email dispatched' })
+  @SchemaResponse({
+    type: MessageResponseDto,
+    status: 200,
+    description: 'Password reset request acknowledged regardless of account or delivery status',
+  })
+  @ApiResponse({ status: 429, description: 'The email request quota was reached.' })
+  @ApiResponse({
+    status: 503,
+    description: 'SUPPORT_MAIL_UNAVAILABLE: the email request quota could not be checked.',
+  })
   async forgotPassword(
     @Body({ schema: ForgotPasswordDto.schema }) dto: ForgotPasswordDto,
     @Req() req?: Request
@@ -589,6 +678,10 @@ export class AuthController {
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Reset password using token from email' })
   @ApiNoContentResponse({ description: 'Password reset' })
+  @ApiResponse({
+    status: 401,
+    description: 'TOKEN_INVALID: the token is invalid, expired, or already used.',
+  })
   async resetPassword(
     @Body({ schema: ResetPasswordDto.schema }) dto: ResetPasswordDto,
     @Req() req?: Request
@@ -601,6 +694,10 @@ export class AuthController {
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Verify email address using token from email' })
   @ApiNoContentResponse({ description: 'Email verified' })
+  @ApiResponse({
+    status: 401,
+    description: 'TOKEN_INVALID: the token is invalid, expired, or already used.',
+  })
   async verifyEmail(
     @Body({ schema: VerifyEmailDto.schema }) dto: VerifyEmailDto,
     @Req() req?: Request
@@ -614,7 +711,12 @@ export class AuthController {
   @SchemaResponse({
     type: MessageResponseDto,
     status: 200,
-    description: 'Verification email dispatched',
+    description: 'Verification request acknowledged regardless of account or delivery status',
+  })
+  @ApiResponse({ status: 429, description: 'The email request quota was reached.' })
+  @ApiResponse({
+    status: 503,
+    description: 'SUPPORT_MAIL_UNAVAILABLE: the email request quota could not be checked.',
   })
   async resendVerification(
     @Body({ schema: ResendVerificationDto.schema }) dto: ResendVerificationDto,

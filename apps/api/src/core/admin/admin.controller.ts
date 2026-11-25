@@ -39,12 +39,12 @@ import {
   type AdminUserResponse,
   AuthType,
   coerceSupportedLocale,
-  PAGINATION,
   type RequestPrincipal,
   SystemRole,
 } from '@amcore/shared'
 
-import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { ApiQuerySchema } from '../../common/schemas/api-query-schema.js'
+import { PRIVATE_NO_STORE_HEADERS, SchemaResponse } from '../../common/schemas/schema-response.js'
 import { SchemaValidationException } from '../../common/schemas/schema-validation.js'
 import type { CleanupResult } from '../../infrastructure/schedule/cleanup.service.js'
 import { RATE_LIMIT_POLICIES, RateLimit } from '../../infrastructure/throttling/index.js'
@@ -123,6 +123,7 @@ export class AdminController {
 
   @Get('audit-logs')
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @RateLimit(RATE_LIMIT_POLICIES.AUDIT_READ)
   @ApiOperation({
     summary: 'Browse redacted audit events — live SUPER_ADMIN bearer only',
@@ -200,22 +201,9 @@ export class AdminController {
   }
 
   @Get('users')
+  @ApiQuerySchema(AdminUserListQueryDto.schema, ['page', 'limit'])
+  @ApiResponse({ status: 403, description: 'Current SUPER_ADMIN role required' })
   @ApiOperation({ summary: 'List all users — SUPER_ADMIN only' })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    type: Number,
-    minimum: 1,
-    example: PAGINATION.DEFAULT_PAGE,
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    minimum: 1,
-    maximum: PAGINATION.MAX_LIMIT,
-    example: PAGINATION.DEFAULT_LIMIT,
-  })
   @ApiQuery({
     name: 'search',
     required: false,
@@ -238,7 +226,9 @@ export class AdminController {
   }
 
   @Get('users/:id')
+  @ApiQuerySchema(AdminUserDetailQueryDto.schema, ['page', 'limit'])
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiOperation({
     summary: 'Inspect user sign-in setup and paginated memberships — SUPER_ADMIN only',
     description:
@@ -247,14 +237,6 @@ export class AdminController {
       'Requires a current SUPER_ADMIN bearer; API keys are rejected.',
   })
   @ApiParam({ name: 'id', description: 'User CUID or UUID' })
-  @ApiQuery({ name: 'page', required: false, type: Number, minimum: 1 })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    minimum: 1,
-    maximum: PAGINATION.MAX_LIMIT,
-  })
   @ApiQuery({
     name: 'search',
     required: false,
@@ -283,6 +265,7 @@ export class AdminController {
   }
 
   @Patch('users/:id')
+  @ApiResponse({ status: 404, description: 'User no longer exists' })
   @ApiOperation({ summary: 'Update user system role — SUPER_ADMIN only' })
   @ApiParam({ name: 'id', description: 'Target user ID' })
   // OB-06b: destructive privileged op — require a recently re-authenticated
@@ -314,7 +297,9 @@ export class AdminController {
   }
 
   @Get('users/:id/sessions')
+  @ApiQuerySchema(AdminSessionsQueryDto.schema, ['page', 'limit'])
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiOperation({
     summary: "List another user's active sessions — SUPER_ADMIN only",
     description:
@@ -323,14 +308,6 @@ export class AdminController {
       'hidden from Audit browsing by default.',
   })
   @ApiParam({ name: 'id', description: 'Target user CUID or UUID' })
-  @ApiQuery({ name: 'page', required: false, type: Number, minimum: 1 })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    minimum: 1,
-    maximum: PAGINATION.MAX_LIMIT,
-  })
   @ApiHeader({
     name: 'accept-language',
     required: false,
@@ -427,6 +404,10 @@ export class AdminController {
   }
 
   @Post('cleanup')
+  @ApiResponse({
+    status: 403,
+    description: 'Current SUPER_ADMIN role and recent authentication required',
+  })
   @ApiOperation({ summary: 'Manually trigger expired records cleanup — SUPER_ADMIN only' })
   // OB-06b: destructive privileged op — require step-up freshness.
   @RequireFreshAuth()
@@ -439,22 +420,9 @@ export class AdminController {
   }
 
   @Get('organizations')
+  @ApiQuerySchema(AdminOrganizationListQueryDto.schema, ['page', 'limit'])
+  @ApiResponse({ status: 403, description: 'Current SUPER_ADMIN role required' })
   @ApiOperation({ summary: 'List all organizations — SUPER_ADMIN only' })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    type: Number,
-    minimum: 1,
-    example: PAGINATION.DEFAULT_PAGE,
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    minimum: 1,
-    maximum: PAGINATION.MAX_LIMIT,
-    example: PAGINATION.DEFAULT_LIMIT,
-  })
   @ApiQuery({
     name: 'search',
     required: false,
@@ -486,19 +454,13 @@ export class AdminController {
   }
 
   @Get('organizations/:id')
+  @ApiQuerySchema(AdminOrganizationDetailQueryDto.schema, ['page', 'limit'])
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiOperation({
     summary: 'Inspect one organization and searchable paginated members — SUPER_ADMIN only',
   })
   @ApiParam({ name: 'id', description: 'Organization CUID or UUID' })
-  @ApiQuery({ name: 'page', required: false, type: Number, minimum: 1 })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    minimum: 1,
-    maximum: PAGINATION.MAX_LIMIT,
-  })
   @ApiQuery({
     name: 'search',
     required: false,
@@ -528,6 +490,7 @@ export class AdminController {
 
   @Get('overview')
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiOperation({ summary: 'Console Overview status — SUPER_ADMIN only' })
   @SchemaResponse({
     type: AdminOverviewResponseDto,

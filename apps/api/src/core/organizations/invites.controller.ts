@@ -21,7 +21,6 @@ import {
   ApiNotFoundResponse,
   ApiOperation,
   ApiParam,
-  ApiQuery,
   ApiServiceUnavailableResponse,
   ApiTags,
   ApiTooManyRequestsResponse,
@@ -30,6 +29,7 @@ import {
 
 import { AuthType, ORGANIZATION_CONTEXT_FAMILY, type ReissueInviteInput } from '@amcore/shared'
 
+import { ApiQuerySchema } from '../../common/schemas/api-query-schema.js'
 import { SchemaResponse } from '../../common/schemas/schema-response.js'
 import { Auth } from '../auth/decorators/auth.decorator.js'
 import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator.js'
@@ -73,10 +73,7 @@ export class InvitesController {
   @RequestContextPolicy({ kind: 'organization', selector: { param: 'orgId' } })
   @Get()
   @ApiOperation({ summary: 'List pending/retained expired invitations with complete role intent' })
-  @ApiQuery({ name: 'page', required: false, type: Number, minimum: 1, maximum: 10000 })
-  @ApiQuery({ name: 'limit', required: false, type: Number, minimum: 1, maximum: 100 })
-  @ApiQuery({ name: 'search', required: false, type: String })
-  @ApiQuery({ name: 'status', required: false, enum: ['pending', 'expired', 'all'] })
+  @ApiQuerySchema(InviteListQueryDto.schema)
   @SchemaResponse({ type: InviteListResponseDto, status: 200 })
   listInvites(
     @Param('orgId') orgId: string,
@@ -92,9 +89,7 @@ export class InvitesController {
   @ApiOperation({
     summary: 'Discover compact assignable roles and complete default MEMBER projection',
   })
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number, maximum: 100 })
-  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuerySchema(InviteRoleChoicesQueryDto.schema)
   @SchemaResponse({ type: InviteRoleChoicesResponseDto, status: 200 })
   roleChoices(
     @Param('orgId') orgId: string,
@@ -167,7 +162,7 @@ export class InvitesController {
   @HttpCode(204)
   @ApiOperation({ summary: 'Revoke the expected generation; this never removes membership' })
   @ApiParam({ name: 'inviteId', type: String })
-  @ApiQuery({ name: 'expectedGeneration', required: true, type: Number })
+  @ApiQuerySchema(RevokeInviteQueryDto.schema)
   @ApiHeader({ name: 'X-Invitation-Operation-Id', required: true })
   @ApiNoContentResponse({ description: 'Revocation committed; empty body' })
   revokeInvite(

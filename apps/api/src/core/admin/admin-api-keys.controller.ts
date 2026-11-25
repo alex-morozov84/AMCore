@@ -17,7 +17,8 @@ import {
   SystemRole,
 } from '@amcore/shared'
 
-import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { ApiQuerySchema } from '../../common/schemas/api-query-schema.js'
+import { PRIVATE_NO_STORE_HEADERS, SchemaResponse } from '../../common/schemas/schema-response.js'
 import { SchemaValidationException } from '../../common/schemas/schema-validation.js'
 import { RATE_LIMIT_POLICIES, RateLimit } from '../../infrastructure/throttling/index.js'
 import { ApiKeyRevocationService } from '../api-keys/api-key-revocation.service.js'
@@ -56,15 +57,11 @@ export class AdminApiKeysController {
   ) {}
 
   @Get()
+  @ApiQuerySchema(AdminApiKeyQueryDto.schema, ['page', 'limit'])
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @RateLimit(RATE_LIMIT_POLICIES.AUDIT_READ)
   @ApiOperation({ summary: 'Browse platform API-key metadata with strict read accountability' })
-  @ApiQuery({ name: 'page', required: false, schema: { type: 'integer', minimum: 1, default: 1 } })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
-  })
   @ApiQuery({
     name: 'search',
     required: false,
@@ -97,8 +94,12 @@ export class AdminApiKeysController {
     description: 'Name defaults ascending; other fields descending; nullable dates last',
   })
   @ApiResponse({
+    status: 500,
+    description: 'Inventory or mandatory read-audit failed; no metadata returned',
+  })
+  @ApiResponse({
     status: 503,
-    description: 'Inventory or mandatory read-audit unavailable; no metadata returned',
+    description: 'Database pool timeout during inventory or read-audit (DATABASE_POOL_TIMEOUT)',
   })
   @SchemaResponse({
     type: AdminApiKeyListDto,
@@ -114,6 +115,7 @@ export class AdminApiKeysController {
 
   @Delete(':id')
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @RequireFreshAuth()
   @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
   @ApiOperation({ summary: 'Irreversibly revoke one API key; known revoked keys are a no-op' })
@@ -136,6 +138,7 @@ export class AdminApiKeysController {
   @Post('revoke')
   @HttpCode(200)
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @RequireFreshAuth()
   @RateLimit(RATE_LIMIT_POLICIES.EXPENSIVE_ACTION)
   @ApiOperation({

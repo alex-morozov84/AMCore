@@ -25,7 +25,7 @@ import {
 } from '@amcore/shared'
 
 import { NotFoundException } from '../../common/exceptions/index.js'
-import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { PRIVATE_NO_STORE_HEADERS, SchemaResponse } from '../../common/schemas/schema-response.js'
 import { Auth } from '../auth/decorators/auth.decorator.js'
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
 import { SystemRoles } from '../auth/decorators/system-roles.decorator.js'
@@ -74,6 +74,7 @@ export class BackgroundWorkController {
 
   @Get('works')
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiOperation({
     summary: 'Discover registered background work and current command capabilities',
     description:
@@ -92,6 +93,7 @@ export class BackgroundWorkController {
 
   @Get('works/:workId/jobs')
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiOperation({
     summary: 'Read a bounded status window of registered work',
     description:
@@ -104,7 +106,11 @@ export class BackgroundWorkController {
   @ApiQuery({
     name: 'state',
     required: false,
-    enum: ['waiting', 'active', 'delayed', 'prioritized', 'failed', 'completed'],
+    schema: {
+      type: 'string',
+      enum: ['waiting', 'active', 'delayed', 'prioritized', 'failed', 'completed'],
+      default: 'failed',
+    },
   })
   @ApiQuery({
     name: 'source',
@@ -130,9 +136,26 @@ export class BackgroundWorkController {
     description:
       'Case-insensitive literal job ID substring within the selected first512-identity window, before pagination. Does not expand observation or search other states.',
   })
-  @ApiQuery({ name: 'page', required: false, type: Number, minimum: 1, maximum: 512 })
-  @ApiQuery({ name: 'limit', required: false, type: Number, minimum: 1, maximum: 50 })
-  @ApiResponse({ status: 400, description: 'Invalid status, page or registered work identifier' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'At most ceil(512 / limit).',
+    schema: { type: 'integer', minimum: 1, maximum: 512, default: 1 },
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    schema: { type: 'integer', minimum: 1, maximum: 50, default: 25 },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid status, page, filters or work identifier syntax',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'ACTION_UNAVAILABLE: this work has no independent provider evidence view',
+  })
+  @ApiResponse({ status: 503, description: 'WORK_UNAVAILABLE: work is unknown or disabled' })
   @SchemaResponse({
     type: BackgroundWorkPageDto,
     status: 200,
@@ -148,6 +171,7 @@ export class BackgroundWorkController {
 
   @Get('works/:workId/jobs/:jobId')
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiOperation({
     summary: 'Read a registered work target’s safe diagnostics and action eligibility',
     description:
@@ -164,6 +188,11 @@ export class BackgroundWorkController {
   })
   @ApiResponse({ status: 400, description: 'Invalid work or target identifier' })
   @ApiResponse({ status: 404, description: 'Target history absent or expired' })
+  @ApiResponse({
+    status: 409,
+    description: 'Observation cannot complete within the work read policy',
+  })
+  @ApiResponse({ status: 503, description: 'WORK_UNAVAILABLE: work is unknown or disabled' })
   @SchemaResponse({
     type: BackgroundWorkJobDto,
     status: 200,
@@ -182,6 +211,7 @@ export class BackgroundWorkController {
   @Post('commands')
   @HttpCode(200)
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiOperation({
     summary: 'Request a registered background-work action',
     description:
@@ -190,10 +220,12 @@ export class BackgroundWorkController {
       'A 200 receipt does not imply that every target was applied. Bull Board remains read-only.',
   })
   @ApiResponse({ status: 400, description: 'Invalid command contract or parameters' })
+  @ApiResponse({ status: 404, description: 'The actor-bound command receipt is unavailable' })
   @ApiResponse({ status: 413, description: 'Command input exceeds the 32KiB byte ceiling' })
   @ApiResponse({
     status: 202,
-    type: BackgroundWorkReceiptDto,
+    headers: PRIVATE_NO_STORE_HEADERS,
+    standardSchema: BackgroundWorkReceiptDto.schema,
     description: 'Durable receipt with unconfirmed targets; never redispatch',
   })
   @SchemaResponse({
@@ -213,6 +245,7 @@ export class BackgroundWorkController {
 
   @Get('commands/:commandId')
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiOperation({
     summary: 'Read your background-work command receipt',
     description:
@@ -240,6 +273,7 @@ export class BackgroundWorkController {
   @Post('commands/:commandId/reconciliation')
   @HttpCode(200)
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiOperation({
     summary: 'Acknowledge an irreducibly unknown ADMIN command without repeating it',
     description:
@@ -272,6 +306,7 @@ export class BackgroundWorkController {
   @Post('works/:workId/jobs/:jobId/reconciliation')
   @HttpCode(204)
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 204, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiOperation({
     summary: 'Record a provider uncertainty disposition independently of ADMIN commands',
     description:

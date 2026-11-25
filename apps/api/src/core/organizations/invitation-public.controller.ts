@@ -2,9 +2,9 @@ import { Body, Controller, Headers, HttpCode, Post, Req, Res, UseGuards } from '
 import {
   ApiBadRequestResponse,
   ApiConflictResponse,
-  ApiForbiddenResponse,
   ApiHeader,
   ApiOperation,
+  ApiResponse,
   ApiServiceUnavailableResponse,
   ApiTags,
   ApiTooManyRequestsResponse,
@@ -43,8 +43,6 @@ import {
 @ApiFrontendContext()
 @ApiTags('auth')
 @ApiBadRequestResponse({ description: 'Invalid, expired or superseded invitation' })
-@ApiConflictResponse({ description: 'Existing account or authentication attempt' })
-@ApiForbiddenResponse({ description: 'Signup policy denied' })
 @ApiTooManyRequestsResponse({ description: 'Invitation admission/registration budget exceeded' })
 @ApiServiceUnavailableResponse({ description: 'Invitation authority unavailable' })
 @Controller('auth/invites')
@@ -87,6 +85,23 @@ export class InvitationPublicController {
   }
 
   @Post('register')
+  @ApiConflictResponse({
+    description:
+      'EMAIL_ALREADY_EXISTS or conflicting browser publication or authentication attempt.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'TOKEN_INVALID for mismatched frontend context or AUTH_HANDOFF_INVALID.',
+  })
+  @ApiResponse({
+    status: 201,
+    headers: {
+      'Set-Cookie': {
+        schema: { type: 'string' },
+        description: 'Sets refresh_token for the new session.',
+      },
+    },
+  })
   @ApiRegistrationPublication()
   @RequestContextPolicy({ kind: 'personal' })
   @RateLimit({ rate: 5, per: 3600000, burst: 5 })

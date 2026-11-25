@@ -1,5 +1,11 @@
 import { Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common'
-import { ApiBearerAuth, ApiNoContentResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
+import {
+  ApiBearerAuth,
+  ApiNoContentResponse,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger'
 
 import {
   AuthType,
@@ -9,6 +15,7 @@ import {
 } from '@amcore/shared'
 
 import { BadRequestException } from '../../common/exceptions/index.js'
+import { ApiQuerySchema } from '../../common/schemas/api-query-schema.js'
 import { SchemaResponse } from '../../common/schemas/schema-response.js'
 import { Auth } from '../auth/decorators/auth.decorator.js'
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
@@ -34,6 +41,7 @@ export class NotificationsController {
   constructor(private readonly feed: NotificationFeedService) {}
 
   @Get()
+  @ApiQuerySchema(NotificationFeedQueryDto.schema)
   @ApiOperation({
     summary: 'Cursor-paginated in-app notification feed',
     description:
@@ -44,6 +52,7 @@ export class NotificationsController {
       'changes do not add or remove existing items. Pages are filtered before the limit, so ' +
       '`hasMore`/`nextCursor` always describe feed items only.',
   })
+  @ApiResponse({ status: 400, description: 'Invalid query parameters or unreadable feed cursor.' })
   @SchemaResponse({
     type: NotificationFeedResponseDto,
     status: 200,

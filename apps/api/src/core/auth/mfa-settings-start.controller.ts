@@ -38,7 +38,7 @@ import {
 } from './organization-context/request-context-policy.js'
 
 class StartInput extends createSchemaDto(mfaSettingsStartInputSchema) {}
-class LookupInput extends createSchemaDto(mfaSettingsStartLookupSchema) {}
+class MfaSettingsStartLookupInput extends createSchemaDto(mfaSettingsStartLookupSchema) {}
 const StartResult = createSchemaDto(mfaSettingsStartResultSchema, 'MfaSettingsStartResult')
 const StatusResult = createSchemaDto(mfaSettingsStartStatusSchema, 'MfaSettingsStartStatus')
 
@@ -69,7 +69,10 @@ function source(req: Request): {
 @OrganizationContextBoundary({ apiRoots: [] })
 @ApiBadRequestResponse({ description: 'Invalid strict operation or dispatch deadline' })
 @ApiUnauthorizedResponse({ description: 'Original source session is invalid' })
-@ApiForbiddenResponse({ description: 'Browser binding required; mixed credentials refused' })
+@ApiForbiddenResponse({
+  description:
+    'Trusted browser transport with the original source binding is required; mixed credentials are refused',
+})
 @ApiConflictResponse({ description: 'Original source or operation tuple changed' })
 @ApiTooManyRequestsResponse({ description: 'Source/start request budget exceeded' })
 @ApiServiceUnavailableResponse({ description: 'Authority storage unavailable' })
@@ -122,7 +125,7 @@ export class MfaSettingsStartController {
   })
   @SchemaResponse({ type: StatusResult, status: 200 })
   status(
-    @Body({ schema: LookupInput.schema }) body: LookupInput,
+    @Body({ schema: MfaSettingsStartLookupInput.schema }) body: MfaSettingsStartLookupInput,
     @Req() req: Request
   ): ReturnType<MfaSettingsStartRecoveryService['resolve']> {
     const { token, binding } = source(req)
@@ -134,7 +137,7 @@ export class MfaSettingsStartController {
   @ApiOperation({ summary: 'Retire an unprogressed settings start or fence its delayed creation' })
   @SchemaResponse({ type: StatusResult, status: 200 })
   abandon(
-    @Body({ schema: LookupInput.schema }) body: LookupInput,
+    @Body({ schema: MfaSettingsStartLookupInput.schema }) body: MfaSettingsStartLookupInput,
     @Req() req: Request
   ): ReturnType<MfaSettingsStartRecoveryService['resolve']> {
     const { token, binding } = source(req)

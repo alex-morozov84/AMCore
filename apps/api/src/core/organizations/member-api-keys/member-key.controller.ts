@@ -8,7 +8,7 @@ import {
   ApiOperation,
   ApiParam,
   ApiPayloadTooLargeResponse,
-  ApiQuery,
+  ApiResponse,
   ApiServiceUnavailableResponse,
   ApiTags,
   ApiTooManyRequestsResponse,
@@ -26,7 +26,11 @@ import {
 } from '@amcore/shared'
 
 import { AppException } from '../../../common/exceptions/index.js'
-import { SchemaResponse } from '../../../common/schemas/schema-response.js'
+import { ApiQuerySchema } from '../../../common/schemas/api-query-schema.js'
+import {
+  PRIVATE_NO_STORE_HEADERS,
+  SchemaResponse,
+} from '../../../common/schemas/schema-response.js'
 import { Auth } from '../../auth/decorators/auth.decorator.js'
 import { RequireTeamAccess } from '../../auth/decorators/require-team-access.decorator.js'
 import {
@@ -87,11 +91,9 @@ export class MemberKeyController {
   @RequestContextPolicy({ kind: 'organization', selector: { param: 'orgId' } })
   @Get()
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiOperation({ summary: 'List safe keys for one current organization member' })
-  @ApiQuery({ name: 'expectedMemberId', required: true, type: String })
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'status', required: false, enum: ['all', 'unexpired', 'expired', 'revoked'] })
+  @ApiQuerySchema(MemberKeyQueryDto.schema)
   @SchemaResponse({ type: MemberKeyListDto, status: 200 })
   list(
     @Param('orgId') orgId: string,
@@ -107,6 +109,7 @@ export class MemberKeyController {
   @RequestContextPolicy({ kind: 'organization', selector: { param: 'orgId' } })
   @Post(':keyId/revoke')
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiOperation({ summary: 'Permanently revoke one member key in this organization' })
   @ApiParam({ name: 'keyId', description: 'Key ID belonging to target user and organization' })
   @SchemaResponse({ type: MemberKeyResultDto, status: 200 })
@@ -125,6 +128,7 @@ export class MemberKeyController {
   @RequestContextPolicy({ kind: 'organization', selector: { param: 'orgId' } })
   @Post('revoke-all')
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @ApiOperation({ summary: 'Permanently revoke all current unrevoked member keys; maximum 1000' })
   @SchemaResponse({ type: MemberKeyResultDto, status: 200 })
   all(

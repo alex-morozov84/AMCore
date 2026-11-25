@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@ne
 
 import { AuthType, type RequestPrincipal, SystemRole } from '@amcore/shared'
 
-import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { PRIVATE_NO_STORE_HEADERS, SchemaResponse } from '../../common/schemas/schema-response.js'
 import { EnvService } from '../../env/env.service.js'
 import { PrismaService } from '../../prisma/index.js'
 import { Auth } from '../auth/decorators/auth.decorator.js'
@@ -37,7 +37,13 @@ import { OrganizationSetupOperations } from '../organizations/organization-setup
 })
 @ApiResponse({
   status: 503,
-  description: 'SETUP_BUSY (Retry-After: 1) or SETUP_UNCONFIRMED; preserve original intent',
+  description: 'SETUP_BUSY or SETUP_UNCONFIRMED; preserve original intent',
+  headers: {
+    'Retry-After': {
+      description: 'Present only on SETUP_BUSY.',
+      schema: { type: 'integer', enum: [1] },
+    },
+  },
 })
 export class OrganizationEstablishmentController {
   constructor(
@@ -56,6 +62,7 @@ export class OrganizationEstablishmentController {
   }
 
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @Get('status')
   @ApiOperation({ summary: 'Inspect initial organization setup state; never starts setup' })
   @SchemaResponse({ type: OrganizationSetupStatusDto, status: 200 })
@@ -64,6 +71,7 @@ export class OrganizationEstablishmentController {
   }
 
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @Post('accounts/prepare')
   @HttpCode(200)
   @RequireFreshAuth()
@@ -82,6 +90,7 @@ export class OrganizationEstablishmentController {
   }
 
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @Get('accounts/:userId/status')
   @ApiOperation({
     summary:
@@ -98,6 +107,7 @@ export class OrganizationEstablishmentController {
   }
 
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @Post('bootstrap')
   @HttpCode(200)
   @RequireFreshAuth()

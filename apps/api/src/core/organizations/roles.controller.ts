@@ -13,10 +13,11 @@ import {
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiConflictResponse,
   ApiForbiddenResponse,
   ApiNoContentResponse,
+  ApiNotFoundResponse,
   ApiOperation,
-  ApiQuery,
   ApiSecurity,
   ApiTags,
   ApiUnauthorizedResponse,
@@ -26,7 +27,6 @@ import { ORGANIZATION_CONTEXT_FAMILY } from '@amcore/shared'
 import {
   AuthType,
   type OrgRoleResponse,
-  PAGINATION,
   type PermissionResponse,
   type RequestPrincipal,
   type RoleListResponse,
@@ -34,6 +34,7 @@ import {
 
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js'
 import { ApiProtectionUnavailable } from '../../common/exceptions/index.js'
+import { ApiQuerySchema } from '../../common/schemas/api-query-schema.js'
 import { SchemaResponse } from '../../common/schemas/schema-response.js'
 import { Auth } from '../auth/decorators/auth.decorator.js'
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
@@ -90,21 +91,7 @@ export class RolesController {
   @ApiSecurity('apiKeyBearer')
   @ApiProtectionUnavailable('API key')
   @ApiOperation({ summary: 'List all roles in the organization — requires full TeamAccess' })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    type: Number,
-    minimum: 1,
-    example: PAGINATION.DEFAULT_PAGE,
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    minimum: 1,
-    maximum: PAGINATION.MAX_LIMIT,
-    example: PAGINATION.DEFAULT_LIMIT,
-  })
+  @ApiQuerySchema(PaginationQueryDto.schema)
   @SchemaResponse({ type: RoleListResponseDto, status: 200, description: 'Paginated roles' })
   @RequestContextPolicy({
     kind: 'organization',
@@ -120,6 +107,8 @@ export class RolesController {
   }
 
   @Post()
+  @ApiNotFoundResponse({ description: 'The organization no longer exists.' })
+  @ApiConflictResponse({ description: 'A role with this name already exists.' })
   @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
   @ApiProtectionUnavailable('API key')
@@ -139,6 +128,8 @@ export class RolesController {
   }
 
   @Patch(':roleId')
+  @ApiNotFoundResponse({ description: 'The role is unavailable in this organization.' })
+  @ApiConflictResponse({ description: 'A role with this name already exists.' })
   @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
   @ApiProtectionUnavailable('API key')
@@ -159,6 +150,7 @@ export class RolesController {
   }
 
   @Delete(':roleId')
+  @ApiNotFoundResponse({ description: 'The role is unavailable in this organization.' })
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
@@ -181,6 +173,7 @@ export class RolesController {
   }
 
   @Post(':roleId/permissions')
+  @ApiNotFoundResponse({ description: 'The role is unavailable in this organization.' })
   @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
   @ApiProtectionUnavailable('API key')
@@ -205,6 +198,9 @@ export class RolesController {
   }
 
   @Delete(':roleId/permissions/:permId')
+  @ApiNotFoundResponse({
+    description: 'The role or permission is unavailable in this organization.',
+  })
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')

@@ -38,6 +38,7 @@ import {
 } from '@amcore/shared'
 
 import { ApiProtectionUnavailable } from '../../common/exceptions/index.js'
+import { ApiQuerySchema } from '../../common/schemas/api-query-schema.js'
 import { SchemaResponse } from '../../common/schemas/schema-response.js'
 import { Auth } from '../auth/decorators/auth.decorator.js'
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
@@ -82,25 +83,7 @@ export class MembersController {
   ) {}
 
   @ApiParam({ name: 'orgId', description: 'Current organization membership selector' })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    type: Number,
-    description: 'Default1; bounded offset',
-  })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Default20, maximum100' })
-  @ApiQuery({
-    name: 'search',
-    required: false,
-    type: String,
-    description: 'Literal name/email contains; maximum100 Unicode code points',
-  })
-  @ApiQuery({
-    name: 'roleId',
-    required: false,
-    type: String,
-    description: 'Only members who hold this role; an unknown role matches nobody',
-  })
+  @ApiQuerySchema(OrganizationMembersQueryDto.schema)
   @ApiBadRequestResponse({ description: 'Invalid query or selector' })
   @ApiNotFoundResponse({ description: 'Organization/member unavailable' })
   @ApiServiceUnavailableResponse({
@@ -110,7 +93,11 @@ export class MembersController {
   @Auth(AuthType.Bearer)
   @RequireTeamAccess('orgId')
   @RequestContextPolicy({ kind: 'organization', selector: { param: 'orgId' } })
-  @ApiOperation({ summary: 'List organization members; full TeamAccess and membership required' })
+  @ApiOperation({
+    summary: 'List organization members; full TeamAccess and membership required',
+    description:
+      'Search matches literal name or email and allows up to 100 Unicode code points after trimming. An unknown roleId matches nobody. The combined pagination offset is bounded.',
+  })
   @SchemaResponse({ type: OrganizationMembersResponseDto, status: 200 })
   list(
     @Param('orgId') orgId: string,
@@ -122,15 +109,7 @@ export class MembersController {
 
   @ApiParam({ name: 'orgId', description: 'Current organization membership selector' })
   @ApiParam({ name: 'userId', description: 'Target member user ID' })
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Default20, maximum100' })
-  @ApiQuery({
-    name: 'search',
-    required: false,
-    type: String,
-    description: 'Literal role name search',
-  })
-  @ApiQuery({ name: 'section', required: false, enum: ['available', 'assigned'] })
+  @ApiQuerySchema(MemberRolesQueryDto.schema)
   @ApiBadRequestResponse({ description: 'Invalid query or selector' })
   @ApiNotFoundResponse({ description: 'MEMBER_UNAVAILABLE' })
   @ApiServiceUnavailableResponse({ description: 'MEMBER_READ_UNAVAILABLE' })
@@ -138,7 +117,11 @@ export class MembersController {
   @Auth(AuthType.Bearer)
   @RequireTeamAccess('orgId')
   @RequestContextPolicy({ kind: 'organization', selector: { param: 'orgId' } })
-  @ApiOperation({ summary: 'Read complete member assignments and paginated role choices' })
+  @ApiOperation({
+    summary: 'Read complete member assignments and paginated role choices',
+    description:
+      'Search matches literal role name and allows up to 100 Unicode code points after trimming. The combined pagination offset is bounded.',
+  })
   @SchemaResponse({ type: MemberRolesResponseDto, status: 200 })
   roles(
     @Param('orgId') orgId: string,
@@ -256,6 +239,8 @@ export class MembersController {
   }
 
   @Post(':userId/roles/:roleId')
+  @ApiNotFoundResponse({ description: 'The member or role is unavailable in this organization.' })
+  @ApiConflictResponse({ description: 'The member already holds the role.' })
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
@@ -277,12 +262,13 @@ export class MembersController {
   }
 
   @Delete(':userId/roles/:roleId')
+  @ApiNotFoundResponse({ description: 'The member is unavailable in this organization.' })
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
   @ApiProtectionUnavailable('API key')
   @ApiOperation({ summary: 'Remove a role from a member — requires full TeamAccess' })
-  @ApiNoContentResponse({ description: 'Role removed' })
+  @ApiNoContentResponse({ description: 'Role removed, or already absent from the member' })
   @RequestContextPolicy({
     kind: 'organization',
     selector: { param: 'orgId' },

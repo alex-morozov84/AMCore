@@ -9,7 +9,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common'
-import { ApiBearerAuth, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger'
+import { ApiBearerAuth, ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 
 import {
   AI_OPERATOR_REASON_HEADER,
@@ -20,6 +20,7 @@ import {
   type RequestPrincipal,
 } from '@amcore/shared'
 
+import { ApiQuerySchema } from '../../../common/schemas/api-query-schema.js'
 import { SchemaResponse } from '../../../common/schemas/schema-response.js'
 import { Auth } from '../../auth/decorators/auth.decorator.js'
 import { CurrentUser } from '../../auth/decorators/current-user.decorator.js'
@@ -51,7 +52,18 @@ export class AiConversationControlController {
 
   @Post(':id/takeover')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Take human control of a conversation (owner or SUPER_ADMIN operator)' })
+  @ApiOperation({ summary: 'Take human control of a conversation (owner or SUPER_ADMIN operator)', description: 'A SUPER_ADMIN operating on another user’s conversation must provide a reason.' })
+  @ApiResponse({ status: 400, description: 'Invalid request or missing or invalid cross-user operator reason.' })
+  @ApiResponse({
+    status: 404,
+    description: 'The conversation does not exist or is not accessible to the caller.',
+    content: { 'application/json': { schema: { $ref: '#/components/schemas/HttpExceptionResponse' } } },
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'The conversation is closed, held by someone else, or changed concurrently.',
+    content: { 'application/json': { schema: { $ref: '#/components/schemas/HttpExceptionResponse' } } },
+  })
   @SchemaResponse({ type: AiConversationResponseDto, status: 200, description: 'Taken over' })
   takeover(
     @CurrentUser() principal: RequestPrincipal,
@@ -63,7 +75,17 @@ export class AiConversationControlController {
 
   @Post(':id/release')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Release control back to the assistant (holder or owner)' })
+  @ApiOperation({ summary: 'Release control back to the assistant (holder or owner)', description: 'A SUPER_ADMIN operating on another user’s conversation must provide a reason.' })
+  @ApiResponse({
+    status: 404,
+    description: 'The conversation does not exist or is not accessible to the caller.',
+    content: { 'application/json': { schema: { $ref: '#/components/schemas/HttpExceptionResponse' } } },
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'The conversation is closed or held by someone else.',
+    content: { 'application/json': { schema: { $ref: '#/components/schemas/HttpExceptionResponse' } } },
+  })
   @SchemaResponse({ type: AiConversationResponseDto, status: 200, description: 'Released' })
   release(
     @CurrentUser() principal: RequestPrincipal,
@@ -74,12 +96,19 @@ export class AiConversationControlController {
   }
 
   @Get(':id/messages')
+  @ApiQuerySchema(AiTranscriptQueryDto.schema)
   @ApiOperation({ summary: 'Read a conversation transcript (owner or SUPER_ADMIN operator)' })
   @ApiHeader({
     name: AI_OPERATOR_REASON_HEADER,
     required: false,
     description: 'Reason / ticket ref — required for a cross-user SUPER_ADMIN operator review.',
   })
+  @ApiResponse({
+    status: 404,
+    description: 'The conversation does not exist or is not accessible to the caller.',
+    content: { 'application/json': { schema: { $ref: '#/components/schemas/HttpExceptionResponse' } } },
+  })
+  @ApiResponse({ status: 400, description: 'Invalid transcript query or missing or invalid cross-user operator reason.' })
   @SchemaResponse({ type: AiTranscriptResponseDto, status: 200, description: 'Transcript page' })
   getTranscript(
     @CurrentUser() principal: RequestPrincipal,
@@ -92,7 +121,17 @@ export class AiConversationControlController {
   }
 
   @Post(':id/messages')
-  @ApiOperation({ summary: 'Post a human turn while holding control' })
+  @ApiOperation({ summary: 'Post a human turn while holding control', description: 'Only text message parts are accepted. A SUPER_ADMIN operating on another user’s conversation must provide a reason.' })
+  @ApiResponse({
+    status: 404,
+    description: 'The conversation does not exist or is not accessible to the caller.',
+    content: { 'application/json': { schema: { $ref: '#/components/schemas/HttpExceptionResponse' } } },
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'The caller does not hold control or the conversation state does not allow posting.',
+    content: { 'application/json': { schema: { $ref: '#/components/schemas/HttpExceptionResponse' } } },
+  })
   @SchemaResponse({ type: AiMessageResponseDto, status: 201, description: 'Posted message' })
   postMessage(
     @CurrentUser() principal: RequestPrincipal,

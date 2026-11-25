@@ -18,9 +18,9 @@ export function addCorrelationHeader(document: OpenAPIObject): void {
     for (const method of ['get', 'post', 'put', 'patch', 'delete', 'options', 'head'] as const) {
       for (const response of Object.values(item?.[method]?.responses ?? {})) {
         if (!response || '$ref' in response) continue
-        response.headers = {
-          ...response.headers,
-          'X-Correlation-Id': { $ref: `#/components/headers/${HEADER_COMPONENT}` },
+        response.headers ??= {}
+        response.headers['X-Correlation-Id'] ??= {
+          $ref: `#/components/headers/${HEADER_COMPONENT}`,
         }
       }
     }

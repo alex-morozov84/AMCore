@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@ne
 
 import { AuthType, ORGANIZATION_CONTEXT_FAMILY } from '@amcore/shared'
 
-import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { PRIVATE_NO_STORE_HEADERS, SchemaResponse } from '../../common/schemas/schema-response.js'
 import { Auth } from '../auth/decorators/auth.decorator.js'
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
 import {
@@ -28,6 +28,7 @@ export class OrganizationCreationController {
 
   @Get('creation-policy')
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @RequestContextPolicy({ kind: 'personal' })
   @ApiOperation({ summary: 'Read the independent self-service organization creation policy' })
   @SchemaResponse({ type: OrganizationCreationPolicyDto, status: 200 })
@@ -37,6 +38,7 @@ export class OrganizationCreationController {
 
   @Get('creation-results/:operationId')
   @Header('Cache-Control', 'private, no-store')
+  @ApiResponse({ status: 200, headers: PRIVATE_NO_STORE_HEADERS })
   @RequestContextPolicy({ kind: 'personal' })
   @ApiOperation({
     summary: 'Resolve the current actor’s committed organization creation result',

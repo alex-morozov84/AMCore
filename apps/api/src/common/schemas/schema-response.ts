@@ -1,8 +1,12 @@
 import { HttpCode, SetMetadata } from '@nestjs/common'
-import { ApiResponse } from '@nestjs/swagger'
+import { ApiResponse, type ApiResponseOptions } from '@nestjs/swagger'
 import { z } from 'zod'
 
 import type { SchemaDto } from './schema-dto.js'
+
+export const PRIVATE_NO_STORE_HEADERS: ApiResponseOptions['headers'] = {
+  'Cache-Control': { schema: { type: 'string', enum: ['private, no-store'] } },
+}
 
 export const RESPONSE_SCHEMA = 'amcore:response-schema'
 export const RESPONSE_SCHEMAS_BY_STATUS = 'amcore:response-schemas-by-status'

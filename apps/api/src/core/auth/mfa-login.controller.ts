@@ -5,6 +5,7 @@ import {
   ApiForbiddenResponse,
   ApiHeader,
   ApiOperation,
+  ApiResponse,
   ApiServiceUnavailableResponse,
   ApiTags,
   ApiTooManyRequestsResponse,
@@ -114,6 +115,10 @@ export class MfaLoginController {
   }
 
   @Post('status')
+  @ApiUnauthorizedResponse({
+    description: 'AUTH_CONTEXT_CHANGED: the original context changed or expired',
+  })
+  @ApiServiceUnavailableResponse({ description: 'MFA authority storage is unavailable' })
   @RequestContextPolicy({ kind: 'personal' })
   @ApiOperation({
     summary: 'Read only this live flow status; never repeat a mutation or redisplay secrets',
@@ -149,7 +154,12 @@ export class MfaLoginController {
   @ApiOperation({
     summary: 'Verify one TOTP or unused backup code for the exact flow; issue no credentials',
   })
-  @SchemaResponse({ type: VerifyResult, status: 200 })
+  @SchemaResponse({
+    type: VerifyResult,
+    status: 200,
+    description:
+      'Proof result, including a limited outcome with its own retry interval in the body',
+  })
   verify(
     @Body({ schema: VerifyInput.schema }) body: VerifyInput,
     @Req() req: Request
@@ -163,6 +173,19 @@ export class MfaLoginController {
   }
 
   @Post('complete')
+  @ApiResponse({
+    status: 200,
+    headers: {
+      'Set-Cookie': {
+        schema: { type: 'string' },
+        description: 'Sets refresh_token for the issued session.',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'The invitation handoff was already claimed or changed.',
+  })
   @RequestContextPolicy({ kind: 'personal' })
   @ApiOperation({
     summary:

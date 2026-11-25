@@ -1,5 +1,11 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Put } from '@nestjs/common'
-import { ApiBearerAuth, ApiNoContentResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
+import {
+  ApiBearerAuth,
+  ApiNoContentResponse,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger'
 
 import {
   AuthType,
@@ -46,7 +52,7 @@ export class NotificationPreferencesController {
   @SchemaResponse({
     type: NotificationPreferencesResponseDto,
     status: 200,
-    description: 'Notification preferences',
+    description: 'Notification preferences. A null enabled value means no saved override.',
   })
   getPreferences(@CurrentUser('sub') userId: string): Promise<NotificationPreferencesResponse> {
     return this.preferences.getPreferences(userId)
@@ -55,6 +61,10 @@ export class NotificationPreferencesController {
   @Put('preferences')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Set one (category, channel) preference' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input, unknown category or channel, or a mandatory channel.',
+  })
   @ApiNoContentResponse({ description: 'Preference updated' })
   async updatePreference(
     @CurrentUser('sub') userId: string,

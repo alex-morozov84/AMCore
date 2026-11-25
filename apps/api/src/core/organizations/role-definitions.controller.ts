@@ -18,7 +18,7 @@ import {
   ApiOperation,
   ApiParam,
   ApiPayloadTooLargeResponse,
-  ApiQuery,
+  ApiResponse,
   ApiServiceUnavailableResponse,
   ApiTags,
   ApiUnauthorizedResponse,
@@ -37,6 +37,7 @@ import {
 } from '@amcore/shared'
 
 import { AppException } from '../../common/exceptions/index.js'
+import { ApiQuerySchema } from '../../common/schemas/api-query-schema.js'
 import { SchemaResponse } from '../../common/schemas/schema-response.js'
 import { Auth } from '../auth/decorators/auth.decorator.js'
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
@@ -89,27 +90,15 @@ export class RoleDefinitionsController {
   @Get()
   @RequireTeamAccess('orgId')
   @RequestContextPolicy({ kind: 'organization', selector: { param: 'orgId' } })
-  @ApiOperation({ summary: 'List role definitions with holder counts and rule summaries' })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    type: Number,
-    description: 'Default 1; bounded offset',
+  @ApiOperation({
+    summary: 'List role definitions with holder counts and rule summaries',
+    description:
+      'Search allows up to 100 Unicode code points after trimming. The combined pagination offset is bounded.',
   })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    description: 'Default 20, maximum 100',
-  })
-  @ApiQuery({
-    name: 'search',
-    required: false,
-    type: String,
-    description: 'Literal role-name contains; maximum 100 Unicode code points',
-  })
+  @ApiQuerySchema(RoleDefinitionListQueryDto.schema)
   @ApiBadRequestResponse({ description: 'Invalid query or selector' })
   @ApiServiceUnavailableResponse({ description: 'ROLE_READ_UNAVAILABLE: read budget exceeded' })
+  @ApiResponse({ status: 404, description: 'The organization is unavailable.' })
   @SchemaResponse({ type: RoleDefinitionListResponseDto, status: 200 })
   list(
     @Param('orgId') orgId: string,
@@ -139,6 +128,7 @@ export class RoleDefinitionsController {
   }
 
   @Post()
+  @ApiNotFoundResponse({ description: 'The parent organization is unavailable.' })
   @RequireTeamAccess('orgId')
   @RequestContextPolicy({ kind: 'organization', selector: { param: 'orgId' } })
   @ApiOperation({ summary: 'Create an empty custom role' })

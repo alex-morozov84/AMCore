@@ -25,11 +25,11 @@ import {
   type ApiKeyListResponse,
   AuthType,
   type OwnKeyOrganizations,
-  PAGINATION,
   type RequestPrincipal,
 } from '@amcore/shared'
 
 import { BadRequestException } from '../../common/exceptions/index.js'
+import { ApiQuerySchema } from '../../common/schemas/api-query-schema.js'
 import { SchemaResponse } from '../../common/schemas/schema-response.js'
 import { Auth } from '../auth/decorators/auth.decorator.js'
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
@@ -76,6 +76,10 @@ export class ApiKeysController {
 
   @Post()
   @ApiOperation({ summary: 'Create an API key for the current user — returns the secret once' })
+  @ApiResponse({
+    status: 403,
+    description: 'The caller is not a member of the selected organization.',
+  })
   @SchemaResponse({ type: CreateApiKeyResponseDto, status: 201, description: 'API key created' })
   create(
     @CurrentUser() user: RequestPrincipal,
@@ -88,11 +92,7 @@ export class ApiKeysController {
   @ApiOperation({
     summary: 'List bounded organization options for own API-key inventory or creation',
   })
-  @ApiQuery({ name: 'purpose', enum: ['inventory', 'creation'], required: true })
-  @ApiQuery({ name: 'search', type: String, required: false, maxLength: 100 })
-  @ApiQuery({ name: 'selectedId', type: String, required: false })
-  @ApiQuery({ name: 'page', type: Number, required: false, minimum: 1 })
-  @ApiQuery({ name: 'limit', type: Number, required: false, minimum: 1, maximum: 20 })
+  @ApiQuerySchema(OwnKeyOrganizationsQueryDto.schema)
   @SchemaResponse({
     type: OwnKeyOrganizationsDto,
     status: 200,
@@ -112,21 +112,7 @@ export class ApiKeysController {
   @ApiQuery({ name: 'organizationId', type: String, required: false })
   @ApiQuery({ name: 'organizationAvailability', enum: ['unavailable'], required: false })
   @ApiOperation({ summary: 'List API keys owned by the current user' })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    type: Number,
-    minimum: 1,
-    example: PAGINATION.DEFAULT_PAGE,
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    minimum: 1,
-    maximum: PAGINATION.MAX_LIMIT,
-    example: PAGINATION.DEFAULT_LIMIT,
-  })
+  @ApiQuerySchema(ApiKeyQueryDto.schema, ['page', 'limit'])
   @ApiQuery({
     name: 'status',
     required: false,

@@ -18,7 +18,6 @@ import {
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOperation,
-  ApiQuery,
   ApiResponse,
   ApiSecurity,
   ApiTags,
@@ -31,13 +30,13 @@ import {
   AuthType,
   type OrganizationListResponse,
   type OrgResponse,
-  PAGINATION,
   type RequestPrincipal,
   type SwitchOrgResponse,
 } from '@amcore/shared'
 
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js'
 import { ApiProtectionUnavailable } from '../../common/exceptions/index.js'
+import { ApiQuerySchema } from '../../common/schemas/api-query-schema.js'
 import { SchemaResponse } from '../../common/schemas/schema-response.js'
 import type { AppAbility } from '../auth/casl/ability.factory.js'
 import type { TeamAccessDecision } from '../auth/casl/ability.factory.js'
@@ -149,21 +148,7 @@ export class OrganizationsController {
   @Get()
   @Auth(AuthType.Bearer)
   @ApiOperation({ summary: 'List all organizations the current user belongs to' })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    type: Number,
-    minimum: 1,
-    example: PAGINATION.DEFAULT_PAGE,
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    minimum: 1,
-    maximum: PAGINATION.MAX_LIMIT,
-    example: PAGINATION.DEFAULT_LIMIT,
-  })
+  @ApiQuerySchema(PaginationQueryDto.schema)
   @SchemaResponse({
     type: OrganizationListResponseDto,
     status: 200,
@@ -235,6 +220,7 @@ export class OrganizationsController {
   }
 
   @Patch(':id')
+  @ApiResponse({ status: 409, description: 'CONFLICT: the organization slug is already in use.' })
   @ApiForbiddenResponse({ description: 'FORBIDDEN: organization access denied' })
   @ApiNotFoundResponse({ description: 'Organization missing' })
   @ApiSecurity('apiKeyBearer')
