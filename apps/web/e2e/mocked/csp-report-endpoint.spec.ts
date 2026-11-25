@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 import { productPath } from '../shared/product-settings'
 
 /**
- * Track 3 PR3 (`ai/models-talk.md` FINAL PLAN §3) — the minimal CSP
+ * The CSP
  * reporting endpoint's HTTP contract. The `mocked` lane runs `next dev`
  * with no `REDIS_URL` configured at all (confirmed: neither this lane nor
  * `server-mocked` needs one — see `next.config.ts`'s `testProxy` comment),

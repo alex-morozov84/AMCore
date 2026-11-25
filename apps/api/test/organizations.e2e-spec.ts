@@ -466,7 +466,6 @@ describe('Organizations (e2e)', () => {
      * integration credential could mint a full-permission token for the
      * owner, bypassing `userPerms ∩ scopes` (ADR-033), and could even
      * target a different organization the owner happens to belong to.
-     * See `ai/ORGANIZATIONS_ADMIN_REVIEW.md` OA-01.
      */
     it('OA-01: rejects API key with 401, even when bound to the target org', async () => {
       const token = await registerAndLogin('owner@example.com')

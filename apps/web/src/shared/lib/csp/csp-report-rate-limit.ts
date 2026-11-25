@@ -7,12 +7,7 @@ const MAX_REPORTS_PER_WINDOW = 20
 const REDIS_KEY_PREFIX = 'csp-report-rate-limit:'
 
 /**
- * Best-effort fixed-window rate limit for the CSP reporting endpoint
- * (Track 3 PR3, `ai/models-talk.md` FINAL PLAN §3 — "rate-limit or
- * otherwise abuse-limit the route"). Deliberately not the GCRA limiter
- * `apps/api` uses (ADR-073): this endpoint is pure observability, not a
- * protected resource, so a coarse fixed window is proportionate and a lot
- * less code.
+ * A best-effort fixed window limits CSP report volume per client identity.
  *
  * `key` should be the caller's resolved client identity (see
  * `resolveTrustedClientIp` — falls back to a single shared bucket when no

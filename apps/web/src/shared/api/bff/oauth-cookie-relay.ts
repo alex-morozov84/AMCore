@@ -6,8 +6,7 @@ import 'server-only'
  * Apple's `oauth_state_apple` binding cookie is set by the backend scoped to
  * its own callback path (`oauth-binding-cookie.ts`'s `APPLE_CALLBACK_PATH`),
  * not `path: '/'` like every other provider's `oauth_state`. Once the OAuth
- * init/callback legs are proxied through the frontend's own origin (Option
- * B, `ai/models-talk.md` "Iteration 2, slice 4"), a `Set-Cookie` relayed
+ * init/callback legs are proxied through the frontend's own origin, a `Set-Cookie` relayed
  * byte-for-byte would carry that backend-only path — a path that doesn't
  * exist on the frontend — so the browser would never send the cookie back
  * on the frontend's own callback request. Rewriting `Path=` here is what

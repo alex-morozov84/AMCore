@@ -23,7 +23,7 @@ export const CSP_ENFORCE_HEADER = 'Content-Security-Policy'
 export const CSP_REPORT_ONLY_HEADER = 'Content-Security-Policy-Report-Only'
 
 /**
- * Track 3 PR3 (`ai/models-talk.md` FINAL PLAN §3) — minimal CSP violation
+ * CSP violation
  * reporting endpoint. Same-origin Route Handler (`app/api/csp-report/route.ts`),
  * outside `src/proxy.ts`'s matcher (paths starting with `api`), so it needs
  * no nonce and isn't subject to the policy it collects reports for.

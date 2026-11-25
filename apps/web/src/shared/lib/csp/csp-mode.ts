@@ -7,10 +7,7 @@ const CspModeSchema = z.enum(['enforce', 'report-only'])
 export type CspMode = z.infer<typeof CspModeSchema>
 
 /**
- * Track 3 PR4 (`ai/models-talk.md` FINAL PLAN §3) — the default is
- * environment-aware: `enforce` in production (owner decision §0.1:
- * production security posture must be secure-by-default), `report-only` in
- * development. The development exception is not caution for its own
+ * The default is `enforce` in production and `report-only` in development. The development exception is not caution for its own
  * sake — it's an observed, reproduced constraint: `next dev`'s own
  * Turbopack HMR machinery injects dozens of inline `<style>` tags for its
  * own tooling (confirmed via a real browser under `WEB_CSP_MODE=enforce`
@@ -19,7 +16,7 @@ export type CspMode = z.infer<typeof CspModeSchema>
  * loads via an external stylesheet). Enforcing there trades a noisy dev
  * console — and likely CSS hot-reload falling back to full reloads — for
  * no real security benefit, since `next dev` is never the artifact that
- * ships (`ai/STATUS.md` working rule 1).
+ * ships.
  *
  * `WEB_CSP_MODE` lets an operator override either direction — including
  * AMCore itself, or a downstream fork temporarily weakening to

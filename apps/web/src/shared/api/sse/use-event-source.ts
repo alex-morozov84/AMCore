@@ -44,7 +44,7 @@ function assertSafeBffUrl(url: string): void {
 }
 
 /**
- * Shared BFF-only SSE consumption primitive (ai/models-talk.md, Track 6 slice 8). Native
+ * Shared BFF-only SSE hook. Native
  * `EventSource` is safe here specifically because the browser never holds a bearer token: the
  * Next.js Route Handler proxy (`authenticated-proxy.ts`) attaches it server-side from the
  * `amcore_session` cookie, which `EventSource` sends automatically via `withCredentials`. A

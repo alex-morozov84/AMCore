@@ -91,8 +91,6 @@ import { UpdateSystemRoleDto } from './dto/update-system-role.dto.js'
  * `@Auth(AuthType.Bearer)` at the class level short-circuits the
  * auth chain to the JWT branch only; an API key fails the JWT
  * branch as a decision-class 401 (per AK-11 `isDecisionError`).
- *
- * See `ai/ORGANIZATIONS_ADMIN_REVIEW.md` OA-02 and ADR-033.
  */
 @ApiTags('admin')
 @ApiBearerAuth()

@@ -30,8 +30,7 @@ function resolveOrigin(request: Request): OriginCheckResult {
  * `Referer` fallback, allow when both are absent — a header-less request
  * isn't a browser request (SSR/native/CLI can't mount CSRF in the first
  * place). Config is deliberately **web-owned** (`WEB_TRUSTED_ORIGINS`), not
- * borrowed from `apps/api`'s `CORS_ORIGIN`, which serves a different purpose
- * (round 2 review correction — see ai/models-talk.md).
+ * borrowed from `apps/api`'s `CORS_ORIGIN`, which serves a different purpose.
  */
 export function isTrustedOrigin(request: Request): boolean {
   const result = resolveOrigin(request)

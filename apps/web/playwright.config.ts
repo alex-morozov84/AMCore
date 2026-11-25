@@ -3,8 +3,8 @@ import { defineConfig, devices } from '@playwright/test'
 import { activeTarget, outputPaths, testOptions } from './e2e/support/managed-target.mjs'
 
 /**
- * Track 7 FINAL PLAN (`ai/models-talk.md`) splits E2E into lanes with
- * different infra costs, each its own Playwright project:
+ * Each Playwright project uses a different test environment.
+ * See docs/frontend/testing.md for the test environments.
  *
  * - `mocked` (this PR): no real Postgres/Redis/`apps/api` — `page.route()`
  *   intercepts browser-originating requests. Runs against `next dev`.

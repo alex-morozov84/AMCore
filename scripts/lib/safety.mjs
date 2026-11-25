@@ -24,15 +24,13 @@ export function assertCleanGitTree(cwd) {
 /**
  * Refuses to apply if `ai/` is present (a strong signal this is the AMCore
  * maintainer checkout, not a downstream fork) unless the caller passed the
- * exact override token. The token is deliberately not documented in
- * `--help` — see ai/PROCESS.md.
+ * exact maintainer override token.
  */
 export function assertNotMaintainerCheckout(cwd, forceToken) {
   if (!existsSync(join(cwd, 'ai'))) return
   if (forceToken === MAINTAINER_OVERRIDE_TOKEN) return
   throw new SafetyError(
     'refusing to apply: an ai/ directory is present, which strongly suggests this is the ' +
-      'AMCore maintainer checkout, not a downstream fork. See ai/PROCESS.md if you are ' +
-      'certain this is intentional.'
+      'AMCore maintainer checkout. Run this command in a downstream fork.'
   )
 }

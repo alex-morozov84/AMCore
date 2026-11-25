@@ -6,11 +6,8 @@ import { describe, expect, it } from 'vitest'
 const SHARED_UI_ROOT = path.resolve(import.meta.dirname)
 
 /**
- * Base UI components that render inline `<style>`/`<script>` tags — the
- * only ones Track 3's `CSPProvider` wiring (`app/[locale]/layout.tsx`) was
- * designed against (`ai/models-talk.md` FINAL PLAN §3, citing the installed
- * `@base-ui/react` CSP docs). None of them are in `shared/ui` today —
- * verified below, not assumed.
+ * These Base UI components render inline tags that need a CSP nonce.
+ * See docs/frontend/browser-security-and-csp.md for the provider setup.
  *
  * This is deliberately a trip-wire, not a functional check: `CSPProvider`
  * being wired globally means these components *should* just work once

@@ -487,7 +487,6 @@ export class AuthController {
   // enumerate or revoke interactive browser sessions. Listing sessions exposes
   // user-agent / IP-derived metadata (recon surface); revoking sessions from a
   // leaked low-scope API key would let an attacker evict the legitimate user.
-  // See `ai/API_KEYS_REVIEW.md` AK-01.
   @Get('sessions')
   @Auth(AuthType.Bearer)
   @ApiBearerAuth()

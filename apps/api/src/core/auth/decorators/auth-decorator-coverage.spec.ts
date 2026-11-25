@@ -239,18 +239,15 @@ describe('Core controllers — @Auth coverage and ADR-034 allowlist (OA-11 guard
         'Per ADR-034 (Auth Default — Bearer-Only), API-key acceptance is an',
         'explicit allow-listed opt-in. To accept API keys on a new route:',
         '',
-        '  1. Open an amendment to ADR-034 in ai/DECISIONS.md describing',
-        '     the route and rationale (industry comparison, scope model,',
-        '     whether it is transitional).',
-        '  2. Add a matching entry to ADR_034_APIKEY_ALLOWLIST in this file.',
+        '  1. Document why the route needs API keys and which scopes it requires.',
+        '  2. Add a matching entry to adr-034-api-key-allowlist.ts.',
         '  3. Keep the @Auth(AuthType.Bearer, AuthType.ApiKey) annotation.',
         '',
         'If the route should NOT accept API keys, remove AuthType.ApiKey',
         'from the @Auth decorator (or drop the decorator to inherit the',
         'bearer-only default).',
         '',
-        'See ADR-034 §"Allowlist of routes that accept `AuthType.ApiKey`',
-        'after Stage 1c" and ai/ORGANIZATIONS_ADMIN_REVIEW.md OA-11.'
+        'See docs/auth/api-keys.md for the route policy and Swagger requirements.'
       )
     }
 

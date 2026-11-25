@@ -94,7 +94,7 @@ const COMPOSE_ONLY_ALLOW = new Set([
   'COMPOSE_WEB_IPV4',
   'POSTGRES_TLS_SERVER_DIR',
   'POSTGRES_TLS_CA_DIR',
-  // apps/web-only (Track 3, ai/models-talk.md FINAL PLAN §3): the browser
+  // apps/web-only: the browser
   // Content-Security-Policy mode (report-only/enforce), read directly via
   // `process.env` in apps/web (no EnvService there) — same reasoning as
   // WEB_TRUSTED_ORIGINS above.
