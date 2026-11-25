@@ -156,5 +156,12 @@ test('required Script contracts checks PR and push history without persisting cr
   assert.equal(checkout.with['persist-credentials'], false)
   assert.equal(checkout.with.ref, undefined)
   const gate = steps.find((step) => step.run === 'node scripts/check-migration-history.mjs')
-  assert.equal(gate.if, undefined)
+  assert.equal(gate.if, "github.event_name == 'pull_request' || github.event_name == 'push'")
+  const required = workflow.jobs['ci-required'].steps
+  const reduced = required.find((step) => step.run === gate.run)
+  assert.match(reduced.if, /heavy-off/)
+  assert.ok(
+    required.indexOf(reduced) <
+      required.findIndex((step) => step.name === 'Require every CI family')
+  )
 })

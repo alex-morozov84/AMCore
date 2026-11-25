@@ -7,7 +7,7 @@ import { requireBrowserTestOwner } from './e2e-ci-plan.mjs'
 import { inheritedBrowserChanges } from './lib/inherited-browser-changes.mjs'
 import { resolveDeliveryProof } from './lib/ci-delivery-proof.mjs'
 import { githubEvidence } from './lib/ci-delivery-api.mjs'
-import { coarseExecution } from './lib/ci-required.mjs'
+import { coarseExecution, requiredCiJobs } from './lib/ci-required.mjs'
 
 try {
   const policy = JSON.parse(
@@ -90,11 +90,30 @@ try {
       `plan=${json}\ncomparison-base=${acquired.baseExists ? acquired.source.base : ''}\n`
     )
   }
-  if (process.env.GITHUB_STEP_SUMMARY)
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    const baseline = coarseExecution(
+      { ...inputs, credit: undefined, mode: policy.mode === 'heavy-off' ? 'normal' : policy.mode },
+      policy.event
+    ).effective
+    const selected = execution.effective
+    const omitted = requiredCiJobs.filter((job) => !selected.includes(job))
+    const status = (job) =>
+      baseline.includes(job)
+        ? credit
+          ? 'Credited from PR'
+          : 'Disabled by heavy-off'
+        : 'Outside this plan'
+    const rows = [
+      '| Check | Plan |',
+      '| --- | --- |',
+      ...selected.map((job) => `| ${job} | Selected |`),
+      ...omitted.map((job) => `| ${job} | ${status(job)} |`),
+    ].join('\n')
     appendFileSync(
       process.env.GITHUB_STEP_SUMMARY,
-      `## CI execution selection\nReason: ${execution.reason}. Selected groups: ${execution.effective.length}.\n\n${deliverySummary}\n\n\`\`\`json\n${json}\n\`\`\`\n`
+      `## CI execution selection\nReason: ${execution.reason}. Selected groups: ${execution.effective.length}.\nSaved mode: ${policy.saved}. Run mode: ${policy.mode}. Proposed mode: ${policy.proposed}.\n\n${deliverySummary}\n\n${rows}\n\n\`\`\`json\n${json}\n\`\`\`\n`
     )
+  }
   console.log(json)
 } catch (error) {
   console.error(error.message)

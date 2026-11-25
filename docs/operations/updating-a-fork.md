@@ -48,16 +48,10 @@ For flexible private products:
 4. Record missing scanning, push protection and enforcement in the product contributor guide.
    Free private repositories lack branch/tag rulesets. Pro/Team can supply rulesets without the security add-ons.
    Require the available checks where supported. Otherwise review and tag discipline depend on your team.
-5. Budget CI before enabling it. Inherited jobs may exceed your private account's included allowance.
-   Select supported whole workflows through their Actions enable/disable state,
-   as in step 3, and align required checks with that selection. Do not select
-   individual `Test` dependencies by removing or skipping them in `ci.yml`.
-   Script contracts locks that dependency set and the guarded leaf commands
-   and conditions; `Test` rejects skipped dependencies.
-   Further coverage reductions need an explicit product policy and corresponding
-   contract changes; changing required checks alone does not change these contracts.
-   **No runner-minute estimate is available yet.** Record minutes per job and total per update PR,
-   including retries and follow-up push runs. Public standard-runner billing of zero is not a private cost estimate.
+5. Choose [automatic checks](ci-security.md#choose-automatic-checks-for-a-product)
+   to manage test coverage and spend. Use the measured example and check your
+   account's allowance. Disable a workflow as in step 3 only when its required
+   feature is unavailable.
 
 The starter's default checks use English and Russian, with English as the
 default and Console on a path. A pre-release update rehearsal also passed
@@ -127,6 +121,9 @@ Creating repositories, pushing code and changing settings require the product ow
    Run initialization before any product commit or tag namespacing. Verify `initialized_from_amcore_version` equals `SOURCE_TAG`.
    Preserve that value thereafter; it describes the starting point, not the latest update.
    Resolve verification failures using the [initializer recovery guide](../frontend/brand-theme-and-tokens.md#recover-from-a-failure).
+   Before the first push, decide how your team accepts changes. Then choose the
+   [automatic checks](ci-security.md#choose-automatic-checks-for-a-product) and
+   record the choice in `ci/product.json`. Check what could have broken by default.
    Commit the inspected initialization changes only after the value and checks are correct.
 
 5. **Independent copy only, before creating any product release tags:** list all copied `v*` tags,
@@ -144,7 +141,33 @@ Creating repositories, pushing code and changing settings require the product ow
 
 6. Deliver initialization to the product, preserving the selected source as an ancestor.
    For an empty independent destination, push the explicit product branch to `main` (`git push origin product-start:main`).
-   For a Fork, push `product-start` and open a PR into its matching `main`.
+   For a Fork, enable Actions, push `product-start` and open a PR into its matching `main`.
+   The first PR uses the starter check mode. The product mode applies after merge.
+   Keep this PR limited to initialization. Until the first merge, keep write
+   and merge access with the owner and turn off auto-merge.
+
+   1. Wait for ordinary CI to pass on the current PR.
+   2. From a separate clean checkout of the supported AMCore release, run
+      this command with a GitHub CLI account that can read the Fork:
+
+      ```sh
+      node scripts/verify-first-product-pr.mjs OWNER/PRODUCT PR_NUMBER
+      ```
+
+   3. Read the current base and head SHAs and compare them with the command output.
+
+      ```sh
+      gh pr view PR_NUMBER -R OWNER/PRODUCT --json baseRefOid,headRefOid
+      ```
+
+      Click **Merge** only when ordinary CI is green and both SHAs still match.
+
+   If a new commit changes either SHA, wait for CI and repeat the independent
+   check. If the command fails or GitHub cannot provide the data it needs, stop
+   and leave the PR open. The check does not execute PR code. GitHub can show
+   **Merge** before you run it. The owner must confirm the result before using
+   the button.
+
    Configure the selected protection mode and verify required CI before subsequent updates.
    Push only explicitly selected branches or product tags, never `--tags` or `--mirror`.
 
@@ -288,7 +311,7 @@ Do not resolve an ambiguous identity, permission or data conflict by taking an e
 
 Never edit, delete, rename or squash a migration after it reaches shared `main`/a release,
 or after applying it to a database you intend to retain. Unshared, unapplied work may still be corrected.
-**Script contracts** compares migration files with the PR merge checkout's first parent.
+**Script contracts** (or **CI required** in reduced mode) compares migration files with the PR merge checkout's first parent.
 After a direct push to `main`, it compares them with the previous commit recorded in the push event.
 It accepts new migrations and rejects edits, renames or deletions of existing migrations.
 The workflow fetches the full history and verifies that `HEAD` matches `GITHUB_SHA`.

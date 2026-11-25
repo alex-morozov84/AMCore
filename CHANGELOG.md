@@ -14,6 +14,9 @@ versions they name. For current source-update instructions, see
 
 ### Added
 
+- Let product owners choose automatic CI coverage and run the full applicable
+  checks once on an exact commit without changing their saved mode.
+
 - Add a skill for outside-service status, reviewed checks and inbound webhooks.
 
 - Add a background-work skill for registered asynchronous and database-owned work.

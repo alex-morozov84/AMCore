@@ -4,6 +4,61 @@ AMCore's GitHub-native CI security stack is intentionally lean: blocking gates
 for new problems, report-only scans where review is enough, and a small amount
 of workflow self-hardening to keep the example forkable.
 
+## Choose automatic checks for a product
+
+Before the first push, decide how your team accepts changes. Then choose what CI
+should check automatically. The two choices are independent.
+
+| Owner's choice                             | Set `mode` in `ci/product.json` | What CI checks                                                      |
+| ------------------------------------------ | ------------------------------- | ------------------------------------------------------------------- |
+| Check what could have broken (recommended) | `normal`                        | Checks selected for the change and product settings.                |
+| Check everything that applies every time   | `full`                          | The full applicable plan. Main can credit a matching successful PR. |
+| Keep only quick checks                     | `heavy-off`                     | Applicable quick checks, migration history and secret scanning.     |
+
+Keep `"version": 1` in the file. For example, use `{"version":1,"mode":"heavy-off"}`
+only after the owner chooses reduced coverage. Unit tests can pass even if the
+browser loses the user's session after sign-in. Reduced CI skips that browser test.
+
+The first push to an empty independent repository uses the saved choice. In a
+GitHub Fork, enable Actions first. The initialization PR uses the starter base's
+check mode. The product's saved choice takes effect on the first push after
+merge. Later mode changes follow the same PR-base rule. Use an independent
+repository for a private product.
+
+Open **Actions → CI → the run → Summary**. Read **CI execution selection** for
+the saved, proposed and run modes. The selected groups are in `effective`. The
+summary links the exact PR attempt when main credits earlier checks. Open **Jobs**
+to confirm execution and read logs. A green reduced result covers the required
+checks in that reduced plan. It leaves the build, browser and API runtime
+scenarios, and disabled scans unverified. Check **Security Scans** separately for
+the Gitleaks result. CodeQL and scheduled OSV report a policy skip when disabled.
+
+To check a version once, open **Actions → CI → Run workflow**. Select its branch,
+enable **Run the full applicable plan once**, and enter its exact commit SHA.
+The workflow rejects a different checkout. It executes the applicable plan
+without reusing PR results. The saved mode stays the same. This run does not
+satisfy the required check on an ordinary PR. Use **CodeQL** and **Security
+Scans** separately to request their manual scans on the same SHA, if your
+repository has the necessary code-scanning access. Inspect both run summaries.
+
+To restore automatic selection, change `mode` to `normal` and deliver it using
+your team's workflow. Check the next main run's Summary and Jobs.
+
+In one public starter PR, the main CI result took 26 minutes to arrive. The
+machines worked for 194 minutes in total because multiple jobs ran at once.
+That example excludes other workflows and billing rounding. Private
+repositories draw runner usage from the owner's account allowance and may incur
+charges. GitHub Free includes $12 of eligible compute per account per month.
+That covers about 2,000 minutes on standard Linux x64 at $0.006 per minute
+if other eligible usage does not draw from the same allowance. Standard
+GitHub-hosted runners are free in public repositories.
+[Included usage](https://docs.github.com/en/billing/reference/product-usage-included).
+Open **Settings → Billing & Licensing → Usage**, select **Actions**,
+and filter by repository for your personal account or organization.
+[Example run](https://github.com/alex-morozov84/amcore-t099-s0-public/actions/runs/45449617102/attempts/1)
+· [Runner rates](https://docs.github.com/en/billing/reference/actions-runner-pricing)
+· [Account usage](https://docs.github.com/en/billing/how-tos/products/view-productlicense-use)
+
 ## Current Gates
 
 | Workflow                | Trigger                                 | Tooling                                                                                             | CI behavior                          |
@@ -91,7 +146,7 @@ classification is unavailable or requires checks beyond the PR plan, CI runs
 the applicable main plan. If the initial path filter fails, CI discards its
 outputs and uses the broad plan. If the final recheck fails after tests have
 been skipped, CI required fails. A saved `full` mode can reuse a matching full PR.
-When manual full execution is wired in, an explicit one-off full run always executes its plan.
+An explicit one-off full run always executes its plan.
 
 A direct push, missing evidence, changed base or untrusted CI change runs the
 applicable checks on main immediately. Unknown impact selects a broad plan.
