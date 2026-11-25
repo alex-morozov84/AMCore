@@ -10,7 +10,7 @@ import {
 } from './filesystem-transaction.mjs'
 import { filesystemSnapshot } from './filesystem-transaction-test-helpers.mjs'
 import { runInitCommand } from './init-engine.mjs'
-import { createFixtureRepo, git } from './test-fixture.mjs'
+import { createFixtureRepo, fakePng, git } from './test-fixture.mjs'
 import { createWorkingTreeCopy } from './working-tree-fixture.mjs'
 
 let fixture
@@ -124,3 +124,53 @@ for (const commit of [false, true]) {
     assert.equal(existsSync(filesystemTransactionJournalPath(fixture.root)), false)
   })
 }
+
+test('confirmation rechecks a requested logo omitted from the write plan', async () => {
+  fixture = createFixtureRepo()
+  const logo = 'apps/web/public/logo-dark.png'
+  const theme = 'apps/web/src/shared/lib/theme.ts'
+  const target = path.join(fixture.root, logo)
+  const beforeTheme = readFileSync(path.join(fixture.root, theme), 'utf8')
+  const { operationPlan } = prepareBrandInit(fixture.root, {
+    logoDarkSrc: target,
+    themeMode: 'dark',
+  })
+  assert.deepEqual(
+    operationPlan.displaySteps.map(({ target }) => target),
+    [path.join(fixture.root, theme)]
+  )
+  assert.deepEqual(
+    operationPlan.operationsForApply().map(({ target }) => target),
+    [theme]
+  )
+
+  const changedLogo = fakePng(64, 64)
+  await assert.rejects(
+    runInitCommand({
+      cwd: fixture.root,
+      flags: {},
+      operationPlan,
+      requestConfirmation: () => {
+        writeFileSync(target, changedLogo)
+        git(fixture.root, [
+          '-c',
+          'user.name=test',
+          '-c',
+          'user.email=test@example.com',
+          'commit',
+          '-m',
+          'replace logo',
+          '--',
+          logo,
+        ])
+        return true
+      },
+      verify: () => assert.fail('verification must not run'),
+    }),
+    /Brand destination changed: apps\/web\/public\/logo-dark\.png/
+  )
+  assert.equal(readFileSync(path.join(fixture.root, theme), 'utf8'), beforeTheme)
+  assert.deepEqual(readFileSync(target), changedLogo)
+  assert.equal(git(fixture.root, ['status', '--porcelain']), '')
+  assert.equal(existsSync(filesystemTransactionJournalPath(fixture.root)), false)
+})

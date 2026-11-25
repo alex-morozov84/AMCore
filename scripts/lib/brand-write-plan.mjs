@@ -65,16 +65,17 @@ export function buildBrandWritePlan({ root, materializedSteps }) {
   const absoluteRoot = path.resolve(root)
   const realRoot = resolveTransactionRoot(absoluteRoot)
   const seen = new Set()
-  const writes = materializedSteps
-    .map((step) => prepareWrite(absoluteRoot, realRoot, step, seen))
-    .filter(({ before, operation }) => !sameFile(before, operation))
+  const destinations = materializedSteps.map((step) =>
+    prepareWrite(absoluteRoot, realRoot, step, seen)
+  )
+  const writes = destinations.filter(({ before, operation }) => !sameFile(before, operation))
   return Object.freeze({
     displaySteps: Object.freeze(
       writes.map(({ step }) => Object.freeze({ ...step, changed: true }))
     ),
     operationCount: writes.length,
     assertFresh() {
-      for (const { before, operation } of writes) {
+      for (const { before, operation } of destinations) {
         if (!sameFile(before, readTarget(realRoot, operation.target))) {
           throw changedSincePlan(operation.target)
         }
