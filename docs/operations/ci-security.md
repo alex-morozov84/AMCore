@@ -54,11 +54,44 @@ That covers about 2,000 minutes on standard Linux x64 at $0.006 per minute
 if other eligible usage does not draw from the same allowance. Standard
 GitHub-hosted runners are free in public repositories.
 [Included usage](https://docs.github.com/en/billing/reference/product-usage-included).
-Open **Settings → Billing & Licensing → Usage**, select **Actions**,
-and filter by repository for your personal account or organization.
 [Example run](https://github.com/alex-morozov84/AMCore/actions/runs/45561653782/attempts/1)
 · [Runner rates](https://docs.github.com/en/billing/reference/actions-runner-pricing)
-· [Account usage](https://docs.github.com/en/billing/how-tos/products/view-productlicense-use)
+
+- **One run.** Open **Actions → workflow → run**. The job list shows execution
+  times. In a private repository, open **Run details → Usage** for billable
+  minutes on GitHub-hosted runners. GitHub rounds each job up to a whole minute.
+  [View job execution time](https://docs.github.com/en/actions/how-tos/monitor-workflows/view-job-execution-time).
+- **One PR.** Start with the PR's **Checks** tab. Use **Actions** to find
+  runs for earlier PR commits too, including failed runs. Add the billable
+  minutes of jobs that ran for each PR commit. For a partial rerun, add only
+  the jobs that ran again. For the full cost of delivery, also add the workflow
+  runs on the merge commit. Multiply the minutes for each runner type by its
+  rate to estimate the compute cost. Any extra charge depends on the account's
+  remaining included usage.
+- **Whole account.** Open **Settings → Billing & Licensing → Usage** in the
+  account or organization that owns the repository. Select **Actions**. Filter by
+  repository to see its share, or clear that filter to see the account total.
+  [Account usage](https://docs.github.com/en/billing/how-tos/products/view-productlicense-use).
+
+The standard Linux x64 machine has 2 CPUs and 8 GB of RAM in private repositories,
+versus 4 CPUs and 16 GB in public repositories. The public PR #704 example shows
+how to read the numbers. The time and cost of a full private product CI run have
+yet to be measured.
+[GitHub-hosted runner specifications](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+
+On GitHub Free, a private product can run lint, tests, builds and Gitleaks when
+their triggers and the selected mode apply. GitHub CodeQL code scanning and
+GitHub Dependency Review for private repositories require GitHub Code Security
+on an eligible Team or Enterprise plan. The OSV scanner can run on Free, but
+its GitHub code scanning upload can fail without Code Security. The same
+restriction applies to the Scorecard upload. Trivy can save reports as workflow
+artifacts without code scanning. [GitHub security plan features](https://docs.github.com/en/get-started/learning-about-github/about-github-advanced-security).
+
+For individual checks on your own machine, see the
+[local test commands](../frontend/testing.md#commands). For a machine you manage,
+see [GitHub's self-hosted runner guidance](https://docs.github.com/en/actions/reference/security/secure-use#hardening-for-self-hosted-runners).
+We verified full CI on a standard GitHub-hosted runner in a public repository.
+We will verify it on a standard GitHub-hosted runner in a private repository with the first real private product.
 
 ## Current Gates
 
