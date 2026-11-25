@@ -44,9 +44,10 @@ repository has the necessary code-scanning access. Inspect both run summaries.
 To restore automatic selection, change `mode` to `normal` and deliver it using
 your team's workflow. Check the next main run's Summary and Jobs.
 
-In one public starter PR, the main CI result took 26 minutes to arrive. The
-machines worked for 194 minutes in total because multiple jobs ran at once.
-That example excludes other workflows and billing rounding. Private
+In AMCore PR #704, the CI workflow took 19 minutes 17 seconds from the start
+of CI selection to the end of CI required. The 39 jobs used 203 minutes
+6 seconds of machine time in total because jobs ran in parallel. These
+figures exclude other workflows and billing rounding. Private
 repositories draw runner usage from the owner's account allowance and may incur
 charges. GitHub Free includes $12 of eligible compute per account per month.
 That covers about 2,000 minutes on standard Linux x64 at $0.006 per minute
@@ -55,7 +56,7 @@ GitHub-hosted runners are free in public repositories.
 [Included usage](https://docs.github.com/en/billing/reference/product-usage-included).
 Open **Settings → Billing & Licensing → Usage**, select **Actions**,
 and filter by repository for your personal account or organization.
-[Example run](https://github.com/alex-morozov84/amcore-t099-s0-public/actions/runs/45449617102/attempts/1)
+[Example run](https://github.com/alex-morozov84/AMCore/actions/runs/45561653782/attempts/1)
 · [Runner rates](https://docs.github.com/en/billing/reference/actions-runner-pricing)
 · [Account usage](https://docs.github.com/en/billing/how-tos/products/view-productlicense-use)
 
