@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 import { productPath } from '../shared/product-settings'
 
 /**
- * Track 3 PR1 (`ai/models-talk.md` FINAL PLAN §3) — static browser
+ * Static browser
  * security-header baseline from `next.config.ts`'s `headers()`. These
  * headers are environment-independent (no per-request nonce), so asserting
  * them against `next dev`'s real HTTP responses is representative of what

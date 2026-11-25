@@ -31,8 +31,7 @@ export const AUTH_TYPE_KEY = 'authType'
  * matrix is auditable. The "explicit declaration" check stays alongside
  * the allowlist check as defense in depth.
  *
- * See ADR-034 (Auth Default — Bearer-Only) and
- * `ai/ORGANIZATIONS_ADMIN_REVIEW.md` OA-11.
+ * See docs/auth/api-keys.md for the route policy.
  *
  * @param types - One or more auth types to accept
  */

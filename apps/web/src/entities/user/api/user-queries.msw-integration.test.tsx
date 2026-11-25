@@ -11,7 +11,7 @@ import { server } from '@/test/msw/server'
 import { userKeys, useSessions } from './user-queries'
 
 /**
- * Integration layer (FINAL PLAN §1, `ai/models-talk.md`): renders the real
+ * Renders the real
  * hook against a mocked `/api/*` wire boundary instead of a mocked client
  * module, so a wrong query param or a misread error shape fails here even
  * though `user-queries.test.tsx`'s `vi.mock('@/shared/api', ...)` tests

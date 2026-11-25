@@ -272,8 +272,7 @@ describe('token contrast (WCAG AA)', () => {
     // and a working --font-sans reference became an unresolvable
     // self-reference — with no warning in the CLI output. These are pinned
     // exact values, not a contrast check, specifically to catch that class of
-    // regression if it's ever reintroduced (see ai/models-talk.md, Track 5,
-    // F23-F25).
+    // regression.
     const chartTokens: Array<[string, string, string]> = [
       ['chart-1', '#2563eb', '#60a5fa'],
       ['chart-2', '#16a34a', '#4ade80'],

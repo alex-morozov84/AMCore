@@ -58,7 +58,7 @@ function routeLocale(request: NextRequest) {
 }
 
 /**
- * Track 3 PR2 (`ai/models-talk.md` FINAL PLAN §3) — generates a per-request
+ * Generates a per-request
  * CSP nonce and composes it with next-intl's locale routing.
  *
  * Mutates `request.headers` **in place** rather than constructing a new
@@ -94,7 +94,6 @@ function routeLocale(request: NextRequest) {
  * there, but the response still gets the CSP header below for
  * completeness/observability.
  *
- * Framework constraint this exists to satisfy (`ai/models-talk.md` §3):
  * Next reads the nonce from the *request's* `Content-Security-Policy` /
  * `-Report-Only` header, not the response — a response-only CSP would
  * silently leave Next's own inline Flight-payload script unnoned and
@@ -109,11 +108,8 @@ function routeLocale(request: NextRequest) {
  * already carries the header AMCore isn't currently using (e.g. a stray or
  * spoofed `Content-Security-Policy` while shipping `-Report-Only`) would
  * survive untouched and win the framework's own preference order, handing
- * Next's internal scripts a nonce this server never generated. Found by
- * Agent 2's diff review (`ai/models-talk.md`), reproduced with a single
- * `curl -H "Content-Security-Policy: script-src 'nonce-attacker'"` against
- * `next dev` before this fix, confirmed absent after — see
- * `csp-nonce.spec.ts`'s hostile-inbound-header regression test.
+ * Next's internal scripts a nonce this server never generated.
+ * See docs/frontend/browser-security-and-csp.md.
  */
 export default function proxy(request: NextRequest) {
   const nonce = generateNonce()

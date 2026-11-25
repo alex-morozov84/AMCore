@@ -78,7 +78,7 @@ import { OrganizationsService } from './organizations.service.js'
  * each ApiKey-accepting handler in this controller individually — a new
  * handler added here inherits the class annotation but must also be
  * added to the allowlist (via ADR amendment) for the metadata test to
- * pass. See `ai/ORGANIZATIONS_ADMIN_REVIEW.md` OA-11.
+ * pass.
  *
  * `@ApiSecurity('apiKeyBearer')` (the Swagger-visible counterpart of the
  * ADR-034 allowlist) is applied per-handler, never at class level:
@@ -293,7 +293,7 @@ export class OrganizationsController {
    * full-permission token for the owner, bypassing the
    * `userPerms ∩ scopes` invariant from ADR-033, and could even cross
    * organizations the API key is not bound to (the handler trusts only
-   * `user.sub` here). See `ai/ORGANIZATIONS_ADMIN_REVIEW.md` OA-01.
+   * `user.sub` here).
    */
   @Post(':id/switch')
   @ApiForbiddenResponse({ description: 'FORBIDDEN: organization access denied' })

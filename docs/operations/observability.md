@@ -712,16 +712,12 @@ healthy. Both tiers tear their Compose stacks down unconditionally (a shell
 `trap` plus an `if: always()` CI step).
 
 **Public/private-boundary ratchet:** `scripts/observability-contract/private-path-baseline.json`
-is an exact, reviewed `(file, target citation, occurrence count)` snapshot of
-every private root `ai/*` citation this repository carried at the time PR7
-shipped (7 legitimate — `AGENTS.md`/`CONTRIBUTING.md`/`PROJECT_CONTEXT.md`,
-which exist specifically to describe the optional private maintainer overlay
-— plus 87 pre-existing citations across 65 files, tracked as their own
-maintainer cleanup item rather than rewritten by this PR). The check
-fails on any citation not in that exact baseline; a baseline entry may only
-shrink. Regenerate it with `node scripts/observability-contract/generate-private-path-baseline.mjs`
-only when deliberately fixing a listed `debt` entry — never to silently admit
-a new one.
+lists the allowed private document references by file, target and occurrence count.
+The remaining entries point maintainers to instructions in the optional private
+overlay. The check rejects new references and increases in existing counts.
+When deliberately removing an allowed reference, regenerate the baseline with
+`node scripts/observability-contract/generate-private-path-baseline.mjs`
+and check that the baseline only shrank.
 
 The `amcore_ai_run_due` collector uses the same PostgreSQL-clock predicate as
 normal execution claim, including epoch/deadline and provider restriction checks.

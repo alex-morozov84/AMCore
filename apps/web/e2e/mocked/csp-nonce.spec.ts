@@ -3,15 +3,9 @@ import { expect, test } from '@playwright/test'
 import { productPath } from '../shared/product-settings'
 
 /**
- * Track 3 PR2 (`ai/models-talk.md` FINAL PLAN §3) — nonce-based CSP,
- * shipped `Report-Only`. Deliberately does NOT assert "zero CSP violations
- * during normal navigation" here: `next dev`/Turbopack's own HMR machinery
- * injects ~130 inline `<style>` tags for CSS hot-reload, a real observed
- * `style-src-elem` violation storm that is 100% dev-tooling noise, absent
- * from the production build (confirmed empirically: 132 vs 0 during PR2's
- * implementation). That check lives in `e2e/real-stack/csp-nonce.spec.ts`
- * instead, against the real standalone server — `ai/STATUS.md` working
- * rule 1 ("verify against the artefact that ships") is exactly why.
+ * This spec checks how the development server applies the CSP nonce.
+ * Development hot reload injects inline styles that can trigger CSP reports.
+ * The standalone production check lives in e2e/real-stack/csp-nonce.spec.ts.
  *
  * What *is* safe to assert against `next dev`: the nonce mechanism itself
  * (deterministic, doesn't depend on dev vs. production), fetched as raw
@@ -80,18 +74,8 @@ test('the theme-init script carries the CSP nonce and still applies the theme be
 test('a hostile inbound Content-Security-Policy request header cannot override the framework nonce', async ({
   request,
 }) => {
-  // Agent 2's diff review (ai/models-talk.md) found this: proxy.ts only
-  // ever *sets* one of the two CSP header names (whichever `getCspMode()`
-  // picks) — `.set()` on the *other* name is a no-op, so a request that
-  // already carried it (a stray header, or one injected by a misconfigured
-  // edge/proxy in front of this origin) would survive untouched. Next's own
-  // nonce extraction (app-render.js) prefers `content-security-policy` over
-  // `-report-only` when both are present, so an attacker-controlled
-  // `Content-Security-Policy` header would win and get stamped onto every
-  // framework-injected script. Reproduced against `next dev` with a plain
-  // `curl -H "Content-Security-Policy: script-src 'nonce-attacker'"` before
-  // the fix (proxy.ts now deletes both header names before setting the
-  // active one); this test pins that fix as a permanent regression guard.
+  // Next prefers the enforcing request header when both CSP headers are present.
+  // The proxy clears both names before forwarding the server-generated nonce.
   const response = await request.get(productPath('/login'), {
     headers: { 'Content-Security-Policy': "script-src 'nonce-attacker'" },
   })

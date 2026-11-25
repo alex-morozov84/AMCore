@@ -37,10 +37,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 const UNATTRIBUTED_CLIENT_KEY = 'unattributed'
 
 /**
- * Minimal CSP violation reporting endpoint (Track 3 PR3,
- * `ai/models-talk.md` FINAL PLAN §3 / owner decision §0.4): observability
- * only, not a protection mechanism. Deliberately does not persist reports
- * anywhere — logs a normalized, redacted summary via `console.warn` (the
+ * The CSP reporting endpoint logs a normalized, redacted summary via `console.warn` (the
  * same plain-`console` convention the rest of `shared/api/bff` uses) for
  * whatever log aggregation the deployment already has, and nothing else.
  * Production teams that want more should route this to their own

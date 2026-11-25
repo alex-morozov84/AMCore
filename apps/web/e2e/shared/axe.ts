@@ -5,10 +5,7 @@ import type { Result } from 'axe-core'
 import { waitForIdleRegions, waitForVisualStability } from './visual-stability'
 
 /**
- * Automated a11y scan for one page/state (Track 7 FINAL PLAN §5,
- * `ai/models-talk.md`). WCAG A/AA tags through 2.2 — `wcag22aa` confirmed
- * present in the installed `axe-core@4.13.0` bundle before use, per the
- * FINAL PLAN's own instruction to verify rather than assume tag support.
+ * Automated accessibility scan for one page or state using WCAG A/AA tags through 2.2.
  *
  * This is **partial** coverage, not a WCAG pass: automated scanning is
  * documented as catching roughly half of real issues (missing alt text,

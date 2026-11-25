@@ -64,7 +64,7 @@ import { RoleService } from './role.service.js'
  * The ADR-034 allowlist in `auth-decorator-coverage.spec.ts` enumerates
  * each handler in this controller individually — adding a new handler
  * also requires an allowlist entry (via ADR amendment) for the
- * metadata test to pass. See `ai/ORGANIZATIONS_ADMIN_REVIEW.md` OA-11.
+ * metadata test to pass.
  *
  * `@ApiSecurity('apiKeyBearer')` (Swagger-visible counterpart of the
  * allowlist) is applied per-handler rather than at class level, matching

@@ -10,8 +10,7 @@ export interface BuildCspDirectivesOptions {
 }
 
 /**
- * Builds the AMCore CSP directive string (Track 3, `ai/models-talk.md`
- * FINAL PLAN §3 PR2). Pure and environment-read-free by design — the
+ * Builds the AMCore CSP directive string without reading the environment. The
  * caller decides `isDev` and the header name (enforcing vs
  * `-Report-Only`) — so this is trivially unit-testable without mocking
  * `process.env`.

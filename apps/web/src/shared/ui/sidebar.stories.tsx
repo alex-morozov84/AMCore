@@ -84,8 +84,7 @@ type Story = StoryObj<typeof meta>
 export const Default: Story = {}
 
 // Real interaction: the trigger toggles `data-state` between expanded/
-// collapsed — the same mechanism `widgets/app-shell` relies on, verified
-// live against a real page in `ai/models-talk.md`'s Track 9 PR3 handoff.
+// collapsed. The app shell relies on this state.
 // Queried by `data-slot`, not accessible name: `SidebarTrigger` and
 // `SidebarRail` share the same `toggleLabel` on purpose (they do the same
 // thing), which makes `getByRole('button', { name: ... })` ambiguous here.
