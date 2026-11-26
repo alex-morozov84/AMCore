@@ -24,8 +24,11 @@ Claude Code reads it via the `@AGENTS.md` import in `CLAUDE.md`.
 2. Use the instructions for the established checkout role:
    - **Downstream product** → resolve [Team process](PROJECT_CONTEXT.md#team-process)
      before task work. Read the selected file, then the task and relevant technical
-     guide. If a selected file is unavailable, name it and clarify before work
-     that depends on it. A product's own local folders do not select AMCore's
+     guide. If a selected file is unavailable, name the saved path and ask
+     the team to confirm the source. Wait before applying team-specific rules.
+     Any planning that can proceed independently can use the technical guides.
+     A nearby or renamed file becomes authoritative only after confirmation.
+     A product's own local folders do not select AMCore's
      maintainer instructions.
    - **AMCore maintainer work** → when the assignment and checkout establish the
      AMCore maintainer context and its private overlay is available, also read
