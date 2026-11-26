@@ -405,6 +405,12 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
   `<...>`/`{...}`, or reuse the canonical fake key) — real-shaped secrets fail the
   gitleaks gate.
 
+For a starter defect, documentation gap or reusable feature found during product
+work, offer to [report the finding to AMCore](CONTRIBUTING.md#report-a-finding-to-amcore).
+Use the shared [upstream issue skill](.agents/skills/amcore-upstream-issue/SKILL.md).
+When receiving a product report in AMCore, also follow the
+[triage guidance](CONTRIBUTING.md#triage-a-report-in-amcore) before proposing a task.
+
 ## Skills for project actions
 
 Read `.agents/skills/amcore-<name>/SKILL.md` for the requested action:

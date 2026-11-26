@@ -12,6 +12,8 @@ versions they name. For current source-update instructions, see
 
 ## [Unreleased]
 
+- Added contributor guidance and an agent skill for reporting product findings to AMCore and turning useful reports into scoped work proposals.
+
 - Product setup can select the included AMCore team workflow or a tracked Markdown file with the team’s own rules. The starter includes task and review examples.
 
 ### Added

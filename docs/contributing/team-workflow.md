@@ -123,6 +123,10 @@ revision. Correct material gaps and repeat affected scenarios. The reviewer
 checks the evidence and final text. For changed agent instructions, observe
 a fresh agent acting on them as a separate check.
 
+If product work reveals a shared problem or capability, use
+[Report a finding to AMCore](../../CONTRIBUTING.md#report-a-finding-to-amcore).
+Keep the product task in its own queue.
+
 ## Deliver and close
 
 Install and [verify Git hooks in the authoring checkout](../operations/ci-security.md#local-commit-hooks-scope-and-limits).

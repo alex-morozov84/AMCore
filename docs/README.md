@@ -190,6 +190,8 @@ there, not here.
 
 ## Help and contributions
 
+[Report an AMCore bug, documentation gap or reusable feature](../CONTRIBUTING.md#report-a-finding-to-amcore).
+
 Read [CONTRIBUTING.md](../CONTRIBUTING.md) before contributing.
 Use [GitHub issues](https://github.com/alex-morozov84/AMCore/issues) for reproducible bugs.
 Report vulnerabilities privately through [SECURITY.md](../SECURITY.md).

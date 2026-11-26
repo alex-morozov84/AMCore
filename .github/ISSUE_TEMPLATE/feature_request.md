@@ -21,3 +21,5 @@ assignees: ''
 ## Additional Context
 
 <!-- Mockups, examples, or any other relevant information -->
+
+<!-- If this came from a product based on AMCore, include the starting AMCore version, the tested revision, and relevant differences if known. Use public-safe examples and say which details are unknown. -->
