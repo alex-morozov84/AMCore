@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 
+import { readMarkdownField, setMarkdownField } from './actions.mjs'
 import { prepareBrandInit } from './brand-init-plan.mjs'
 import { applyFilesystemTransaction } from './filesystem-transaction.mjs'
 import { createWorkingTreeCopy } from './working-tree-fixture.mjs'
@@ -16,6 +17,26 @@ test('initialization previews and applies locale settings, installation metadata
   const manifest = 'apps/web/src/app/manifest.ts'
   const locales = 'packages/shared/src/config/locales.json'
   const english = 'apps/web/messages/en.json'
+  const contextFile = 'PROJECT_CONTEXT.md'
+  const consoleFile = 'packages/shared/src/config/admin-console.json'
+  const write = (file, content) => writeFileSync(join(root, file), content)
+  const json = (value) => JSON.stringify(value, null, 2) + '\n'
+  const context = setMarkdownField(read(contextFile), {
+    label: 'Mode',
+    value: '`upstream-starter`',
+  })
+  write(
+    contextFile,
+    setMarkdownField(context, { label: 'initialized_from_amcore_version', value: 'N/A' })
+  )
+  write(locales, json({ version: 1, enabled: ['en', 'ru'], default: 'en' }))
+  write(consoleFile, json({ ...JSON.parse(read(consoleFile)), mode: 'path' }))
+  const en = JSON.parse(read(english))
+  en.meta.description = 'Production-oriented application starter for secure, modular products.'
+  write(english, json(en))
+  consoleEdgeFiles(root, true)
+  productAdminEdgeFiles(root, true)
+  const manifestBefore = read(manifest)
   const { operationPlan } = prepareBrandInit(root, {
     productSetup: true,
     amcoreVersion: 'v1.0.0',
@@ -29,7 +50,7 @@ test('initialization previews and applies locale settings, installation metadata
     ciMode: 'heavy-off',
   })
   assert.equal(JSON.parse(read(locales)).default, 'en')
-  assert.match(read(manifest), /name: 'AMCore'/)
+  assert.equal(read(manifest), manifestBefore)
   assert.ok(
     operationPlan.displaySteps.some(({ target }) => target.endsWith('operations-console.conf'))
   )
@@ -52,5 +73,5 @@ test('initialization previews and applies locale settings, installation metadata
   applyFilesystemTransaction({ root, operations: replay.operationPlan.operationsForApply() })
   assert.equal(JSON.parse(read(english)).meta.description, 'A reviewed translation')
   assert.match(read(manifest), /description: 'A reviewed translation'/)
-  assert.match(read('PROJECT_CONTEXT.md'), /initialized_from_amcore_version:\*\* v1\.0\.0/)
+  assert.equal(readMarkdownField(read(contextFile), 'initialized_from_amcore_version'), 'v1.0.0')
 })
