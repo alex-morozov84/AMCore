@@ -232,8 +232,10 @@ and first feature in the same request. The agent carries that request through se
 2. The agent opens `pnpm init:product` in an interactive terminal it can keep
    open across chat turns. It starts without answer flags and enters earlier
    answers only when their questions appear. It explains defaults before
-   accepting them. Choose English or Russian for setup separately from the site's languages. Options shown by
-   the wizard depend on earlier answers. The agent enters free text literally.
+   accepting them. When it needs an answer, it leaves the wizard open and
+   ends its chat turn so you can reply. Choose English or Russian for setup
+   separately from the site's languages. The wizard's options depend on
+   earlier answers. The agent enters free text literally.
    The wizard has no question for the team's purpose. The agent keeps any
    purpose you give in the conversation for later product work. For first setup,
    it shows that `PROJECT_CONTEXT.md` will contain `To be defined.` for Purpose.
@@ -242,8 +244,8 @@ and first feature in the same request. The agent carries that request through se
    and returns to the menu. It uses the actual preview to report the product
    directory, affected files and effective settings. It checks what is saved
    and explains example addresses and deferred work. For replacement icons it
-   identifies the source, size and destination. The agent waits for your
-   explicit approval of that preview in that directory.
+   identifies the source, size and destination. It leaves the wizard open
+   and ends its chat turn. You can then approve that preview for that directory.
 4. The agent checks the directory, Git branch and commit before selecting
    **Apply settings** in the same terminal session. The wizard keeps the
    prepared writes, including icon contents, in that session. On refusal,
