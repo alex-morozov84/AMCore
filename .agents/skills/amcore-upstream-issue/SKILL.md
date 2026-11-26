@@ -13,5 +13,6 @@ product task in view.
 Offer a verified solution, one question that changes the next step, or a
 self-contained draft. Use the existing [bug](../../../.github/ISSUE_TEMPLATE/bug_report.md)
 or [feature](../../../.github/ISSUE_TEMPLATE/feature_request.md) template.
-For a suspected vulnerability, follow [SECURITY.md](../../../SECURITY.md)
-before any public search or draft. The skill grants no network or write authority.
+For a suspected AMCore vulnerability, follow the guide's security step before
+any public search or draft. Verify the private recipient against a trusted
+copy of AMCore's policy. The skill grants no network or write authority.

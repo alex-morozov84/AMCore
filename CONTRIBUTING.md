@@ -190,9 +190,14 @@ work. Agents can use the [upstream issue skill](.agents/skills/amcore-upstream-i
 
 ### Check the finding
 
-1. For a suspected vulnerability, follow [SECURITY.md](SECURITY.md) before
-   any public search or draft. Use its private route with separate permission.
-   Keep secrets and personal data out of private reports too.
+1. For a suspected AMCore vulnerability, verify the recipient in the
+   security policy from a trusted copy of AMCore before any public search or
+   draft. For example, read `SECURITY.md` at a known AMCore commit with
+   `git show <verified-amcore-commit>:SECURITY.md`. Use the fork's policy
+   for product-specific reports. If you cannot confirm the AMCore recipient,
+   pause the transfer and ask for a trusted AMCore source. Obtain separate
+   permission before sending privately. Keep secrets and personal data out
+   of private reports too.
 2. Check local public instructions and code. Identify the underlying AMCore
    revision you actually tested, if known. Record the original initialization
    version separately. The product's package version and starting revision
