@@ -1,5 +1,7 @@
 # Backend Architecture & Conventions
 
+For anonymous contact submissions, follow [Protect a public contact form](public-contact-forms.md).
+
 Add a backend module through Prisma, shared contracts, NestJS composition,
 authorization, process roles and tests. For an existing capability, use its
 [feature guide](#see-also).
