@@ -200,8 +200,9 @@ and first feature in the same request. The agent carries that request through se
    separately for a local trial. Repository creation and remote delivery require
    their own authorization.
 2. The agent opens `pnpm init:product` in an interactive terminal it can keep
-   open across chat turns. It uses the wizard's prompts and enters answers
-   you already gave. It explains defaults before accepting them. Choose English
+   open across chat turns. It starts without answer flags and enters earlier
+   answers only when their questions appear. It explains defaults before
+   accepting them. Choose English
    or Russian for setup separately from the site's languages. Options shown by
    the wizard depend on earlier answers. The agent enters free text literally.
    The site description and the team's purpose are separate fields. The wizard
