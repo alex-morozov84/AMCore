@@ -122,7 +122,7 @@ describe('init-product input validation', () => {
     )
     writeFileSync(path.join(root, guide), '# Team rules\n')
     commit()
-    apply(['--workflow-mode', 'custom'])
+    assert.match(apply(['--workflow-mode', 'custom']), /Team process: AMCore/)
     assert.doesNotMatch(readFixtureFile(root, context), /Team process/)
     commit()
 

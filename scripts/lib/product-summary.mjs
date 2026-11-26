@@ -20,9 +20,10 @@ export function printProductSummary(root, answers, plan) {
   const read = (file) =>
     plan.displaySteps.find((step) => relative(root, step.target) === file)?.after ??
     readFileSync(join(root, file), 'utf8')
-  const process = readMarkdownField(read('PROJECT_CONTEXT.md'), TEAM_PROCESS_FIELD)
+  const process =
+    readMarkdownField(read('PROJECT_CONTEXT.md'), TEAM_PROCESS_FIELD) ?? DEFAULT_TEAM_PROCESS
   if (!answers.interactive && !answers.locales && !answers.defaultLocale) {
-    if (process !== undefined) printTeamProcess(root, process, tr)
+    printTeamProcess(root, process, tr)
     return
   }
   const locales = proposedLocales(root, answers)
@@ -81,7 +82,7 @@ export function printProductSummary(root, answers, plan) {
     )
   if (answers.purpose) console.log(tr('Purpose:', 'Назначение:'), answers.purpose)
   if (answers.packageName) console.log(tr('Package name:', 'Имя пакета:'), answers.packageName)
-  printTeamProcess(root, process ?? DEFAULT_TEAM_PROCESS, tr)
+  printTeamProcess(root, process, tr)
   if (answers.workflowMode)
     console.log(tr('Team workflow:', 'Правила команды:'), answers.workflowMode)
   if (answers.upstreamSyncPolicy)
