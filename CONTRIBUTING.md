@@ -212,8 +212,9 @@ work. Agents can use the [upstream issue skill](.agents/skills/amcore-upstream-i
    If the sources disagree, clarify the target before accessing it. With
    permitted GitHub access, search open and closed issues using only public,
    anonymized terms. Match conditions and results. For a closed issue, check
-   whether its fix applies to the tested revision. If you could not search,
-   say so. An existing issue may only need a link or new evidence.
+   whether its fix applies to the tested revision. Report which states you
+   actually searched. If you could not search, say so. An existing issue may
+   only need a link or new evidence.
 2. Draft a title and body that stand alone. For a defect, include the relevant
    setup, minimal steps, expected and observed result, and what was tested.
    For a feature, include the shared need, current workaround, alternatives
