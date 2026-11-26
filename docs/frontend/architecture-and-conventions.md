@@ -377,6 +377,8 @@ catches a typo or a code the backend has since removed.
 
 ## Form validation
 
+For anonymous submissions, start with the [public contact form example](../backend/public-contact-forms.md).
+
 Build forms with **`useLocalizedForm(schema, options)`** rather than `useForm` +
 `zodResolver` directly. It wires a per-parse Zod error map so validation
 messages render in the active locale.

@@ -14,6 +14,8 @@ versions they name. For current source-update instructions, see
 
 ### Added
 
+- Add a public contact form protection guide and an opt-in AMCore example.
+
 - Let product owners choose automatic CI coverage and run the full applicable
   checks once on an exact commit without changing their saved mode.
 

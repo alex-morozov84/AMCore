@@ -1,0 +1,676 @@
+diff --git a/apps/api/src/app-imports.ts b/apps/api/src/app-imports.ts
+index 1910720b..28c15f6d 100644
+--- a/apps/api/src/app-imports.ts
++++ b/apps/api/src/app-imports.ts
+@@ -30,6 +30,7 @@ import { OrganizationsModule } from './core/organizations/organizations.module.j
+ import { envConfigOptions } from './env/env.config.js'
+ import { EnvModule } from './env/env.module.js'
+ import { EnvService } from './env/env.service.js'
++import { ContactModule } from './examples/public-contact/contact.module.js'
+ import { HealthModule } from './health/index.js'
+ import { AiCatalogModule } from './infrastructure/ai/ai-catalog.module.js'
+ import {
+@@ -181,6 +182,7 @@ export const webImports: Imports = [
+   StoragePublicModule,
+   // Auth
+   AuthModule,
++  ContactModule,
+   // Core: Organizations, Roles & Permissions
+   OrganizationsModule,
+   // Core: Admin (SUPER_ADMIN only)
+diff --git a/apps/api/src/bootstrap/configure-fastify-body-parser.ts b/apps/api/src/bootstrap/configure-fastify-body-parser.ts
+index 9b52ec6f..665f507e 100644
+--- a/apps/api/src/bootstrap/configure-fastify-body-parser.ts
++++ b/apps/api/src/bootstrap/configure-fastify-body-parser.ts
+@@ -6,6 +6,7 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
+ import type { FastifyAdapter } from '@nestjs/platform-fastify'
+
+ import {
++  CONTACT_BODY_LIMIT,
+   MEMBER_KEY_REQUEST_BYTES,
+   MEMBER_REQUEST_BYTES,
+   ROLE_REQUEST_BYTES,
+@@ -13,6 +14,7 @@ import {
+ } from '@amcore/shared'
+
+ import { mfaCredentialPath } from '../common/utils/mfa-credential-path.js'
++import { isContactPath } from '../examples/public-contact/contact-path.js'
+
+ import { decodedBodyLimit } from './decoded-body-limit.js'
+ import { configureInvitationBoundary, invitationJsonLimit } from './invitation-request-boundary.js'
+@@ -29,6 +31,7 @@ type BudgetRequest = { url: string; method: string; headers: Record<string, unkn
+ function bodyBudget(req: BudgetRequest, prefix: string): number {
+   if (mfaCredentialPath(req.url, prefix)) return MFA_CREDENTIAL_BODY_BYTES
+   const path = req.url.split('?')[0]
++  if (req.method === 'POST' && isContactPath(req.url, prefix)) return CONTACT_BODY_LIMIT
+   if (
+     req.method === 'POST' &&
+     path?.startsWith(`${prefix}/organizations/`) &&
+diff --git a/apps/api/src/common/config/logging.config.ts b/apps/api/src/common/config/logging.config.ts
+index cce51f94..df834a86 100644
+--- a/apps/api/src/common/config/logging.config.ts
++++ b/apps/api/src/common/config/logging.config.ts
+@@ -3,6 +3,7 @@ import type { ClsService } from 'nestjs-cls'
+ import type { Params } from 'nestjs-pino'
+ import { hostname } from 'os'
+
++import { isContactPath } from '../../examples/public-contact/contact-path.js'
+ import { mfaCredentialPath } from '../utils/mfa-credential-path.js'
+
+ export type TruncatedBody = {
+@@ -100,7 +101,7 @@ function serializeRequestBody(
+   body: unknown,
+   maxBodyBytes: number
+ ): unknown | TruncatedBody | '[REDACTED]' {
+-  if (url?.includes('/webhooks/')) return '[REDACTED]'
++  if (url && (url.includes('/webhooks/') || isContactPath(url))) return '[REDACTED]'
+   // Validation may reject arbitrary extra fields; they must not reach logs first.
+   if (url && /\/ai\/approvals(?:\/|\?|$)/.test(url)) return '[REDACTED]'
+   if (url && mfaCredentialPath(url)) return '[REDACTED]'
+diff --git a/apps/api/test/openapi.e2e-spec.ts b/apps/api/test/openapi.e2e-spec.ts
+index 2e4cf500..5749fcbc 100644
+--- a/apps/api/test/openapi.e2e-spec.ts
++++ b/apps/api/test/openapi.e2e-spec.ts
+@@ -85,6 +85,7 @@ const EXPECTED: Record<string, Expected> = {
+   'get /auth/sessions': { status: '200', kind: 'json' },
+   'delete /auth/sessions/{sessionId}': { status: '204', kind: 'none' },
+   'delete /auth/sessions': { status: '204', kind: 'none' },
++  'post /contact': { status: '200', kind: 'json' },
+   'post /auth/forgot-password': { status: '200', kind: 'json' },
+   'post /auth/reset-password': { status: '204', kind: 'none' },
+   'post /auth/verify-email': { status: '204', kind: 'none' },
+diff --git a/apps/web/messages/en.json b/apps/web/messages/en.json
+index c8fa2df3..bd03cc3c 100644
+--- a/apps/web/messages/en.json
++++ b/apps/web/messages/en.json
+@@ -1,4 +1,15 @@
+ {
++  "contactExample": {
++    "title": "Contact us",
++    "email": "Email",
++    "message": "Message",
++    "send": "Send",
++    "sending": "Sending…",
++    "success": "Message accepted.",
++    "wait": "Too many submissions. Try again in {seconds} seconds.",
++    "unknown": "The result is unknown. Retry the original submission.",
++    "retry": "Retry original submission"
++  },
+   "productAdmin": {
+     "visitSite": "Go to website",
+     "unavailableTitle": "Page unavailable",
+diff --git a/apps/web/messages/ru.json b/apps/web/messages/ru.json
+index eafae0d8..59250f57 100644
+--- a/apps/web/messages/ru.json
++++ b/apps/web/messages/ru.json
+@@ -1,4 +1,15 @@
+ {
++  "contactExample": {
++    "title": "Напишите нам",
++    "email": "Электронная почта",
++    "message": "Сообщение",
++    "send": "Отправить",
++    "sending": "Отправляем…",
++    "success": "Обращение принято.",
++    "wait": "Слишком много отправок. Повторите через {seconds} с.",
++    "unknown": "Результат неизвестен. Повторите отправку исходного обращения.",
++    "retry": "Повторить исходную отправку"
++  },
+   "productAdmin": {
+     "visitSite": "Перейти на сайт",
+     "unavailableTitle": "Страница недоступна",
+diff --git a/packages/shared/src/schemas/index.ts b/packages/shared/src/schemas/index.ts
+index 5e4dbec8..9a8789cd 100644
+--- a/packages/shared/src/schemas/index.ts
++++ b/packages/shared/src/schemas/index.ts
+@@ -490,3 +490,5 @@ export * from './role-definition'
+ export * from './role-definition-budget'
+ export * from './scheduled-jobs'
+ export * from './storage-probe-setting'
++
++export * from './public-contact'
+diff --git a/apps/api/src/examples/public-contact/contact.module.ts b/apps/api/src/examples/public-contact/contact.module.ts
+new file mode 100644
+index 00000000..875d13be
+--- /dev/null
++++ b/apps/api/src/examples/public-contact/contact.module.ts
+@@ -0,0 +1,69 @@
++import {
++  BadRequestException,
++  Body,
++  Controller,
++  HttpCode,
++  Module,
++  Post,
++  ServiceUnavailableException,
++} from '@nestjs/common'
++import { ApiHeader, ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
++
++import { AuthType, contactReceiptSchema, contactSchema } from '@amcore/shared'
++
++import { createSchemaDto } from '../../common/schemas/schema-dto.js'
++import { Auth } from '../../core/auth/decorators/auth.decorator.js'
++import { EmailModule } from '../../infrastructure/email/email.module.js'
++import { EmailService } from '../../infrastructure/email/email.service.js'
++import { Idempotent } from '../../infrastructure/idempotency/idempotent.decorator.js'
++import { IdempotencyModule } from '../../infrastructure/idempotency/index.js'
++import { RateLimit } from '../../infrastructure/throttling/rate-limit.decorator.js'
++
++class ContactDto extends createSchemaDto(contactSchema) {}
++class ContactReceiptDto extends createSchemaDto(contactReceiptSchema) {}
++
++@ApiTags('Contact example')
++@Controller('contact')
++export class ContactController {
++  constructor(private readonly mail: EmailService) {}
++
++  @Post()
++  @HttpCode(200)
++  @Auth(AuthType.None)
++  @RateLimit({ rate: 5, per: 60_000, burst: 3 })
++  @Idempotent({ scope: 'public-contact-example' })
++  @ApiOperation({ summary: 'Send a message to the configured contact mailbox' })
++  @ApiHeader({ name: 'Idempotency-Key', required: true })
++  @ApiResponse({ status: 400, description: 'Invalid request, trap or key.' })
++  @ApiResponse({ status: 409, description: 'Submission still processing.' })
++  @ApiResponse({ status: 413, description: 'Request too large.' })
++  @ApiResponse({ status: 422, description: 'Key used with different input.' })
++  @ApiResponse({ status: 429, description: 'Too many requests.' })
++  @ApiResponse({ status: 503, description: 'Submission outcome unavailable.' })
++  // Validate the object before returning it. Cached replays return serialized JSON.
++  @ApiOkResponse({
++    schema: {
++      type: 'object',
++      required: ['accepted'],
++      properties: {
++        accepted: { type: 'boolean', enum: [true] },
++      },
++    },
++  })
++  async submit(@Body({ schema: ContactDto.schema }) input: ContactDto): Promise<ContactReceiptDto> {
++    if (input.website) throw new BadRequestException()
++    const text = `From: ${input.email}\n\n${input.message}`
++    const html = text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
++    const result = await this.mail.send({
++      to: 'contact@example.com',
++      subject: 'Contact form message',
++      text,
++      html: `<pre>${html}</pre>`,
++    })
++    if (!result.success) throw new ServiceUnavailableException()
++    return contactReceiptSchema.parse({ accepted: true })
++  }
++}
++
++@Module({ imports: [EmailModule, IdempotencyModule], controllers: [ContactController] })
++export class ContactModule {}
+diff --git a/apps/api/src/examples/public-contact/contact-path.ts b/apps/api/src/examples/public-contact/contact-path.ts
+new file mode 100644
+index 00000000..c0ece00b
+--- /dev/null
++++ b/apps/api/src/examples/public-contact/contact-path.ts
+@@ -0,0 +1,5 @@
++/** Match the contact route's case and trailing-slash aliases without changing routing. */
++export function isContactPath(url: string, prefix = '/api/v1'): boolean {
++  const path = url.split('?')[0]?.replace(/\/$/, '').toLowerCase()
++  return path === `${prefix}/contact`.toLowerCase()
++}
+diff --git a/apps/api/test/public-contact.e2e-spec.ts b/apps/api/test/public-contact.e2e-spec.ts
+new file mode 100644
+index 00000000..9c736c7e
+--- /dev/null
++++ b/apps/api/test/public-contact.e2e-spec.ts
+@@ -0,0 +1,64 @@
++import { randomUUID } from 'node:crypto'
++
++import request from 'supertest'
++
++import type { SendEmailParams } from '../src/infrastructure/email/email.types.js'
++
++import { type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
++
++const deliveries: SendEmailParams[] = []
++let context: E2ETestContext
++
++beforeAll(async () => {
++  context = await setupE2ETest(
++    (builder) =>
++      builder.overrideProvider('EmailProvider').useValue({
++        async send(mail: SendEmailParams) {
++          deliveries.push(mail)
++          return { id: randomUUID(), success: true }
++        },
++      }),
++    { productionOrder: true }
++  )
++}, 120_000)
++
++afterAll(async () => {
++  if (context) await teardownE2ETest(context)
++}, 120_000)
++
++const input = { email: 'visitor@example.com', message: 'What are your opening hours?' }
++
++function submit(data: object, key = randomUUID()) {
++  return request(context.app.getHttpServer())
++    .post('/api/v1/contact')
++    .set('Idempotency-Key', key)
++    .send(data)
++}
++
++function expectDeliveriesSince(before: number, count: number) {
++  expect(deliveries.length - before).toBe(count)
++}
++
++it('counts every delivery independently of the submission identifier', async () => {
++  const before = deliveries.length
++  const key = randomUUID()
++  await submit(input, key).expect(200, { accepted: true })
++  await submit(input, key).expect(200).expect('idempotency-replayed', 'true')
++  expectDeliveriesSince(before, 1)
++  expect(deliveries.at(-1)?.to).toBe('contact@example.com')
++
++  await submit(input).expect(200)
++  expect(() => expectDeliveriesSince(before, 1)).toThrow()
++  expectDeliveriesSince(before, 2)
++})
++
++it('refuses invalid and excess attempts without delivering mail', async () => {
++  await context.throttlerStorage.reset()
++  const before = deliveries.length
++  await submit({ ...input, website: 'robot' }).expect(400)
++  await submit({ ...input, message: '  ' }).expect(400)
++  await submit({ ...input, message: 'x'.repeat(2001) }).expect(400)
++  await submit({ ...input, message: 'x'.repeat(17_000) }).expect(413)
++  await submit(input).expect(429).expect('retry-after', /^\d+$/)
++  expectDeliveriesSince(before, 0)
++})
+diff --git a/apps/web/e2e/real-stack/public-contact.spec.ts b/apps/web/e2e/real-stack/public-contact.spec.ts
+new file mode 100644
+index 00000000..257bfc38
+--- /dev/null
++++ b/apps/web/e2e/real-stack/public-contact.spec.ts
+@@ -0,0 +1,128 @@
++import { randomUUID } from 'node:crypto'
++
++import { expect, test } from '@playwright/test'
++
++import { expectNoAxeViolations } from '../shared/axe'
++import { messages, productPath } from '../shared/product-settings'
++import { activeTarget } from '../support/managed-target.mjs'
++
++const copy = messages.contactExample
++const input = { email: 'visitor@example.com', message: '  What are your opening hours?  ' }
++
++async function mailCount() {
++  const port = activeTarget().ports.api
++  const response = await fetch(`http://127.0.0.1:${port}/api/v1/metrics`, {
++    redirect: 'error',
++    signal: AbortSignal.timeout(3000),
++  })
++  expect(response.ok).toBe(true)
++  return (await response.text())
++    .split('\n')
++    .filter(
++      (line) =>
++        line.startsWith('amcore_email_operations_total{') &&
++        ['operation="send"', 'mode="direct"', 'result="success"'].every((label) =>
++          line.includes(label)
++        )
++    )
++    .reduce((total, line) => total + Number(line.slice(line.lastIndexOf(' ') + 1)), 0)
++}
++
++test.describe.configure({ mode: 'serial' })
++
++test('retains and reuses a submission when the response is lost', async ({ page }) => {
++  const before = await mailCount()
++  await page.goto(productPath('/contact'))
++  const email = page.getByRole('textbox', { name: copy.email })
++  const message = page.getByRole('textbox', { name: copy.message })
++  await expectNoAxeViolations(page)
++  await email.fill(input.email)
++  await message.fill(input.message)
++
++  const releaseResponse = Promise.withResolvers<void>()
++  const attempts: Array<{ key: string; body: string | null }> = []
++  await page.route('**/api/contact', async (route) => {
++    const request = route.request()
++    attempts.push({ key: request.headers()['idempotency-key'] ?? '', body: request.postData() })
++    const response = await route.fetch()
++    if (attempts.length === 1) {
++      expect(response.status()).toBe(200)
++      await releaseResponse.promise
++      await route.abort()
++      return
++    }
++    await route.fulfill({ response })
++  })
++
++  try {
++    await page.getByRole('button', { name: copy.send }).dblclick()
++    await expect(page.getByRole('button', { name: copy.sending })).toBeDisabled()
++    for (const [field, value] of [
++      [email, input.email],
++      [message, input.message],
++    ] as const) {
++      await expect(field).not.toBeEditable()
++      await field.focus()
++      await page.keyboard.type(' changed')
++      await expect(field).toHaveValue(value)
++    }
++  } finally {
++    releaseResponse.resolve()
++  }
++  const retry = page.getByRole('button', { name: copy.retry })
++  await expect(retry).toBeEnabled()
++  expect(attempts).toHaveLength(1)
++  await expect(email).toHaveValue(input.email)
++  await expect(message).toHaveValue(input.message)
++  const visibleInput = { email: await email.inputValue(), message: await message.inputValue() }
++  const replay = page.waitForResponse((response) => response.url().endsWith('/api/contact'))
++  await retry.click()
++  expect((await replay).headers()['idempotency-replayed']).toBe('true')
++  await expect(page.getByRole('status')).toHaveText(copy.success)
++  expect(attempts).toHaveLength(2)
++  expect(attempts[0]?.key).not.toBe('')
++  expect(attempts[1]).toEqual(attempts[0])
++  expect(JSON.parse(attempts[0]?.body ?? '{}')).toMatchObject(visibleInput)
++  expect(JSON.parse(attempts[1]?.body ?? '{}')).toMatchObject(visibleInput)
++  expect(await mailCount()).toBe(before + 1)
++})
++
++test('rejects the trap and oversized messages through the browser endpoint', async ({
++  request,
++}) => {
++  const before = await mailCount()
++  const post = (data: object) =>
++    request.post('/api/contact', { data, headers: { 'Idempotency-Key': randomUUID() } })
++  expect((await post({ ...input, website: 'bot' })).status()).toBe(400)
++  expect((await post({ ...input, message: 'x'.repeat(17_000) })).status()).toBe(413)
++  expect(await mailCount()).toBe(before)
++})
++
++test('keeps editable fields and re-enables submit after a rate refusal', async ({ page }) => {
++  const before = await mailCount()
++  await page.goto(productPath('/contact'))
++  const email = page.getByRole('textbox', { name: copy.email })
++  const message = page.getByRole('textbox', { name: copy.message })
++  await email.fill(input.email)
++  await message.fill(input.message)
++  await page.clock.install()
++  await page.route('**/api/contact', (route) =>
++    route.fulfill({ status: 429, headers: { 'Retry-After': '20' }, json: {} })
++  )
++  const button = page.getByRole('button', { name: copy.send })
++  await email.focus()
++  await page.keyboard.press('Tab')
++  await expect(message).toBeFocused()
++  await page.keyboard.press('Tab')
++  await expect(button).toBeFocused()
++  await page.keyboard.press('Enter')
++  await expect(page.locator('[data-slot=alert]')).toHaveText(copy.wait.replace('{seconds}', '20'))
++  await expect(button).toBeDisabled()
++  await expect(email).toBeEditable()
++  await expect(message).toBeEditable()
++  await expect(email).toHaveValue(input.email)
++  await expect(message).toHaveValue(input.message)
++  await page.clock.fastForward(20_000)
++  await expect(button).toBeEnabled()
++  expect(await mailCount()).toBe(before)
++})
+diff --git a/apps/web/src/_pages/public-contact/contact-form.tsx b/apps/web/src/_pages/public-contact/contact-form.tsx
+new file mode 100644
+index 00000000..aebb0685
+--- /dev/null
++++ b/apps/web/src/_pages/public-contact/contact-form.tsx
+@@ -0,0 +1,130 @@
++'use client'
++
++import { useRef, useState } from 'react'
++import { useTranslations } from 'next-intl'
++import { type ContactInput, contactSchema } from '@amcore/shared'
++
++import { apiClient, ApiRequestError } from '@/shared/api/http-client'
++import { useLocalizedForm } from '@/shared/hooks'
++import { Alert, AlertDescription } from '@/shared/ui/alert'
++import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
++import { Button } from '@/shared/ui/button'
++import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/shared/ui/form'
++import { Input } from '@/shared/ui/input'
++
++type Attempt = { key: string; input: ContactInput }
++
++export function ContactForm() {
++  const t = useTranslations('contactExample')
++  const form = useLocalizedForm<ContactInput>(contactSchema, {
++    defaultValues: { email: '', message: '', website: '' },
++  })
++  const active = useRef(false)
++  const attempt = useRef<Attempt | null>(null)
++  const [pending, setPending] = useState(false)
++  const [accepted, setAccepted] = useState(false)
++  const [unknown, setUnknown] = useState(false)
++  const [wait, setWait] = useState(0)
++  const [error, setError] = useState<unknown>()
++
++  async function submit(input: ContactInput) {
++    if (active.current || wait) return
++    active.current = true
++    const current = (attempt.current ??= { key: crypto.randomUUID(), input })
++    setError(undefined)
++    setPending(true)
++
++    try {
++      await apiClient.post('/contact', current.input, {
++        headers: { 'Idempotency-Key': current.key },
++        signal: AbortSignal.timeout(12_000),
++      })
++      attempt.current = null
++      setAccepted(true)
++    } catch (cause) {
++      if (cause instanceof ApiRequestError && cause.status === 429) {
++        const seconds = cause.retryAfterSeconds ?? 1
++        setWait(seconds)
++        setTimeout(() => setWait(0), seconds * 1000)
++        if (!unknown) attempt.current = null
++      } else if (
++        !unknown &&
++        cause instanceof ApiRequestError &&
++        [400, 403, 413].includes(cause.status)
++      ) {
++        attempt.current = null
++        setError(cause)
++      } else {
++        setUnknown(true)
++      }
++    } finally {
++      active.current = false
++      setPending(false)
++    }
++  }
++
++  if (accepted) return <p role="status">{t('success')}</p>
++
++  return (
++    <Form {...form}>
++      <form
++        className="space-y-4"
++        noValidate
++        onSubmit={(event) => {
++          const original = attempt.current
++          if (unknown && original) {
++            event.preventDefault()
++            void submit(original.input)
++            return
++          }
++          void form.handleSubmit(submit)(event)
++        }}
++      >
++        <ApiErrorAlert error={error} />
++        {wait > 0 && (
++          <Alert variant="destructive">
++            <AlertDescription>{t('wait', { seconds: wait })}</AlertDescription>
++          </Alert>
++        )}
++        {unknown && <p role="status">{t('unknown')}</p>}
++        <FormField
++          control={form.control}
++          name="email"
++          render={({ field }) => (
++            <FormItem>
++              <FormLabel>{t('email')}</FormLabel>
++              <FormControl>
++                <Input type="email" autoComplete="email" readOnly={pending || unknown} {...field} />
++              </FormControl>
++              <FormMessage />
++            </FormItem>
++          )}
++        />
++        <FormField
++          control={form.control}
++          name="message"
++          render={({ field }) => (
++            <FormItem>
++              <FormLabel>{t('message')}</FormLabel>
++              <FormControl>
++                <textarea
++                  className="w-full rounded-md border border-input bg-background px-3 py-2"
++                  rows={5}
++                  readOnly={pending || unknown}
++                  {...field}
++                />
++              </FormControl>
++              <FormMessage />
++            </FormItem>
++          )}
++        />
++        <div hidden>
++          <input autoComplete="off" tabIndex={-1} {...form.register('website')} />
++        </div>
++        <Button type="submit" className="w-full" disabled={pending || wait > 0}>
++          {pending ? t('sending') : unknown ? t('retry') : t('send')}
++        </Button>
++      </form>
++    </Form>
++  )
++}
+diff --git a/apps/web/src/_pages/public-contact/index.tsx b/apps/web/src/_pages/public-contact/index.tsx
+new file mode 100644
+index 00000000..4d3f9483
+--- /dev/null
++++ b/apps/web/src/_pages/public-contact/index.tsx
+@@ -0,0 +1,26 @@
++import { getTranslations } from 'next-intl/server'
++
++import { ClientMessages } from '@/i18n/client-message-boundary'
++import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
++
++import { ContactForm } from './contact-form'
++
++export async function ContactPage() {
++  const t = await getTranslations('contactExample')
++  return (
++    <main className="mx-auto max-w-md px-4 py-12">
++      <Card>
++        <CardHeader className="text-center">
++          <CardTitle as="h1" className="text-2xl">
++            {t('title')}
++          </CardTitle>
++        </CardHeader>
++        <CardContent>
++          <ClientMessages namespaces={['contactExample']}>
++            <ContactForm />
++          </ClientMessages>
++        </CardContent>
++      </Card>
++    </main>
++  )
++}
+diff --git a/apps/web/src/app/[locale]/contact/page.tsx b/apps/web/src/app/[locale]/contact/page.tsx
+new file mode 100644
+index 00000000..4f757136
+--- /dev/null
++++ b/apps/web/src/app/[locale]/contact/page.tsx
+@@ -0,0 +1,9 @@
++import { setRequestLocale } from 'next-intl/server'
++
++import { ContactPage } from '@/_pages/public-contact'
++import { resolveLocaleParam } from '@/i18n/params'
++
++export default async function Page({ params }: { params: Promise<{ locale: string }> }) {
++  setRequestLocale(await resolveLocaleParam(params))
++  return <ContactPage />
++}
+diff --git a/apps/web/src/app/api/contact/route.ts b/apps/web/src/app/api/contact/route.ts
+new file mode 100644
+index 00000000..8cc68a36
+--- /dev/null
++++ b/apps/web/src/app/api/contact/route.ts
+@@ -0,0 +1,46 @@
++import { CONTACT_BODY_LIMIT } from '@amcore/shared'
++
++import { fetchBackendResponse } from '@/shared/api/backend-transport'
++import { isTrustedOrigin } from '@/shared/api/bff/origin-guard'
++
++export async function POST(request: Request) {
++  if (!isTrustedOrigin(request)) return Response.json({}, { status: 403 })
++  if (request.headers.get('content-type') !== 'application/json' || !request.body) {
++    return Response.json({}, { status: 400 })
++  }
++
++  const body = new Uint8Array(CONTACT_BODY_LIMIT)
++  const reader = request.body.getReader()
++  let size = 0
++  try {
++    for (;;) {
++      const { done, value } = await reader.read()
++      if (done) break
++      if (size + value.length > body.length) {
++        await reader.cancel()
++        return Response.json({}, { status: 413 })
++      }
++      body.set(value, size)
++      size += value.length
++    }
++
++    const upstream = await fetchBackendResponse('/api/v1/contact', request.headers, {
++      method: 'POST',
++      headers: {
++        'content-type': 'application/json',
++        'idempotency-key': request.headers.get('idempotency-key') ?? '',
++      },
++      body: body.subarray(0, size),
++      signal: AbortSignal.timeout(10_000),
++    })
++
++    const headers = new Headers({ 'cache-control': 'no-store' })
++    for (const name of ['content-type', 'retry-after', 'idempotency-replayed']) {
++      const value = upstream.headers.get(name)
++      if (value) headers.set(name, value)
++    }
++    return new Response(upstream.body, { status: upstream.status, headers })
++  } catch {
++    return Response.json({}, { status: 503 })
++  }
++}
+diff --git a/packages/shared/src/schemas/public-contact.ts b/packages/shared/src/schemas/public-contact.ts
+new file mode 100644
+index 00000000..892ff374
+--- /dev/null
++++ b/packages/shared/src/schemas/public-contact.ts
+@@ -0,0 +1,14 @@
++import { z } from 'zod'
++
++export const contactSchema = z.strictObject({
++  email: z.email().max(254),
++  message: z
++    .string()
++    .max(2000)
++    .refine((message) => message.trim().length > 0),
++  website: z.string().max(254).optional(),
++})
++
++export const contactReceiptSchema = z.object({ accepted: z.literal(true) })
++export const CONTACT_BODY_LIMIT = 16_384
++export type ContactInput = z.input<typeof contactSchema>
