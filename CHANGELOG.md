@@ -27,6 +27,9 @@ versions they name. For current source-update instructions, see
 
 ### Fixed
 
+- Require existing PNG destinations in `init:brand` and skip identical assets.
+  Refuse to apply a plan if a destination changed after the preview.
+
 - Correct the API reference for authentication, request parameters, response schemas,
   and errors. Keep the HTTP contract unchanged.
 

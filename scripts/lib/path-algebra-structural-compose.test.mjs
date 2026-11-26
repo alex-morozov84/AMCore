@@ -2,7 +2,7 @@
 // parse, adapters edit one shared model, one validated serialization, and
 // a defective adapter is diagnosed rather than trusted. Planning-side
 // behaviour is in path-algebra-structural-compose-plan.test.mjs; real-file
-// compositions in path-algebra-eslint-compose.test.mjs.
+// compositions exercised by the brand structural preservation tests.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createOperationRegistry } from './path-algebra-operation-registry.mjs'
