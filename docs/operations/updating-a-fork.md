@@ -117,13 +117,12 @@ Creating repositories, pushing code and changing settings require the product ow
    If it already contains later commits, do not rewind it. Use a supported tag matching that head or the independent-copy route.
 
 4. Follow [product initialization](../product-admin/adoption.md#initialize-a-clean-product) to prepare dependencies and run `pnpm init:product`.
-   Set product name, purpose, description, workflow and upstream sync policy. Declare reviewed release merges as the sync policy.
+   Use the wizard directly or [ask an agent to guide setup in chat](../frontend/brand-theme-and-tokens.md#configure-a-product-with-an-agent).
+   Decide how the team accepts changes and which automatic checks to run in the wizard. You can defer the update policy. Follow this guide if you later adopt supported releases.
    Run initialization before any product commit or tag namespacing. Verify `initialized_from_amcore_version` equals `SOURCE_TAG`.
    Preserve that value thereafter; it describes the starting point, not the latest update.
    Resolve verification failures using the [initializer recovery guide](../frontend/brand-theme-and-tokens.md#recover-from-a-failure).
-   Before the first push, decide how your team accepts changes. Then choose the
-   [automatic checks](ci-security.md#choose-automatic-checks-for-a-product) and
-   record the choice in `ci/product.json`. Check what could have broken by default.
+   Confirm the [automatic checks](ci-security.md#choose-automatic-checks-for-a-product) choice in `ci/product.json` before the first push.
    Commit the inspected initialization changes only after the value and checks are correct.
 
 5. **Independent copy only, before creating any product release tags:** list all copied `v*` tags,

@@ -189,6 +189,42 @@ Run the wizard in a clean product checkout with the workspace dependencies insta
 
 The wizard writes the files the application and CI read. It previews locale-dependent proxy output alongside source settings and writes the approved plan together. It runs type and lint checks after writing. Prepare the shared build and generated Prisma client as described in [product adoption](../product-admin/adoption.md#initialize-a-clean-product). Source changes require a new web build. Commit or stash local edits before applying another run. Rerun the wizard to edit settings.
 
+### Configure a product with an agent
+
+Ask the agent to set up your product in chat. You can give it the product name
+and first feature in the same request. The agent carries that request through setup.
+
+1. Confirm the product directory and intended repository visibility. If you are
+   creating a product, check the supported starting release in the
+   [fork guide](../operations/updating-a-fork.md). Agree on a specific commit
+   separately for a local trial. Repository creation and remote delivery require
+   their own authorization.
+2. The agent opens `pnpm init:product` in an interactive terminal it can keep
+   open across chat turns. It uses the wizard's prompts and enters answers you already gave. It explains defaults before accepting them. Choose English
+   or Russian for setup separately from the site's languages. Options shown by
+   the wizard depend on earlier answers. The agent enters free text literally.
+3. At **Apply these product settings?**, the agent can select **Show file
+   changes** and return to the menu. It shows you the product directory,
+   effective settings, example addresses, affected files and deferred work.
+   For replacement icons it identifies the source, size and destination.
+   The agent waits for your explicit approval of that preview in that directory.
+4. The agent checks the directory, Git branch and commit before selecting
+   **Apply settings** in the same terminal session. The wizard keeps the
+   prepared writes, including icon contents, in that session. On refusal,
+   the agent selects **Exit without writing**. If the answers, checkout or
+   session change before applying, it prepares a fresh preview and asks again.
+   If applying was interrupted, it checks the files and transaction journal
+   using [failure recovery](#recover-from-a-failure) before attempting a retry.
+5. The agent reports whether files were written and what the checks found.
+   If you requested or agreed to local launch, it runs `pnpm local` and checks
+   the printed URL. If launch is unavailable, it gives the command and the
+   missing prerequisite. The agent explains what is available and returns to
+   the feature you originally requested.
+
+If the agent cannot keep the terminal open, it summarizes your answers so you
+can confirm them in the wizard yourself. Separate `--dry-run` and `--yes` runs
+each build a new plan. The agent uses the original open menu for chat approval.
+
 ### Scripted initialization
 
 Use `--non-interactive` to suppress questions. Field flags answer individual questions. `--setup-language en|ru` chooses only the wizard language. Use `--dry-run` for a preview, or `--yes` to authorize a noninteractive write. On first setup, provide a name for the default site language, including for a preview. Omitted fields keep their current values unless first initialization requires starter metadata replacement.

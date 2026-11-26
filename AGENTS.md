@@ -12,13 +12,12 @@ Claude Code reads it via the `@AGENTS.md` import in `CLAUDE.md`.
 1. Read `PROJECT_CONTEXT.md`. It declares whether this checkout is the AMCore
    upstream starter or a downstream product, and which workflow mode applies
    (`strict`, `flexible`, or `custom`). Do not guess from git remotes or names.
-   If the file is missing or still says `upstream-starter` in a product fork, stop
-   and ask the owner to initialize it. The supported fork-initialization path is
-   `pnpm init:product`, which writes the product identity, workflow and theme fields; see
-   `docs/frontend/brand-theme-and-tokens.md#configure-a-new-product`. Served locales and the
-   Console mode are build settings in `packages/shared/src/config/*.json`, not fields
-   there (see `PROJECT_CONTEXT.md` → _Build Settings_). A frontend Route Handler is not
-   a NestJS backend controller.
+   For a new product request or work in a confirmed product awaiting setup,
+   offer to run [product setup in chat](docs/frontend/brand-theme-and-tokens.md#configure-a-product-with-an-agent).
+   Answer reference questions first. Offer setup once in an established product
+   context and respect a deferral. Ordinary AMCore work and initialized products
+   follow their existing workflows. If identity is missing or contradictory,
+   clarify the target before product writes. New products use a separate checkout.
 2. Detect the working-context overlay:
    - **`ai/` directory present** → maintainer copy of the product named in
      `PROJECT_CONTEXT.md`. ALSO read, in order: `ai/README.md` (private-repo

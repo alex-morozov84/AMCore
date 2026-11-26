@@ -23,13 +23,10 @@ When this file and the guide disagree, follow the guide and report the differenc
 
 ## Create a product
 
-Before the first push, ask how the team accepts changes. Wait for the answer.
-Then ask what CI should check: what could have broken (recommended), everything
-applicable, or only quick checks. Explain that quick checks can miss a broken
-browser sign-in and show the time example in the
-[CI guide](../../../docs/operations/ci-security.md#choose-automatic-checks-for-a-product).
-Record the owner's choice before delivery. A Fork's first PR uses the starter
-check mode. The chosen mode applies after merge.
+Offer [product setup in chat](../../../docs/frontend/brand-theme-and-tokens.md#configure-a-product-with-an-agent)
+when the user asks to create a product. Retain the initial request while the
+wizard collects identity, workflow and CI choices. Follow the fork guide for
+first delivery and the chat setup instructions for approval of local writes.
 
 Follow these guide sections in order:
 
