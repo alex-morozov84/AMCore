@@ -1,11 +1,16 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { readMarkdownField } from './actions.mjs'
+import { LOCALE_CATALOGUES } from './settings-files.mjs'
 import { proposedLocales } from './product-settings-plan.mjs'
 
 const starter = {
   en: 'Production-oriented application starter for secure, modular products.',
   ru: 'Стартовый шаблон для безопасных модульных приложений.',
+}
+
+export function supportsProductMetadataLocale(locale) {
+  return Object.hasOwn(starter, locale)
 }
 
 export function productMetadata(root, answers) {
@@ -23,7 +28,7 @@ export function productMetadata(root, answers) {
   ].some((key) => answers[key] !== undefined)
   if (!relevant) return { answers, metadata: null }
   const current = Object.fromEntries(
-    ['en', 'ru'].map((locale) => [
+    LOCALE_CATALOGUES.map((locale) => [
       locale,
       JSON.parse(readFileSync(join(root, `apps/web/messages/${locale}.json`), 'utf8')).meta,
     ])
@@ -41,7 +46,7 @@ export function productMetadata(root, answers) {
   }
   const chosenName = names[defaultLocale] ?? (fresh ? undefined : current[defaultLocale].title)
   if (!chosenName) throw new Error('Enter a product name for the default site language')
-  for (const locale of ['en', 'ru']) {
+  for (const locale of LOCALE_CATALOGUES) {
     if (fresh && !names[locale] && (enabled.includes(locale) || current[locale].title === 'AMCore'))
       names[locale] = chosenName
     if (fresh && !descriptions[locale] && current[locale].description === starter[locale])

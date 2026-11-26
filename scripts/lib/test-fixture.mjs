@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { LOCALE_CATALOGUES } from './settings-files.mjs'
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 
@@ -80,7 +81,7 @@ export function createFixtureRepo() {
   write(
     root,
     'packages/shared/src/config/locales.json',
-    '{"version":1,"enabled":["en","ru"],"default":"en"}\n'
+    JSON.stringify({ version: 1, enabled: LOCALE_CATALOGUES, default: 'en' }) + '\n'
   )
   write(root, 'apps/web/public/logo-dark.png', fakePng(32, 32))
   write(root, 'apps/web/public/icons/icon-192x192.png', fakePng(192, 192))

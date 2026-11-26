@@ -8,6 +8,11 @@ import { DEFAULT_TEAM_PROCESS, teamProcessError } from './team-process.mjs'
 import { clack } from './init-engine.mjs'
 import { validateAnswers } from './brand-validate.mjs'
 import { productQuestions } from './product-questions.mjs'
+const SETUP_LANGUAGE_OPTIONS = [
+  { value: 'en', label: 'English' },
+  { value: 'ru', label: 'Русский' },
+]
+
 const FLAG_TO_ANSWER = {
   locales: 'locales',
   'default-locale': 'defaultLocale',
@@ -70,16 +75,13 @@ export async function collectAnswers({ root, flags }) {
   const interactive = process.stdin.isTTY && process.stdout.isTTY && !flags['non-interactive']
   const answers = answersFromFlags(flags)
   let language = flags['setup-language']
-  if (language && !['en', 'ru'].includes(language))
+  if (language && !SETUP_LANGUAGE_OPTIONS.some(({ value }) => value === language))
     throw new Error('Expected setup language en or ru')
   if (!language && interactive) {
     clack.note('Setup language / Язык настройки')
     language = await clack.select({
       message: 'Choose an option / Выберите вариант',
-      options: [
-        { value: 'en', label: 'English' },
-        { value: 'ru', label: 'Русский' },
-      ],
+      options: SETUP_LANGUAGE_OPTIONS,
       initialValue: 'en',
     })
     if (clack.isCancel(language)) process.exit(1)

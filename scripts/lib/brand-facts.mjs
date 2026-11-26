@@ -5,6 +5,7 @@ import { readMarkdownField } from './actions.mjs'
 import { buildBrandAssetFacts } from './brand-asset-facts.mjs'
 import { productMetadata } from './product-metadata.mjs'
 import { TEAM_PROCESS_FIELD } from './team-process.mjs'
+import { LOCALE_CATALOGUES } from './settings-files.mjs'
 import { BRAND_PATHS } from './brand-ownership.mjs'
 
 const content = (path, operationKey, params) => ({
@@ -93,7 +94,7 @@ function semanticFacts(root, input, metadata) {
   if (answers.productDescription) manifest.description = answers.productDescription
   if (Object.keys(manifest).length)
     facts.push(content(BRAND_PATHS.manifest, 'brand.set-manifest-fields', manifest))
-  for (const locale of ['en', 'ru']) {
+  for (const locale of LOCALE_CATALOGUES) {
     const name = metadata ? metadata.names[locale] : answers.productName
     const description = metadata
       ? metadata.descriptions[locale]

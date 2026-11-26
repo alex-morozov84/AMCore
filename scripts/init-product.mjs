@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { parseCommonFlags, runInitCommand } from './lib/init-engine.mjs'
 import { collectAnswers, BRAND_FLAG_OPTIONS } from './lib/brand-fields.mjs'
 import { printProductSummary } from './lib/product-summary.mjs'
+import { supportsProductMetadataLocale } from './lib/product-metadata.mjs'
 import { LOCALE_CATALOGUES } from './lib/settings-files.mjs'
 import { proposedLocales } from './lib/product-settings-plan.mjs'
 import { prepareBrandInit } from './lib/brand-init-plan.mjs'
@@ -44,7 +45,7 @@ async function main() {
     )
     return
   }
-  if (LOCALE_CATALOGUES.some((locale) => !['en', 'ru'].includes(locale))) {
+  if (LOCALE_CATALOGUES.some((locale) => !supportsProductMetadataLocale(locale))) {
     const guide = 'docs/frontend/i18n-and-errors.md#task-choose-the-served-locales'
     throw new Error(
       flags['setup-language'] === 'ru'
