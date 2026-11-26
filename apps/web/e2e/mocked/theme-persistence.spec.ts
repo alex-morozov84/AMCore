@@ -10,9 +10,11 @@ import { productPath } from '../shared/product-settings'
  * paint, avoiding a light->dark flash. `addInitScript` writes to
  * `localStorage` before any page script runs, the same position a real
  * returning visitor's browser would be in.
+ * Fixed theme settings override the stored preference. Keep these test titles
+ * stable because the configured browser inventory compares case IDs with main.
  */
 
-test('first paint applies the fixed or stored theme', async ({ page }) => {
+test('a stored "dark" theme setting is applied before paint, no flash', async ({ page }) => {
   await page.addInitScript(() => window.localStorage.setItem('amcore-theme', 'dark'))
 
   await page.goto(productPath('/login'))
@@ -24,7 +26,7 @@ test('first paint applies the fixed or stored theme', async ({ page }) => {
   expect(colorScheme).toBe(fixedTheme() ?? 'dark')
 })
 
-test('fixed or stored theme persists across reload', async ({ page }) => {
+test('a stored "dark" theme setting persists across reload', async ({ page }) => {
   await page.addInitScript(() => window.localStorage.setItem('amcore-theme', 'dark'))
   await page.goto(productPath('/login'))
   await page.reload()
@@ -33,7 +35,9 @@ test('fixed or stored theme persists across reload', async ({ page }) => {
   expect(isDark).toBe((fixedTheme() ?? 'dark') === 'dark')
 })
 
-test('without stored settings the site applies the fixed or default theme', async ({ page }) => {
+test("no stored setting resolves via system preference, not the previous test's leftover state", async ({
+  page,
+}) => {
   await page.emulateMedia({ colorScheme: 'light' })
   await page.goto(productPath('/login'))
 
