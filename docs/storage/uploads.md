@@ -24,7 +24,7 @@ The pipe:
 - uses `buffer.length` as the authoritative size;
 - uses `file-type` magic bytes, never client `Content-Type`;
 - returns `413 FILE_TOO_LARGE` for oversized files;
-- returns `400` for unknown, spoofed, disallowed, or SVG image files.
+- returns `400` when the detected format is unknown or disallowed.
 
 ## Presets
 
@@ -122,3 +122,44 @@ Use a complete post-upload policy:
 5. never trust the client-supplied MIME type.
 
 For most app features, use server-side validated upload first.
+
+## Public forms with attachments
+
+The avatar route requires sign-in, limits upload size and frequency, and detects
+the format from bytes. It checks decoded image dimensions and publishes only a
+generated WebP. The original stays private. These checks provide no malware verdict. See [Media security](../media/security.md).
+
+The AI attachment route also requires sign-in and limits upload size and
+frequency. It checks the conversation owner and state, detects the format from
+bytes, and applies limits for images and PDFs. It stores the original privately
+and serves it as an attachment after an access check. These format and size
+checks provide no malware verdict.
+
+1. Cap the request at the proxy when available. Limit file size, file count,
+   field size, field count, and total multipart parts before buffering.
+2. Limit upload frequency and stored bytes. Use server-generated keys and expire
+   abandoned uploads. Allow only the formats the form needs. Keep archives out
+   unless the product can bound the work and output of extraction.
+3. Check file bytes on the server. For public images, decode within pixel limits
+   and publish a new raster image. For a PDF that staff will open, keep it
+   private while a scanner checks it. Block downloads, previews, and downstream
+   processing while the result is pending, failed, or denied.
+4. After the scanner allows the file, use a download route that checks the
+   assigned recipient and their current rights on every request. A direct
+   signed URL can remain usable until it expires after the app revokes access.
+   Serve the approved bytes as an attachment. Bind the verdict to an immutable
+   version or verify the digest of the exact bytes sent. Give each resubmission
+   its own version and verdict.
+
+Run the [PDF quarantine example](../../apps/api/src/infrastructure/storage/pdf-quarantine.example.spec.ts)
+from the repository root after installing dependencies.
+
+```sh
+pnpm --filter shared build
+pnpm --filter api test --runInBand --runTestsByPath src/infrastructure/storage/pdf-quarantine.example.spec.ts
+```
+
+The test shows an invalid upload rejected, a pending PDF held privately, and an
+approved PDF released only to the authorized recipient. It uses a test scanner
+result to exercise access rules. For a public form, connect a real scanner and
+define when to retry failed scans and delete rejected or expired uploads.
