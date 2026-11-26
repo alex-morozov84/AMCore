@@ -23,9 +23,15 @@ The stand assigns local ports, prepares its database and keys, and loads system
 data. A root `.env` is optional for this workflow. The stand preserves any
 existing root `.env`.
 
-After changing code or pulling a commit, run `pnpm local` again to rebuild and see the changes. Ordinary restarts preserve the local database and keys. Use `pnpm local status` to inspect the stand for the current settings and `pnpm local down` to stop product stands and retain their data.
+After changing code or pulling a commit, run `pnpm local` again to rebuild and see the changes. Ordinary restarts preserve the local database and keys. Use `pnpm local status` to see the selected configuration and running containers in retained product stands and `pnpm local down` to stop product stands and retain their data.
 
 Changing the served languages or administrative placement selects a separate local dataset. Returning to the previous settings reuses the previous dataset if retained. When using a separate local HTTPS host, follow the browser trust instructions below. For native watch mode, see [API development](../backend/api-build.md#development).
+
+If a local switch is interrupted, run `pnpm local recover`. It releases only the
+dispatcher lock after the owning process and its child operations have exited.
+If a stand still has an interrupted per-stand operation, recover its ID with
+the stand recovery procedure below. Recovery preserves datasets unless you
+explicitly request a purge through the stand recovery procedure.
 
 ## Prerequisites and commands
 

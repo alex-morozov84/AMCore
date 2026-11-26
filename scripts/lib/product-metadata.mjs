@@ -30,10 +30,10 @@ export function productMetadata(root, answers) {
   )
   const localeFile = join(root, 'packages/shared/src/config/locales.json')
   const previousDefault = JSON.parse(readFileSync(localeFile, 'utf8')).default
-  const defaultLocale = proposedLocales(root, answers).default
+  const { default: defaultLocale, enabled } = proposedLocales(root, answers)
   const names = {
-    en: answers.nameEn ?? answers.productName,
-    ru: answers.nameRu ?? answers.productName,
+    en: answers.nameEn ?? (enabled.includes('en') ? answers.productName : undefined),
+    ru: answers.nameRu ?? (enabled.includes('ru') ? answers.productName : undefined),
   }
   const descriptions = {
     en: answers.descriptionEn ?? answers.productDescription,
@@ -42,9 +42,10 @@ export function productMetadata(root, answers) {
   const chosenName = names[defaultLocale] ?? (fresh ? undefined : current[defaultLocale].title)
   if (!chosenName) throw new Error('Enter a product name for the default site language')
   for (const locale of ['en', 'ru']) {
-    if (fresh && !names[locale]) names[locale] = chosenName
+    if (fresh && !names[locale] && (enabled.includes(locale) || current[locale].title === 'AMCore'))
+      names[locale] = chosenName
     if (fresh && !descriptions[locale] && current[locale].description === starter[locale])
-      descriptions[locale] = names[locale]
+      descriptions[locale] = names[locale] ?? current[locale].title
   }
   const syncName =
     fresh ||

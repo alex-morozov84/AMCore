@@ -97,14 +97,14 @@ describe('init-product safety guards', () => {
       const wrongSizeIcon = path.join(assets, 'wrong-icon-512.png')
       writeFileSync(wrongSizeIcon, fakePng(100, 100))
 
-      const good = runInitProduct(fixture.root, ['--yes', `--icon-192=${goodIcon}`])
+      const good = runInitProduct(fixture.root, [...BASE_FLAGS, `--icon-192=${goodIcon}`])
       assert.equal(good.status, 0, good.stderr)
       const copiedIcon = readFileSync(
         path.join(fixture.root, 'apps/web/public/icons/icon-192x192.png')
       )
       assert.ok(copiedIcon.equals(readFileSync(goodIcon)))
 
-      const bad = runInitProduct(fixture.root, ['--yes', `--icon-512=${wrongSizeIcon}`])
+      const bad = runInitProduct(fixture.root, [...BASE_FLAGS, `--icon-512=${wrongSizeIcon}`])
       assert.notEqual(bad.status, 0)
       assert.match(bad.stderr, /expected 512x512/)
     } finally {

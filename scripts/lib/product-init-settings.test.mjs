@@ -62,6 +62,21 @@ test('initialization previews and applies locale settings, installation metadata
   assert.ok(consoleEdgeFiles(root))
   productAdminEdgeFiles(root)
 
+  const russian = 'apps/web/messages/ru.json'
+  for (const [locale, activeTitle, inactiveFile, inactiveTitle] of [
+    ['en', 'My catalog', russian, 'Мой каталог'],
+    ['ru', 'Мой каталог', english, 'My catalog'],
+  ]) {
+    const single = prepareBrandInit(root, {
+      productSetup: true,
+      locales: locale,
+      defaultLocale: locale,
+      productName: activeTitle,
+    })
+    applyFilesystemTransaction({ root, operations: single.operationPlan.operationsForApply() })
+    assert.equal(JSON.parse(read(inactiveFile)).meta.title, inactiveTitle)
+  }
+
   const after = JSON.parse(read(english))
   after.meta.description = 'A reviewed translation'
   writeFileSync(join(root, english), JSON.stringify(after, null, 2) + '\n')
@@ -72,6 +87,8 @@ test('initialization previews and applies locale settings, installation metadata
   })
   applyFilesystemTransaction({ root, operations: replay.operationPlan.operationsForApply() })
   assert.equal(JSON.parse(read(english)).meta.description, 'A reviewed translation')
+  assert.equal(JSON.parse(read(russian)).meta.title, 'Мой каталог')
+  assert.equal(JSON.parse(read(english)).meta.title, 'My catalog')
   assert.match(read(manifest), /description: 'A reviewed translation'/)
   assert.equal(readMarkdownField(read(contextFile), 'initialized_from_amcore_version'), 'v1.0.0')
 })

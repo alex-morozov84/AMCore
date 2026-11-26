@@ -26,6 +26,22 @@ afterEach(() => {
 })
 
 describe('init-product input validation', () => {
+  test('requires a default-language name before planning a fresh scripted setup', () => {
+    fixture = createFixtureRepo()
+    const before = readFixtureFile(fixture.root, 'PROJECT_CONTEXT.md')
+    for (const consent of ['--dry-run', '--yes']) {
+      const result = runInitProduct(fixture.root, [
+        '--non-interactive',
+        '--ci-mode',
+        'heavy-off',
+        consent,
+      ])
+      assert.notEqual(result.status, 0)
+      assert.match(result.stderr, /Enter a product name for the default site language/)
+      assert.equal(readFixtureFile(fixture.root, 'PROJECT_CONTEXT.md'), before)
+    }
+  })
+
   test('rejects an out-of-range enum flag before building a plan', () => {
     fixture = createFixtureRepo()
     const result = runInitProduct(fixture.root, ['--yes', '--theme-mode=neon'])

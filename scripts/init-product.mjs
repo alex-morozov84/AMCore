@@ -9,6 +9,8 @@ import { fileURLToPath } from 'node:url'
 import { parseCommonFlags, runInitCommand } from './lib/init-engine.mjs'
 import { collectAnswers, BRAND_FLAG_OPTIONS } from './lib/brand-fields.mjs'
 import { printProductSummary } from './lib/product-summary.mjs'
+import { LOCALE_CATALOGUES } from './lib/settings-files.mjs'
+import { proposedLocales } from './lib/product-settings-plan.mjs'
 import { prepareBrandInit } from './lib/brand-init-plan.mjs'
 
 // Testability seams for scripts/*.test.mjs: AMCORE_INIT_ROOT points the real
@@ -42,6 +44,14 @@ async function main() {
     )
     return
   }
+  if (LOCALE_CATALOGUES.some((locale) => !['en', 'ru'].includes(locale))) {
+    const guide = 'docs/frontend/i18n-and-errors.md#task-choose-the-served-locales'
+    throw new Error(
+      flags['setup-language'] === 'ru'
+        ? `Мастер поддерживает каталоги EN и RU. Для дополнительных языков настройте проект вручную. Файлы не изменены. См. ${guide}`
+        : `The wizard supports EN and RU catalogues. Configure additional languages manually. No files were written. See ${guide}`
+    )
+  }
   const answers = await collectAnswers({ root: ROOT, flags })
   const context = readFileSync(path.join(ROOT, 'PROJECT_CONTEXT.md'), 'utf8')
   if (
@@ -53,14 +63,16 @@ async function main() {
         ? 'Укажите путь или ссылку на правила команды.'
         : 'Provide --workflow-reference for a custom workflow.'
     )
-  if (
-    answers.interactive &&
-    readMarkdownField(context, 'Mode')?.includes('upstream-starter') &&
-    !(answers.productName || answers.nameEn || answers.nameRu)
-  )
-    throw new Error(
-      answers.language === 'ru' ? 'Введите название продукта.' : 'Enter a product name.'
-    )
+  if (readMarkdownField(context, 'Mode')?.includes('upstream-starter')) {
+    const locale = proposedLocales(ROOT, answers).default
+    const localizedName = locale === 'ru' ? answers.nameRu : answers.nameEn
+    if (!(localizedName ?? answers.productName)?.trim())
+      throw new Error(
+        answers.language === 'ru'
+          ? 'Введите название продукта на языке сайта по умолчанию.'
+          : 'Enter a product name for the default site language.'
+      )
+  }
   const { operationPlan } = prepareBrandInit(ROOT, { ...answers, productSetup: true })
   printProductSummary(ROOT, answers, operationPlan)
   await runInitCommand({
