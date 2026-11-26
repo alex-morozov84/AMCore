@@ -18,6 +18,9 @@ Claude Code reads it via the `@AGENTS.md` import in `CLAUDE.md`.
    context and respect a deferral. Ordinary AMCore work and initialized products
    follow their existing workflows. If identity is missing or contradictory,
    clarify the target before product writes. New products use a separate checkout.
+   Served locales and Console mode are build settings in
+   `packages/shared/src/config/*.json`. See `PROJECT_CONTEXT.md` → _Build Settings_.
+   A frontend Route Handler and a NestJS backend controller have separate roles.
 2. Detect the working-context overlay:
    - **`ai/` directory present** → maintainer copy of the product named in
      `PROJECT_CONTEXT.md`. ALSO read, in order: `ai/README.md` (private-repo

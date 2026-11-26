@@ -202,11 +202,12 @@ and first feature in the same request. The agent carries that request through se
 2. The agent opens `pnpm init:product` in an interactive terminal it can keep
    open across chat turns. It starts without answer flags and enters earlier
    answers only when their questions appear. It explains defaults before
-   accepting them. Choose English
-   or Russian for setup separately from the site's languages. Options shown by
+   accepting them. Choose English or Russian for setup separately from the site's languages. Options shown by
    the wizard depend on earlier answers. The agent enters free text literally.
-   The site description and the team's purpose are separate fields. The wizard
-   leaves the purpose for later unless you explicitly provide it.
+   The wizard has no question for the team's purpose. The agent keeps any
+   purpose you give in the conversation for later product work. For first setup,
+   it shows that `PROJECT_CONTEXT.md` will contain `To be defined.` for Purpose.
+   The site description still goes to the site and install metadata.
 3. At **Apply these product settings?**, the agent selects **Show file changes**
    and returns to the menu. It uses the actual preview to report the product
    directory, affected files and effective settings. It checks what is saved
@@ -221,14 +222,19 @@ and first feature in the same request. The agent carries that request through se
    If applying was interrupted, it checks the files and transaction journal
    using [failure recovery](#recover-from-a-failure) before attempting a retry.
 5. The agent reports whether files were written and what the checks found.
-   If you requested or agreed to local launch, it runs `pnpm local` and checks
-   the printed URL. If launch is unavailable, it gives the command and the
+   If verification fails after writing, the agent identifies the failed check,
+   explains that the files are already changed, and follows
+   [failure recovery](#recover-from-a-failure). It holds off on applying again
+   and launching. After successful checks, it runs `pnpm local` if you requested
+   or agreed to launch and checks the printed URL. If launch is unavailable, it gives the command and the
    missing prerequisite. The agent explains what is available and returns to
    the feature you originally requested.
 
-If the agent cannot keep the terminal open, it summarizes your answers so you
-can confirm them in the wizard yourself. Separate `--dry-run` and `--yes` runs
-each build a new plan. The agent uses the original open menu for chat approval.
+If the agent cannot keep the terminal open, it hands you the answers collected
+so far. Open `pnpm init:product` in the product directory, enter the answers,
+and review the new preview before confirming there. Approval of a previous
+preview expires with its session. Separate `--dry-run` and `--yes` runs each
+build a new plan.
 
 ### Scripted initialization
 
