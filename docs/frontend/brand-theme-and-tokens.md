@@ -16,9 +16,8 @@ covers layers and routing, this one covers the visual/token layer.
    documented CSS-variable theming convention.
 
 `@custom-variant dark (&:where(.dark, .dark *));` makes Tailwind's `dark:`
-prefix follow the `.dark` class (toggled by the app's own theme switch), not
-the browser's `prefers-color-scheme` media query directly — that's what lets
-a user override their OS preference.
+prefix follow the `.dark` class. The app sets that class from the product's
+theme configuration, the saved browser preference, or the device setting.
 
 ### Token set
 
@@ -72,10 +71,16 @@ Tailwind utility, not a repeated arbitrary-value class at every call site:
 
 ## Light / dark / system modes
 
-Default is **`system`**: the resolved theme follows the OS preference unless
-the user has explicitly picked one. A downstream product that doesn't want a
-toggle can force `light` or `dark` as the fixed setting instead — see the
-[rebrand checklist](#downstream-rebrand-checklist).
+When both themes are available, AMCore uses the browser's saved theme choice.
+Without a saved choice, the product default applies. AMCore starts with
+**`system`**, which follows the device setting. A product can add a theme
+switch using `useTheme()`. The starter UI has no built-in theme switch.
+
+A light-only or dark-only product always uses that theme. The fixed theme
+leaves the saved choice intact. For example, a browser that saved dark shows
+light while the product allows only light. When the product enables both
+themes again, the browser uses dark if the saved choice is still available
+at the same site origin (scheme, host, and port).
 
 AMCore's default persistence model is **static-friendly client persistence**:
 the browser stores the user's choice in `localStorage`, the pre-hydration script
@@ -98,7 +103,7 @@ exposes it to React via `useTheme()` (`setting`, `resolvedTheme`, `setTheme`).
 ## No-flash: the pre-hydration script
 
 The locale layout runs `getThemeInitScript()` as an inline script at the
-start of the body. It applies the stored choice or the system preference
+start of the body. It applies the fixed theme or resolves the saved choice and product default
 before the page content paints. Keep the script code-owned and pass the
 request nonce. See [Browser security headers and CSP](./browser-security-and-csp.md).
 
@@ -173,11 +178,13 @@ Run the wizard in a clean product checkout with the workspace dependencies insta
 
 1. Run `pnpm init:product` and choose English or Russian for the wizard.
 2. Choose the languages the site serves. English and Russian ship with interface and email translations. One language gives pages bare paths such as `/login`. Two give pages language prefixes such as `/en/login` and `/ru/login`. [Add another language](i18n-and-errors.md#recipe-add-a-third-locale) before enabling it. Once you add another catalogue, manage product settings manually. The wizard supports English and Russian catalogues and exits before writing in a checkout with additional catalogues.
-3. Choose whether to enter the name and description once for both languages or separately for each language. The names appear in browser tabs (`<title>`). Enter optional descriptions for the HTML description metadata. On first setup, a skipped starter description becomes the product name. The default site's name and description supply install metadata.
-4. Choose available themes and, when both are available, the first-visit setting. A fixed theme applies before the first page paint, including when browser storage is unavailable. Storybook keeps both themes. Choose whether to show the top navigation progress bar. [Theme and navigation details](route-progress.md).
+3. Choose whether to enter the name and description once for both languages or separately for each language. The name appears in browser tabs (`<title>`). An optional description supplies `<meta name="description">`. The default language supplies the name and description for the install manifest.
+   - On first setup, if you skip a description and the catalogue still has the original AMCore description, the wizard replaces it with the product name in that catalogue. This also applies to a language you leave disabled.
+   - On later runs, temporarily disabling a language keeps its existing `meta.title` and `meta.description`. To edit them directly, use `apps/web/messages/en.json` for English or `apps/web/messages/ru.json` for Russian.
+4. Choose available themes and, when both are available, the first-visit setting. A fixed theme applies before the first page paint, including when browser storage is unavailable. Storybook keeps both themes. Choose whether to show the top navigation progress bar. [Theme behavior](#light--dark--system-modes) and [navigation progress](route-progress.md).
 5. Enable or disable the path-based Operations Console. Existing aliases and host placements are retained. To change them later, follow the [Console guide](../operations-console/configuration.md#topology) or [product administration guide](../product-admin/placement-and-sessions.md#configure-or-move-the-administration-area).
 6. Keep or replace the three install icons. Supply ready PNG files in the sizes listed in [the icon guide](../../apps/web/public/icons/README.md). Logo assets and color tokens are separate customizations.
-7. Choose the team's Git workflow and [automatic checks](../operations/ci-security.md#choose-automatic-checks-for-a-product). Configure GitHub branch protection separately. Review the settings summary and confirm. Choose **Show file changes** to inspect the full plan before deciding. The wizard records the starting Git version when first establishing product identity.
+7. Choose the team's Git workflow and [automatic checks](../operations/ci-security.md#choose-automatic-checks-for-a-product). Configure GitHub branch protection separately. Review the settings summary. Choose **Show file changes** to inspect the full plan and return to the decision. The wizard initially selects **Exit without writing**. Choose **Apply settings** when you are ready to save. The wizard records the starting Git version when first establishing product identity.
 8. Start Docker and run `pnpm local` from the project root. Open the URL it prints. See [the local development lifecycle](../operations/local-stands.md#develop-a-configured-product).
 
 The wizard writes the files the application and CI read. It previews locale-dependent proxy output alongside source settings and writes the approved plan together. It runs type and lint checks after writing. Prepare the shared build and generated Prisma client as described in [product adoption](../product-admin/adoption.md#initialize-a-clean-product). Source changes require a new web build. Commit or stash local edits before applying another run. Rerun the wizard to edit settings.

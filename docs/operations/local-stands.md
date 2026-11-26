@@ -25,7 +25,18 @@ existing root `.env`.
 
 After changing code or pulling a commit, run `pnpm local` again to rebuild and see the changes. Ordinary restarts preserve the local database and keys. Use `pnpm local status` to see the selected configuration and running containers in retained product stands and `pnpm local down` to stop product stands and retain their data.
 
-Changing the served languages or administrative placement selects a separate local dataset. Returning to the previous settings reuses the previous dataset if retained. When using a separate local HTTPS host, follow the browser trust instructions below. For native watch mode, see [API development](../backend/api-build.md#development).
+Within a checkout, `pnpm local` selects a local database from these settings:
+
+- The enabled site languages, their order, and the default site language.
+- The mode and alias of the Operations Console and of product administration.
+  An alias is a route segment such as `admin` or `manage`.
+
+Changing only the default language selects a separate database. Returning
+to the previous settings reuses the previous database if you retained it.
+Changes to code, themes, or CI keep the same database.
+
+When using a separate local HTTPS host, follow the browser trust instructions
+below. For native watch mode, see [API development](../backend/api-build.md#development).
 
 If a local switch is interrupted, run `pnpm local recover`. It releases the
 dispatcher lock after the owning process and its child operations have exited.
