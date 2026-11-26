@@ -1,5 +1,7 @@
 # Frontend API Consumption
 
+For anonymous contact forms, use the [public contact form example](../backend/public-contact-forms.md).
+
 How `apps/web` consumes the media, notifications, and AI backend surfaces —
 auth (login/register/sessions) is already covered by
 [`architecture-and-conventions.md`](architecture-and-conventions.md#browser-api-reach)
