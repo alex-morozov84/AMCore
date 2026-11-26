@@ -24,7 +24,7 @@ The pipe:
 - uses `buffer.length` as the authoritative size;
 - uses `file-type` magic bytes, never client `Content-Type`;
 - returns `413 FILE_TOO_LARGE` for oversized files;
-- returns `400` for unknown, spoofed, disallowed, or SVG image files.
+- returns `400` when the detected format is unknown or disallowed.
 
 ## Presets
 
@@ -144,7 +144,9 @@ checks provide no malware verdict.
    and publish a new raster image. For a PDF that staff will open, keep it
    private while a scanner checks it. Block downloads, previews, and downstream
    processing while the result is pending, failed, or denied.
-4. After the scanner allows the file, check the recipient's current rights.
+4. After the scanner allows the file, use a download route that checks the
+   assigned recipient and their current rights on every request. A direct
+   signed URL can remain usable until it expires after the app revokes access.
    Serve the approved bytes as an attachment. Bind the verdict to an immutable
    version or verify the digest of the exact bytes sent. Give each resubmission
    its own version and verdict.
