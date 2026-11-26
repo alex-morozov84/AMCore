@@ -26,13 +26,17 @@ export function parseCommonFlags(argv, extraOptions = {}) {
   return values
 }
 
-export function printPlan(steps) {
+export function printPlan(steps, ru = false) {
   const changed = steps.filter((step) => step.changed)
   if (changed.length === 0) {
-    console.log('Nothing to do — every value already matches.')
+    console.log(
+      ru
+        ? 'Изменений нет. Проверки не запускались.'
+        : 'Nothing to do — every value already matches.'
+    )
     return changed
   }
-  console.log(`Plan (${changed.length} change(s)):`)
+  console.log(ru ? `План. Изменений: ${changed.length}` : `Plan (${changed.length} change(s)):`)
   for (const step of changed) {
     console.log(`  - [${step.kind}] ${step.target}: ${step.summary}`)
     if (step.kind === 'edit') {
@@ -53,28 +57,47 @@ function indent(text) {
     .join('\n')
 }
 
-function reportVerification(results) {
-  console.log('\nRunning post-apply verification...')
+function reportVerification(results, ru) {
+  console.log(ru ? '\nПроверка записанных настроек…' : '\nRunning post-apply verification...')
   for (const result of results) {
     console.log(`  - ${result.label}: ${result.ok ? 'OK' : 'FAILED'}`)
     if (!result.ok) console.log(indent(result.output))
   }
   if (results.some((result) => !result.ok)) {
-    console.log('\nVerification failed — review the changes above before committing.')
+    console.log(
+      ru
+        ? '\nПроверка не прошла. Файлы записаны. Исправьте ошибки и повторите проверку.'
+        : '\nVerification failed — review the changes above before committing.'
+    )
     process.exitCode = 1
   }
 }
 
-/**
- * Prints the plan (with diffs), then — unless `--dry-run` — runs the
- * apply-mode safety guards, confirms (unless `--yes`), writes, and runs
- * `verify`. `--dry-run` returns before any guard runs, so it is always
- * safe, including in the AMCore maintainer checkout.
- */
+async function chooseProductAction(question, steps, ru) {
+  while (true) {
+    clack.note(question)
+    const choice = await clack.select({
+      message: ru ? 'Выберите вариант' : 'Choose an option',
+      initialValue: 'cancel',
+      showInstructions: !ru,
+      options: [
+        { value: 'apply', label: ru ? 'Применить настройки' : 'Apply settings' },
+        { value: 'diff', label: ru ? 'Показать изменения в файлах' : 'Show file changes' },
+        { value: 'cancel', label: ru ? 'Выйти без записи' : 'Exit without writing' },
+      ],
+    })
+    if (choice !== 'diff') return choice === 'apply'
+    printPlan(steps, ru)
+  }
+}
+
 export async function runInitCommand({
   cwd,
   flags,
   operationPlan,
+  language,
+  requireConsentFlag = false,
+  onSuccess,
   confirmMessage,
   verify = runVerification,
   applyFilesystem = applyFilesystemTransaction,
@@ -83,20 +106,30 @@ export async function runInitCommand({
 }) {
   const plan = operationPlan
   if (!plan) throw new Error('runInitCommand requires a complete operationPlan')
-  const changed = printPlan(plan.displaySteps)
+  const ru = language === 'ru'
+  const useProductMenu = Boolean(language && !requireConsentFlag && !flags.yes && !flags['dry-run'])
+  const changed = plan.displaySteps.filter((step) => step.changed)
+  if (!useProductMenu || changed.length === 0) printPlan(plan.displaySteps, ru)
   if (changed.length === 0) return
   if (flags['dry-run']) {
-    console.log('\n--dry-run: no files were written.')
+    console.log(ru ? '\nПредпросмотр. Файлы не изменены.' : '\n--dry-run: no files were written.')
     return
   }
 
+  if (requireConsentFlag && !flags.yes)
+    throw new Error(
+      ru ? 'Для записи без вопросов добавьте --yes.' : 'Use --yes to apply without prompts.'
+    )
   assertCleanGitTree(cwd)
   assertNotMaintainerCheckout(cwd, flags['force-maintainer-checkout'])
 
   if (!flags.yes) {
-    const ok = await requestConfirmation({ message: confirmMessage ?? 'Apply these changes?' })
+    const question = confirmMessage ?? 'Apply these changes?'
+    const ok = useProductMenu
+      ? await chooseProductAction(question, changed, ru)
+      : await requestConfirmation({ message: question })
     if (isCancellation(ok) || !ok) {
-      console.log('Aborted — no files were written.')
+      console.log(ru ? 'Отменено. Файлы не изменены.' : 'Aborted — no files were written.')
       return
     }
   }
@@ -106,6 +139,10 @@ export async function runInitCommand({
     assertCleanGitTree(cwd)
   }
   applyFilesystem({ root: cwd, operations: plan.operationsForApply() })
-  console.log(`\nApplied ${changed.length} change(s).`)
-  reportVerification(verify(cwd))
+  console.log(
+    ru ? `\nЗаписано изменений: ${changed.length}.` : `\nApplied ${changed.length} change(s).`
+  )
+  const results = verify(cwd)
+  reportVerification(results, ru)
+  if (results.every((result) => result.ok)) onSuccess?.()
 }

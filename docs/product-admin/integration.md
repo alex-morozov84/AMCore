@@ -1,6 +1,6 @@
 # Integrate organization pages and custom UI
 
-Initialize your downstream identity with `pnpm init:brand` before manual route
+Initialize your downstream identity with `pnpm init:product` before manual route
 movement. The examples below use the multi-locale `[locale]` route tree. Use
 nonreserved same-host destinations that do not overlap API,
 authentication, assets or Operations Console routes.

@@ -1,3 +1,5 @@
+import { fixedTheme } from './theme-availability'
+
 export const THEME_STORAGE_KEY = 'amcore-theme'
 
 export type ThemeSetting = 'light' | 'dark' | 'system'
@@ -114,8 +116,9 @@ export function escapeForInlineScript(json: string): string {
  * the same constants instead, so the storage key/setting values can't drift
  * from the TypeScript helpers above.
  */
-export function getThemeInitScript(): string {
+export function getThemeInitScript(fixedSetting = fixedTheme()): string {
   const storageKey = escapeForInlineScript(JSON.stringify(THEME_STORAGE_KEY))
   const defaultSetting = escapeForInlineScript(JSON.stringify(DEFAULT_THEME_SETTING))
-  return `(function(){try{var k=${storageKey};var s=localStorage.getItem(k);var setting=(s==='light'||s==='dark'||s==='system')?s:${defaultSetting};var dark=setting==='dark'||(setting==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.classList.toggle('dark',dark);r.style.colorScheme=dark?'dark':'light'}catch(e){}})()`
+  const fixed = JSON.stringify(fixedSetting)
+  return `(function(){var setting=${fixed};if(!setting){var s;try{s=localStorage.getItem(${storageKey})}catch(e){}setting=(s==='light'||s==='dark'||s==='system')?s:${defaultSetting}}var dark=setting==='dark'||(setting==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.classList.toggle('dark',dark);r.style.colorScheme=dark?'dark':'light'})()`
 }

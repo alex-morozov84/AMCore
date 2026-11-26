@@ -3,6 +3,10 @@ import { readPngDimensions, EngineError } from './actions.mjs'
 import { WORKFLOW_MODES, THEME_MODES, THEME_PERSISTENCE_MODES } from './brand-config.mjs'
 
 const ENUM_ANSWERS = [
+  { key: 'themeAvailability', allowed: ['both', 'light', 'dark'], flag: '--theme-availability' },
+  { key: 'routeProgress', allowed: ['on', 'off'], flag: '--route-progress' },
+  { key: 'consoleMode', allowed: ['path', 'disabled'], flag: '--console-mode' },
+  { key: 'ciMode', allowed: ['normal', 'full', 'heavy-off'], flag: '--ci-mode' },
   { key: 'workflowMode', allowed: WORKFLOW_MODES, flag: '--workflow-mode' },
   { key: 'themeMode', allowed: THEME_MODES, flag: '--theme-mode' },
   { key: 'themePersistence', allowed: THEME_PERSISTENCE_MODES, flag: '--theme-persistence' },
@@ -10,6 +14,11 @@ const ENUM_ANSWERS = [
 
 const SINGLE_LINE_ANSWERS = [
   'productName',
+  'nameEn',
+  'nameRu',
+  'descriptionEn',
+  'descriptionRu',
+  'workflowReference',
   'purpose',
   'productDescription',
   'upstreamSyncPolicy',
@@ -33,15 +42,23 @@ const NPM_RESERVED_PACKAGE_NAMES = ['node_modules', 'favicon.ico']
  * treats as single-line, or a `packageName` that isn't a valid npm package
  * name (the prompt promises "npm-safe").
  */
-export function validateAnswers(answers) {
+export function validateAnswers(answers, language) {
+  const tr = (en, ru) => (language === 'ru' ? ru : en)
   for (const { key, allowed, flag } of ENUM_ANSWERS) {
     if (answers[key] !== undefined && !allowed.includes(answers[key])) {
-      throw new EngineError(`${flag}=${answers[key]} is not one of: ${allowed.join(', ')}`)
+      throw new EngineError(
+        tr(
+          `${flag}=${answers[key]} is not one of: ${allowed.join(', ')}`,
+          `${flag}: выберите одно из значений: ${allowed.join(', ')}`
+        )
+      )
     }
   }
   for (const key of SINGLE_LINE_ANSWERS) {
     if (typeof answers[key] === 'string' && /[\r\n]/.test(answers[key])) {
-      throw new EngineError(`"${key}" cannot contain a newline`)
+      throw new EngineError(
+        tr(`"${key}" cannot contain a newline`, `"${key}": введите значение в одну строку`)
+      )
     }
   }
   if (answers.packageName !== undefined) {
@@ -51,9 +68,12 @@ export function validateAnswers(answers) {
       NPM_RESERVED_PACKAGE_NAMES.includes(answers.packageName)
     if (invalid) {
       throw new EngineError(
-        `--package-name=${answers.packageName} is not a valid npm package name ` +
-          '(lowercase, URL-safe characters only, optionally scoped as @scope/name, ' +
-          `and not a reserved name: ${NPM_RESERVED_PACKAGE_NAMES.join(', ')})`
+        tr(
+          `--package-name=${answers.packageName} is not a valid npm package name ` +
+            '(lowercase, URL-safe characters only, optionally scoped as @scope/name, ' +
+            `and not a reserved name: ${NPM_RESERVED_PACKAGE_NAMES.join(', ')})`,
+          '--package-name: используйте имя npm строчными латинскими буквами, например my-app или @team/my-app.'
+        )
       )
     }
   }

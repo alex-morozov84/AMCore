@@ -1,13 +1,13 @@
 // Post-apply, read-only verification (FINAL PLAN, Safety model point 7):
 // "this is the bar for 'coherent output', not an afterthought a human/agent
-// is expected to run separately." init:brand only ever writes JSON (always
+// is expected to run separately." init:product only ever writes JSON (always
 // syntactically valid via JSON.stringify) and known single-line TS/JS
 // literals, so `typecheck` + `lint` catch the realistic failure modes.
 // `test:e2e` stays out on purpose — it needs Docker/Testcontainers, which this
 // verification step cannot assume is available.
 //
 // Deliberately never runs `pnpm install`: this module runs as part of the
-// real `init:brand` CLI against a fork the owner already has installed, and
+// real `init:product` CLI against a fork the owner already has installed, and
 // a tool reaching out to the network and rewriting node_modules on every
 // real run is its own hazard. A disposable test copy with no node_modules
 // is the test harness's own setup problem.

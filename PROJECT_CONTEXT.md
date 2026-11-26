@@ -17,7 +17,7 @@ separate product from the starter.
 - **theme_persistence:** local-storage
 - **initialized_from_amcore_version:** N/A — this checkout is AMCore itself.
 
-One field per line, machine-editable by `pnpm init:brand` — do not fold multiple
+One field per line, machine-editable by `pnpm init:product` — do not fold multiple
 fields back into a single prose bullet.
 
 ## Mode Contract
@@ -57,6 +57,10 @@ after a rebuild:
 | Operations Console mode (`disabled`, `path`, `host`) and its URL segment | `packages/shared/src/config/admin-console.json` | [Console settings](docs/operations-console/configuration.md#topology)              |
 | Product administration placement                                         | `packages/shared/src/config/product-admin.json` | [Product administration](docs/product-admin/placement-and-sessions.md)             |
 
+Theme availability is set in `apps/web/src/shared/lib/theme-availability.ts`.
+When both themes are available, `DEFAULT_THEME_SETTING` in `theme.ts` controls the
+first visit. Automatic GitHub checks follow `ci/product.json`.
+
 Storybook is part of every project, and the route-progress bar follows the
 `ROUTE_PROGRESS_ENABLED` source flag in
 `apps/web/src/shared/lib/route-progress/route-progress-flag.ts` (see
@@ -72,8 +76,8 @@ Two fields in this file describe the product's choices:
   initialized from, e.g. `v0.4.0`. It gives later work and upstream-sync decisions the
   fork's starting baseline.
 
-`pnpm init:brand` writes the identity, workflow, theme and
-`initialized_from_amcore_version` fields. No command edits the settings files.
+`pnpm init:product` writes product identity, workflow, the initialization baseline and selected build settings.
+Product administration placement and custom host changes follow their placement guide.
 
 ## Workflow Modes
 

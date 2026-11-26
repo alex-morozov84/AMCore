@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+import { DEFAULT_THEME_SETTING, resolveTheme } from '../../src/shared/lib/theme'
+import { fixedTheme } from '../../src/shared/lib/theme-availability'
 import { productPath } from '../shared/product-settings'
 
 /**
@@ -10,33 +12,31 @@ import { productPath } from '../shared/product-settings'
  * returning visitor's browser would be in.
  */
 
-test('a stored "dark" theme setting is applied before paint, no flash', async ({ page }) => {
+test('first paint applies the fixed or stored theme', async ({ page }) => {
   await page.addInitScript(() => window.localStorage.setItem('amcore-theme', 'dark'))
 
   await page.goto(productPath('/login'))
 
   const isDark = await page.evaluate(() => document.documentElement.classList.contains('dark'))
-  expect(isDark).toBe(true)
+  expect(isDark).toBe((fixedTheme() ?? 'dark') === 'dark')
 
   const colorScheme = await page.evaluate(() => document.documentElement.style.colorScheme)
-  expect(colorScheme).toBe('dark')
+  expect(colorScheme).toBe(fixedTheme() ?? 'dark')
 })
 
-test('a stored "dark" theme setting persists across reload', async ({ page }) => {
+test('fixed or stored theme persists across reload', async ({ page }) => {
   await page.addInitScript(() => window.localStorage.setItem('amcore-theme', 'dark'))
   await page.goto(productPath('/login'))
   await page.reload()
 
   const isDark = await page.evaluate(() => document.documentElement.classList.contains('dark'))
-  expect(isDark).toBe(true)
+  expect(isDark).toBe((fixedTheme() ?? 'dark') === 'dark')
 })
 
-test("no stored setting resolves via system preference, not the previous test's leftover state", async ({
-  page,
-}) => {
+test('without stored settings the site applies the fixed or default theme', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light' })
   await page.goto(productPath('/login'))
 
   const isDark = await page.evaluate(() => document.documentElement.classList.contains('dark'))
-  expect(isDark).toBe(false)
+  expect(isDark).toBe((fixedTheme() ?? resolveTheme(DEFAULT_THEME_SETTING, false)) === 'dark')
 })

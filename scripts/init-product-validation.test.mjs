@@ -5,14 +5,14 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createFixtureRepo, readFixtureFile } from './lib/test-fixture.mjs'
 
-const INIT_BRAND = path.join(path.dirname(fileURLToPath(import.meta.url)), 'init-brand.mjs')
+const INIT_PRODUCT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'init-product.mjs')
 
 // Enum/newline rejection happens in collectAnswers(), before verify() would
 // ever run — no AMCORE_INIT_SKIP_VERIFY needed for those. The
 // failed-verification test explicitly opts into AMCORE_INIT_FAKE_VERIFY_FAIL
 // instead of skipping verification, since that's the exact path it tests.
-function runInitBrand(root, args, extraEnv = {}) {
-  return spawnSync('node', [INIT_BRAND, ...args], {
+function runInitProduct(root, args, extraEnv = {}) {
+  return spawnSync('node', [INIT_PRODUCT, ...args], {
     encoding: 'utf8',
     env: { ...process.env, NODE_ENV: 'test', AMCORE_INIT_ROOT: root, ...extraEnv },
   })
@@ -25,10 +25,10 @@ afterEach(() => {
   fixture = undefined
 })
 
-describe('init-brand input validation', () => {
+describe('init-product input validation', () => {
   test('rejects an out-of-range enum flag before building a plan', () => {
     fixture = createFixtureRepo()
-    const result = runInitBrand(fixture.root, ['--yes', '--theme-mode=neon'])
+    const result = runInitProduct(fixture.root, ['--yes', '--theme-mode=neon'])
 
     assert.notEqual(result.status, 0)
     assert.match(result.stderr, /--theme-mode=neon is not one of: system, light, dark/)
@@ -37,7 +37,7 @@ describe('init-brand input validation', () => {
 
   test('rejects an invalid npm package name before building a plan', () => {
     fixture = createFixtureRepo()
-    const result = runInitBrand(fixture.root, ['--dry-run', '--package-name=Bad Name!'])
+    const result = runInitProduct(fixture.root, ['--dry-run', '--package-name=Bad Name!'])
 
     assert.notEqual(result.status, 0)
     assert.match(result.stderr, /--package-name=Bad Name! is not a valid npm package name/)
@@ -47,7 +47,7 @@ describe('init-brand input validation', () => {
   for (const reserved of ['node_modules', 'favicon.ico']) {
     test(`rejects the reserved npm package name "${reserved}" before building a plan`, () => {
       fixture = createFixtureRepo()
-      const result = runInitBrand(fixture.root, ['--dry-run', `--package-name=${reserved}`])
+      const result = runInitProduct(fixture.root, ['--dry-run', `--package-name=${reserved}`])
 
       assert.notEqual(result.status, 0)
       assert.match(result.stderr, /is not a valid npm package name/)
@@ -60,7 +60,7 @@ describe('init-brand input validation', () => {
 
   test('rejects a newline embedded in a single-line answer', () => {
     fixture = createFixtureRepo()
-    const result = runInitBrand(fixture.root, [
+    const result = runInitProduct(fixture.root, [
       '--yes',
       '--product-name=Acme\nMode: downstream-product',
     ])
@@ -71,7 +71,7 @@ describe('init-brand input validation', () => {
 
   test('reports a failed post-apply verification and exits non-zero', () => {
     fixture = createFixtureRepo()
-    const result = runInitBrand(fixture.root, ['--yes', "--product-name=Bob's App"], {
+    const result = runInitProduct(fixture.root, ['--yes', "--product-name=Bob's App"], {
       AMCORE_INIT_FAKE_VERIFY_FAIL: '1',
     })
 

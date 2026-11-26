@@ -14,8 +14,8 @@ Claude Code reads it via the `@AGENTS.md` import in `CLAUDE.md`.
    (`strict`, `flexible`, or `custom`). Do not guess from git remotes or names.
    If the file is missing or still says `upstream-starter` in a product fork, stop
    and ask the owner to initialize it. The supported fork-initialization path is
-   `pnpm init:brand`, which writes the product identity, workflow and theme fields; see
-   `docs/frontend/brand-theme-and-tokens.md#fork-initialization`. Served locales and the
+   `pnpm init:product`, which writes the product identity, workflow and theme fields; see
+   `docs/frontend/brand-theme-and-tokens.md#configure-a-new-product`. Served locales and the
    Console mode are build settings in `packages/shared/src/config/*.json`, not fields
    there (see `PROJECT_CONTEXT.md` → _Build Settings_). A frontend Route Handler is not
    a NestJS backend controller.
@@ -66,7 +66,7 @@ pnpm test               # unit tests  pnpm build       # build all
 pnpm test:background-work-contracts # isolated work registration/control/provider safety (Docker)
 pnpm test:extension-contracts  # isolated notification/AI registration + upgrade conformance (Docker)
 pnpm --filter api organization:setup -- status # inspect trusted initial organization setup
-pnpm init:brand         # downstream fork identity/brand/theme initializer
+pnpm init:product         # downstream fork identity/brand/theme initializer
 node scripts/api-e2e-ci.mjs --prepare # generate Prisma and build shared for API E2E
 pnpm --filter api test:e2e            # e2e (Jest + Testcontainers, needs Docker)
 pnpm --filter api db:migrate          # prisma migrate dev (LOCAL dev only)

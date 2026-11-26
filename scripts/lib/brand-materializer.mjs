@@ -25,7 +25,7 @@ function summary(facts) {
     return `update ${Object.keys(fact.params).join(', ')}`
   }
   if (fact.operationKey === 'brand.messages-ru-meta') {
-    return 'update meta.title (meta.description not auto-translated — update ru.json by hand)'
+    return `update ${Object.keys(fact.params).join(', ')}`
   }
   if (fact.operationKey === 'brand.set-theme-default') {
     return `set DEFAULT_THEME_SETTING to '${fact.params.theme}'`

@@ -116,7 +116,7 @@ Creating repositories, pushing code and changing settings require the product ow
    For a Fork, inspect `origin/main`: it must equal the selected source commit for this initial delivery.
    If it already contains later commits, do not rewind it. Use a supported tag matching that head or the independent-copy route.
 
-4. Follow [product initialization](../product-admin/adoption.md#initialize-a-clean-product) to prepare dependencies and run `pnpm init:brand`.
+4. Follow [product initialization](../product-admin/adoption.md#initialize-a-clean-product) to prepare dependencies and run `pnpm init:product`.
    Set product name, purpose, description, workflow and upstream sync policy. Declare reviewed release merges as the sync policy.
    Run initialization before any product commit or tag namespacing. Verify `initialized_from_amcore_version` equals `SOURCE_TAG`.
    Preserve that value thereafter; it describes the starting point, not the latest update.

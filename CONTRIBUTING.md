@@ -25,11 +25,11 @@ inline exceptions and paired presets. Run `pnpm lint:fix` for supported autofixe
 | `pnpm test`                                                       | Run all unit tests                                                                                                                                                                                                                                   |
 | `pnpm format:check`                                               | Check Prettier formatting                                                                                                                                                                                                                            |
 | `pnpm format`                                                     | Format code with Prettier                                                                                                                                                                                                                            |
-| `pnpm init:brand`                                                 | Initialize a downstream fork's identity, brand, assets, and theme choices                                                                                                                                                                            |
+| `pnpm init:product`                                               | Initialize a downstream fork's identity, brand, assets, and theme choices                                                                                                                                                                            |
 | `docker compose --profile local-infra --profile monitoring up -d` | Optional dev-only Prometheus + Grafana + Alertmanager harness scraping this stack's real metrics — needs `METRICS_AUTH_TOKEN`/`GF_SECURITY_ADMIN_PASSWORD` set in `.env`; see [`docs/operations/observability.md`](docs/operations/observability.md) |
 | `pnpm test:observability-contract`                                | Static observability-contract checks (metric references, runbook links/anchors/panel citations, private-path ratchet, image-pin consistency) — no Docker needed                                                                                      |
 | `pnpm test:observability-contract:live`                           | Live observability-contract checks — boots the monitoring harness above and Grafana's old-volume migration smoke, then tears both down; needs Docker                                                                                                 |
-| `pnpm test:scripts`                                               | Script contract tests (init:brand with its engine core, product-admin placement, lint, Lighthouse, migrator and deployment tooling); the CI job "Script contracts" runs this command                                                                 |
+| `pnpm test:scripts`                                               | Script contract tests (init:product with its engine core, product-admin placement, lint, Lighthouse, migrator and deployment tooling); the CI job "Script contracts" runs this command                                                               |
 
 `pnpm test:extension-contracts` runs notification/channel/tool/provider registration
 and migration conformance in an isolated copy with PostgreSQL/Redis Testcontainers.
@@ -71,7 +71,7 @@ parse a changed file, without blocking the commit; inspect the diff directly
 in that case. The reporter can also be rerun with
 `node scripts/code-size-report.mjs` while the change is staged.
 
-`pnpm init:brand` initializes a downstream fork's identity, brand assets and theme.
+`pnpm init:product` initializes a downstream fork's identity, brand assets and theme.
 See [`docs/frontend/brand-theme-and-tokens.md` → Fork initialization](docs/frontend/brand-theme-and-tokens.md#fork-initialization).
 
 ### API-specific test commands

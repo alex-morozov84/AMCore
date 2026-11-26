@@ -1,4 +1,4 @@
-// Path/option tables for init-brand prompts and validation.
+// Path/option tables for init-product prompts and validation.
 import path from 'node:path'
 
 export function resolvePaths(root) {

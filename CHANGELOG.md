@@ -14,6 +14,8 @@ versions they name. For current source-update instructions, see
 
 ### Added
 
+- Initialize a product in English or Russian with `pnpm init:product`. Start the configured product locally with `pnpm local`.
+
 - Add a public contact form protection guide and an opt-in AMCore example.
 
 - Let product owners choose automatic CI coverage and run the full applicable
@@ -29,7 +31,7 @@ versions they name. For current source-update instructions, see
 
 ### Fixed
 
-- Require existing PNG destinations in `init:brand` and skip identical assets.
+- Require existing PNG destinations in `init:product` and skip identical assets.
   Refuse to apply a plan if a destination changed after the preview.
 
 - Correct the API reference for authentication, request parameters, response schemas,
@@ -181,7 +183,7 @@ versions they name. For current source-update instructions, see
 ### Removed
 
 - The `pnpm init:project` command and its generated-project test matrix, change selector
-  and CI jobs. `pnpm init:brand` stays. The CI job "Scaffolding contract (fast)" is replaced
+  and CI jobs. `pnpm init:product` stays. The CI job "Scaffolding contract (fast)" is replaced
   by "Script contracts" (`pnpm test:scripts`, which runs the repository's tooling tests); the
   two "Scaffolding contract" required checks no longer exist. The last state with the old
   command is the Git tag `scaffolding-final`. Forks created with `init:project` before this
@@ -1222,7 +1224,7 @@ versions they name. For current source-update instructions, see
   shared code, configuration, tests, and docs require an explicit fail-closed
   seam. The `init:project` flags and generated project tree remain unchanged.
 
-- **Transactional and manifest-backed downstream initialization.** `pnpm init:brand` and
+- **Transactional and manifest-backed downstream initialization.** The former brand initializer and
   `pnpm init:project` now materialize their complete plans before confirmation
   and apply a confirmed plan in one recoverable filesystem transaction. Shared
   scaffold files are composed semantically once, and external logo/icon inputs
@@ -1251,7 +1253,7 @@ versions they name. For current source-update instructions, see
   unchanged; the legacy projection generated failing tests, uncompilable RU
   fixtures, an incorrect RU database default, stale multi-locale browser and
   EN schema expectations, opposite-locale auth/OAuth fixtures, and removed the
-  independent CSP security entrypoint. `init:brand` now uses the same
+  independent CSP security entrypoint. the former brand initializer now uses the same
   desired-state, ownership, structural-operation, and single-transaction
   pipeline. Its logo/icon inputs are snapshotted once as validated bytes plus
   mode before confirmation, and the former brand planners, step materializer,
@@ -1781,11 +1783,11 @@ PRIVILEGES FOR ROLE` also fails for a non-member admin connection
 - **`PROJECT_CONTEXT.md`:** new downstream-product contract fields —
   `i18n_mode`, `base_locale`, `supported_locales`, `frontend_storybook`,
   `theme_persistence`, `initialized_from_amcore_version` — laying the
-  groundwork for the upcoming `pnpm init:brand`/`pnpm init:project` fork
+  groundwork for the upcoming brand initializer and project initializer fork
   initialization tooling (ADR-071). AMCore upstream's own current choices are
   now recorded explicitly (`i18n_mode: multi`, `frontend_storybook: enabled`,
   `theme_persistence: local-storage`) rather than left implicit in the code.
-- **`pnpm init:brand`** (ADR-071): a repeatable, non-destructive brand/
+- **Brand initializer** (ADR-071): a repeatable, non-destructive brand/
   identity initializer for downstream forks. Records product identity,
   upstream sync policy, workflow mode, and theme choices into
   `PROJECT_CONTEXT.md`; updates `apps/web`'s PWA manifest and the en/ru
@@ -1808,11 +1810,11 @@ PRIVILEGES FOR ROLE` also fails for a non-member admin connection
   every affected import/call site, trims `SUPPORTED_LOCALES`/
   `DEFAULT_LOCALE` (and the `emailMessages`/`telegramGenericMessages`
   catalogues) to the chosen locale, and updates `PROJECT_CONTEXT.md`'s
-  `i18n_mode`/`base_locale`/`supported_locales`. Unlike `init:brand`, not
+  `i18n_mode`/`base_locale`/`supported_locales`. Unlike the former brand initializer, not
   repeatable — a second run refuses with a clear message rather than
   re-reading files the first run already moved. `--dry-run` computes and
   prints the full plan plus unified diffs without writing anything; apply
-  mode runs the same safety guards as `init:brand` plus a real
+  mode runs the same safety guards as the former brand initializer plus a real
   `pnpm --filter web build` and the `api`/`web` unit-test suites after
   writing.
 - **`pnpm init:project --storybook=disabled`** (ADR-071): a one-time,
@@ -1832,7 +1834,7 @@ PRIVILEGES FOR ROLE` also fails for a non-member admin connection
 
 ### Changed
 
-- **Docs closeout for `pnpm init:brand`/`pnpm init:project` (ADR-071):**
+- **Docs closeout for brand initializer and project initializer (ADR-071):**
   the root `README.md` fork-onboarding callout, `docs/README.md`,
   `docs/frontend/README.md`, and `docs/frontend/brand-theme-and-tokens.md`'s
   downstream rebrand checklist now point at the actual commands instead of

@@ -671,4 +671,19 @@ for (const [name, files, ignores, extra] of [
     },
   })
 }
+const runtimeSyntax = policy.find((block) => block.name === 'project/message-boundary-runtime')
+policy.push({
+  name: 'project/localized-install-metadata',
+  files: ['src/app/manifest.ts'],
+  rules: {
+    'no-restricted-syntax': runtimeSyntax.rules['no-restricted-syntax'].map((rule) =>
+      rule.selector === 'Literal[value=/[^\\x00-\\x7F]/]'
+        ? {
+            ...rule,
+            selector: `${rule.selector}:not(Property[key.name=/^(name|short_name|description)$/] > Literal)`,
+          }
+        : rule
+    ),
+  },
+})
 export default residualConfig(policy)

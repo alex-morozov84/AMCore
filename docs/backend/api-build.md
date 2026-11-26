@@ -72,6 +72,8 @@ For host package commands, use Node 24 from `.nvmrc` with the minimum patch in
 `package.json` (currently 24.15.0) and its exact `packageManager` pnpm version
 (currently 12.18.0). Check both versions before installing frozen dependencies.
 
+For a managed rebuild-and-run loop with automatic local credentials, see [pnpm local](../operations/local-stands.md#develop-a-configured-product). The native watch setup follows below.
+
 For the bundled PostgreSQL, set `DATABASE_URL="postgresql://amcore:amcore@localhost:5432/amcore?schema=public"`
 in root `.env`. An exported `DATABASE_URL` takes precedence. Check the file value first.
 The shell guard below stops before installation or migration if an exported value differs.

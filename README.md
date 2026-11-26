@@ -21,7 +21,9 @@ Install Git, OpenSSL and Docker with Compose v2.20.2 or newer. Docker supplies N
 For [manual host development](docs/backend/api-build.md#development), follow the native setup instead.
 Agents use [managed local development](docs/operations/local-stands.md) for database writes and previews.
 
-Use a fresh checkout and disposable local PostgreSQL and Redis. Compose runs migrations automatically.
+For a product based on AMCore, follow [product initialization](docs/frontend/brand-theme-and-tokens.md#configure-a-new-product) and use [pnpm local](docs/operations/local-stands.md#develop-a-configured-product).
+
+For the Docker-only quick start below, use a fresh checkout and disposable local PostgreSQL and Redis. Compose runs migrations automatically.
 
 ```bash
 git clone https://github.com/alex-morozov84/AMCore.git

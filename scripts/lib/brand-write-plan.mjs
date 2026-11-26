@@ -1,5 +1,6 @@
 import path from 'node:path'
 
+import { PRODUCT_SETTINGS_PATHS } from './product-settings-plan.mjs'
 import { BRAND_PATHS } from './brand-ownership.mjs'
 import { readExternalRegularFile } from './external-file-snapshot.mjs'
 import {
@@ -9,7 +10,7 @@ import {
   resolveTransactionRoot,
 } from './filesystem-transaction-paths.mjs'
 
-const brandPaths = new Set(Object.values(BRAND_PATHS))
+const brandPaths = new Set([...Object.values(BRAND_PATHS), ...PRODUCT_SETTINGS_PATHS])
 
 function readTarget(root, target) {
   inspectParents(root, target)

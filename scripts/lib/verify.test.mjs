@@ -1,6 +1,6 @@
 // Deliberately NOT run against a disposable fixture: `pnpm typecheck`/
 // `pnpm lint` only mean something inside a real pnpm/turbo workspace, and a
-// minimal fixture tree isn't one (see init-brand.test.mjs, which stubs
+// minimal fixture tree isn't one (see init-product.test.mjs, which stubs
 // verify() for exactly that reason). This is the one test proving the real
 // command wiring actually works, against the one workspace where it can.
 import { test, describe } from 'node:test'

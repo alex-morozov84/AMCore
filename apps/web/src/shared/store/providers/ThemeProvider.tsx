@@ -20,6 +20,7 @@ import {
   subscribeToThemeSetting,
   type ThemeSetting,
 } from '@/shared/lib'
+import { fixedTheme } from '@/shared/lib/theme-availability'
 
 function subscribeToSystemPreference(callback: () => void): () => void {
   const media = window.matchMedia('(prefers-color-scheme: dark)')
@@ -32,11 +33,11 @@ function subscribeToSystemPreference(callback: () => void): () => void {
 // stable function reference, but keeping it a named top-level function
 // avoids any doubt and matches the documented style exactly.
 function getThemeSettingSnapshot(): ThemeSetting {
-  return readStoredThemeSetting() ?? DEFAULT_THEME_SETTING
+  return fixedTheme() ?? readStoredThemeSetting() ?? DEFAULT_THEME_SETTING
 }
 
 function getThemeSettingServerSnapshot(): ThemeSetting {
-  return DEFAULT_THEME_SETTING
+  return fixedTheme() ?? DEFAULT_THEME_SETTING
 }
 
 function getSystemPrefersDarkServerSnapshot(): boolean {
@@ -82,7 +83,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   const resolvedTheme = resolveTheme(setting, systemPrefersDark)
 
   const setTheme = useCallback((next: ThemeSetting) => {
-    storeThemeSetting(next)
+    if (!fixedTheme()) storeThemeSetting(next)
   }, [])
 
   // Pure DOM side effect reacting to the already-derived value — no

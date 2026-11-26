@@ -12,6 +12,21 @@ Ordinary API deployments keep their environment override; managed CI uses this
 fixed setting to check disk headroom before dependency installation. See
 [runner disk cleanup](ci-security.md#docker-e2e-disk-preparation).
 
+## Develop a configured product
+
+Start Docker, then run `pnpm local` from the product root. Open the product URL
+in the final summary. The summary shows the enabled administration pages, service
+addresses and stand commands. PostgreSQL is reachable only inside Docker.
+Redis also has a loopback port.
+
+The stand assigns local ports, prepares its database and keys, and loads system
+data. A root `.env` is optional for this workflow. The stand preserves any
+existing root `.env`.
+
+After changing code or pulling a commit, run `pnpm local` again to rebuild and see the changes. Ordinary restarts preserve the local database and keys. Use `pnpm local status` to inspect the stand for the current settings and `pnpm local down` to stop product stands and retain their data.
+
+Changing the served languages or administrative placement selects a separate local dataset. Returning to the previous settings reuses the previous dataset if retained. When using a separate local HTTPS host, follow the browser trust instructions below. For native watch mode, see [API development](../backend/api-build.md#development).
+
 ## Prerequisites and commands
 
 Install the repository's frozen dependencies. Use its supported Node/pnpm versions

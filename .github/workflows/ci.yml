@@ -562,7 +562,7 @@ jobs:
         if: github.event_name == 'pull_request' || github.event_name == 'push'
         run: node scripts/check-migration-history.mjs
 
-      # Unit and contract tests of the repository's own tooling: the init:brand
+      # Unit and contract tests of the repository's own tooling: the init:product
       # initializer with the engine, filesystem transaction and AST core it uses, product-admin
       # placement, lint, Lighthouse, migrator, API E2E and deployment contracts. They read the
       # real working tree and need no Docker. This is the same command as the root

@@ -5,21 +5,20 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createFixtureRepo, readFixtureFile, git } from './lib/test-fixture.mjs'
 
-const INIT_BRAND = path.join(path.dirname(fileURLToPath(import.meta.url)), 'init-brand.mjs')
+const INIT_PRODUCT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'init-product.mjs')
 
 const BASE_FLAGS = [
   '--yes',
   "--product-name=Bob's App",
-  '--product-description=A new tagline.',
+  '--description-en=A new tagline.',
   '--purpose=Ship Acme things.',
   '--upstream-sync-policy=Rebase onto upstream/main quarterly.',
   '--workflow-mode=flexible',
   '--theme-mode=dark',
-  '--theme-persistence=cookie-ssr',
 ]
 
-function runInitBrand(root, args) {
-  return spawnSync('node', [INIT_BRAND, ...args], {
+function runInitProduct(root, args) {
+  return spawnSync('node', [INIT_PRODUCT, ...args], {
     encoding: 'utf8',
     env: { ...process.env, NODE_ENV: 'test', AMCORE_INIT_ROOT: root, AMCORE_INIT_SKIP_VERIFY: '1' },
   })
@@ -46,12 +45,12 @@ afterEach(() => {
   fixture = undefined
 })
 
-describe('init-brand (end-to-end against a disposable fixture)', () => {
+describe('init-product (end-to-end against a disposable fixture)', () => {
   test('--dry-run writes nothing and prints a unified diff', () => {
     fixture = createFixtureRepo()
     const before = readFixtureFile(fixture.root, 'PROJECT_CONTEXT.md')
 
-    const result = runInitBrand(fixture.root, ['--dry-run', ...BASE_FLAGS])
+    const result = runInitProduct(fixture.root, ['--dry-run', ...BASE_FLAGS])
 
     assert.equal(result.status, 0, result.stderr)
     assert.match(result.stdout, /--dry-run: no files were written/)
@@ -65,7 +64,7 @@ describe('init-brand (end-to-end against a disposable fixture)', () => {
   test('apply updates every target file, correctly escaping a value containing an apostrophe', () => {
     fixture = createFixtureRepo()
 
-    const result = runInitBrand(fixture.root, BASE_FLAGS)
+    const result = runInitProduct(fixture.root, BASE_FLAGS)
     assert.equal(result.status, 0, result.stderr)
 
     const context = readFixtureFile(fixture.root, 'PROJECT_CONTEXT.md')
@@ -106,12 +105,12 @@ describe('init-brand (end-to-end against a disposable fixture)', () => {
   test('re-running with the same answers is a safe no-op', () => {
     fixture = createFixtureRepo()
 
-    const first = runInitBrand(fixture.root, BASE_FLAGS)
+    const first = runInitProduct(fixture.root, BASE_FLAGS)
     assert.equal(first.status, 0, first.stderr)
     commit(fixture.root, 'apply brand')
     const contextAfterFirst = readFixtureFile(fixture.root, 'PROJECT_CONTEXT.md')
 
-    const second = runInitBrand(fixture.root, BASE_FLAGS)
+    const second = runInitProduct(fixture.root, BASE_FLAGS)
     assert.equal(second.status, 0, second.stderr)
     assert.match(second.stdout, /Nothing to do — every value already matches\./)
     assert.equal(
@@ -128,10 +127,10 @@ describe('init-brand (end-to-end against a disposable fixture)', () => {
 
   test('re-running with a changed answer only updates that field', () => {
     fixture = createFixtureRepo()
-    runInitBrand(fixture.root, BASE_FLAGS)
+    runInitProduct(fixture.root, BASE_FLAGS)
     commit(fixture.root, 'apply brand')
 
-    const second = runInitBrand(fixture.root, ['--yes', '--product-name=Acme'])
+    const second = runInitProduct(fixture.root, ['--yes', '--product-name=Acme'])
     assert.equal(second.status, 0, second.stderr)
 
     const context = readFixtureFile(fixture.root, 'PROJECT_CONTEXT.md')
