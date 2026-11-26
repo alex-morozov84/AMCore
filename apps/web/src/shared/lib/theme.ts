@@ -119,6 +119,6 @@ export function escapeForInlineScript(json: string): string {
 export function getThemeInitScript(fixedSetting = fixedTheme()): string {
   const storageKey = escapeForInlineScript(JSON.stringify(THEME_STORAGE_KEY))
   const defaultSetting = escapeForInlineScript(JSON.stringify(DEFAULT_THEME_SETTING))
-  const fixed = JSON.stringify(fixedSetting)
+  const fixed = escapeForInlineScript(JSON.stringify(fixedSetting))
   return `(function(){var setting=${fixed};if(!setting){var s;try{s=localStorage.getItem(${storageKey})}catch(e){}setting=(s==='light'||s==='dark'||s==='system')?s:${defaultSetting}}var dark=setting==='dark'||(setting==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.classList.toggle('dark',dark);r.style.colorScheme=dark?'dark':'light'})()`
 }
