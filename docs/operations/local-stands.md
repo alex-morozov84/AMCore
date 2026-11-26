@@ -27,8 +27,9 @@ After changing code or pulling a commit, run `pnpm local` again to rebuild and s
 
 Changing the served languages or administrative placement selects a separate local dataset. Returning to the previous settings reuses the previous dataset if retained. When using a separate local HTTPS host, follow the browser trust instructions below. For native watch mode, see [API development](../backend/api-build.md#development).
 
-If a local switch is interrupted, run `pnpm local recover`. It releases only the
+If a local switch is interrupted, run `pnpm local recover`. It releases the
 dispatcher lock after the owning process and its child operations have exited.
+It also clears interrupted startup locks that have no stand record.
 If a stand still has an interrupted per-stand operation, recover its ID with
 the stand recovery procedure below. Recovery preserves datasets unless you
 explicitly request a purge through the stand recovery procedure.

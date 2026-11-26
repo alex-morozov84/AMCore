@@ -184,7 +184,7 @@ The wizard writes the files the application and CI read. It previews locale-depe
 
 ### Scripted initialization
 
-Use `--non-interactive` to suppress questions. Field flags answer individual questions. `--setup-language en|ru` chooses only the wizard language. Use `--dry-run` for a preview, or `--yes` to authorize a noninteractive write. Omitted fields keep their current values unless first initialization requires starter metadata replacement.
+Use `--non-interactive` to suppress questions. Field flags answer individual questions. `--setup-language en|ru` chooses only the wizard language. Use `--dry-run` for a preview, or `--yes` to authorize a noninteractive write. On first setup, provide a name for the default site language, including for a preview. Omitted fields keep their current values unless first initialization requires starter metadata replacement.
 
 | Setting                         | Flags                                                                                                                     |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
