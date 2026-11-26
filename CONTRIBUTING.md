@@ -175,6 +175,12 @@ docs: update quick start env step
 chore: unify github repository url
 ```
 
+## Team process for products
+
+Find the [selected rules](PROJECT_CONTEXT.md#team-process) before task work.
+The [AMCore process](docs/contributing/team-workflow.md) covers a small repair,
+a consequential change and parallel pairs. Git delivery uses the mode below.
+
 ## Branching & merging
 
 - Follow the workflow mode declared in `PROJECT_CONTEXT.md`.

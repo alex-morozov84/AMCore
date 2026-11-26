@@ -2,14 +2,29 @@ import { readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { readProductAdminPlacement, readAdminConsoleSettings } from './settings-files.mjs'
 import { proposedLocales } from './product-settings-plan.mjs'
+import { readMarkdownField } from './actions.mjs'
+import { DEFAULT_TEAM_PROCESS, TEAM_PROCESS_FIELD, validTeamProcess } from './team-process.mjs'
+
+function printTeamProcess(root, process, tr) {
+  const label = tr('Team process:', 'Процесс команды:')
+  const source = process === DEFAULT_TEAM_PROCESS ? 'AMCore' : JSON.stringify(process)
+  const unavailable = validTeamProcess(root, process)
+    ? ''
+    : tr(' (file unavailable or invalid)', ' (файл недоступен или путь неверен)')
+  console.log(`${label} ${source}${unavailable}`)
+}
 
 export function printProductSummary(root, answers, plan) {
-  if (!answers.interactive && !answers.locales && !answers.defaultLocale) return
   const ru = answers.language === 'ru'
   const tr = (en, russian) => (ru ? russian : en)
   const read = (file) =>
     plan.displaySteps.find((step) => relative(root, step.target) === file)?.after ??
     readFileSync(join(root, file), 'utf8')
+  const process = readMarkdownField(read('PROJECT_CONTEXT.md'), TEAM_PROCESS_FIELD)
+  if (!answers.interactive && !answers.locales && !answers.defaultLocale) {
+    if (process !== undefined) printTeamProcess(root, process, tr)
+    return
+  }
   const locales = proposedLocales(root, answers)
   const admin = readAdminConsoleSettings(root)
   const staff = readProductAdminPlacement(root)
@@ -66,6 +81,7 @@ export function printProductSummary(root, answers, plan) {
     )
   if (answers.purpose) console.log(tr('Purpose:', 'Назначение:'), answers.purpose)
   if (answers.packageName) console.log(tr('Package name:', 'Имя пакета:'), answers.packageName)
+  printTeamProcess(root, process ?? DEFAULT_TEAM_PROCESS, tr)
   if (answers.workflowMode)
     console.log(tr('Team workflow:', 'Правила команды:'), answers.workflowMode)
   if (answers.upstreamSyncPolicy)

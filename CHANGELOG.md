@@ -12,6 +12,8 @@ versions they name. For current source-update instructions, see
 
 ## [Unreleased]
 
+- Product setup can select the included AMCore team workflow or a tracked Markdown file with the team’s own rules. The starter includes task and review examples.
+
 ### Added
 
 - Initialize a product in English or Russian with `pnpm init:product`. Start the configured product locally with `pnpm local`.

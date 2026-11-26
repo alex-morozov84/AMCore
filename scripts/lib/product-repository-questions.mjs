@@ -2,6 +2,58 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { readMarkdownField } from './actions.mjs'
 import { parseCiPolicy } from './ci-policy.mjs'
+import { DEFAULT_TEAM_PROCESS, TEAM_PROCESS_FIELD, teamProcessError } from './team-process.mjs'
+
+async function askTeamProcess(root, answers, context, { tr, select, text, note }) {
+  if (answers.teamProcess !== undefined) return
+  const repeat = readMarkdownField(context, 'Mode')?.includes('downstream-product')
+  const current = readMarkdownField(context, TEAM_PROCESS_FIELD) ?? DEFAULT_TEAM_PROCESS
+  const options = [
+    ['amcore', 'AMCore process (default)', 'Процесс AMCore (по умолчанию)'],
+    ['file', 'Our rules from a file', 'Наши правила из файла'],
+  ]
+  const gitReference =
+    answers.workflowMode === 'custom' &&
+    (answers.workflowReference ?? readMarkdownField(context, 'Workflow reference'))
+  const gitFile = gitReference && `file:${gitReference}`
+  if (gitFile && !teamProcessError(root, gitFile, tr))
+    options.push([
+      'git',
+      'Use the Git rules file for team process too',
+      'Использовать файл правил Git и для процесса команды',
+    ])
+  if (repeat) options.unshift(['keep', 'Keep the current choice', 'Оставить текущий выбор'])
+  note(
+    'Choose how the team plans, tests and reviews work. Git delivery and CI stay separate. You can change this in PROJECT_CONTEXT.md later.',
+    'Выберите порядок планирования, проверок и ревью. Режим поставки через Git и настройки CI задаются отдельно. Позже процесс можно сменить в PROJECT_CONTEXT.md.'
+  )
+  if (repeat)
+    note(`Current choice: ${JSON.stringify(current)}`, `Текущий выбор: ${JSON.stringify(current)}`)
+  const choice = await select(
+    'teamProcessChoice',
+    tr(
+      'Which process should your team and agents follow for development?',
+      'По каким правилам команда и агенты будут вести разработку?'
+    ),
+    options,
+    repeat ? 'keep' : 'amcore'
+  )
+  if (choice === 'amcore') answers.teamProcess = DEFAULT_TEAM_PROCESS
+  if (choice === 'git') answers.teamProcess = gitFile
+  if (choice !== 'file') return
+
+  note(
+    'Enter a tracked Markdown path inside this repository, for example docs/team/Our process.md.',
+    'Укажите путь к Markdown-файлу, который отслеживается Git в этом репозитории. Пример — docs/team/Наш процесс.md.'
+  )
+  const file = await text(
+    'teamProcessPath',
+    tr('Path to the team rules', 'Путь к файлу правил команды'),
+    undefined,
+    (input) => teamProcessError(root, `file:${input}`, tr)
+  )
+  answers.teamProcess = `file:${file}`
+}
 
 export async function repository(root, a, p) {
   const { tr, select, text, note } = p
@@ -10,8 +62,8 @@ export async function repository(root, a, p) {
     readMarkdownField(context, 'Workflow mode')?.match(/\b(strict|custom|flexible)\b/)?.[1] ??
     'strict'
   note(
-    'main is the primary branch. A pull request asks to merge changes into it. In strict mode, configure branch protection in GitHub to require a pull request and passing checks. Flexible mode lets your team set exceptions. For a custom process, provide the location of your rules. The wizard records your choice in PROJECT_CONTEXT.md. You can change it later.',
-    'main — основная ветка проекта. Pull request — запрос на добавление изменений в эту ветку. Для строгого режима настройте защиту ветки в GitHub. Тогда GitHub потребует запрос на слияние и успешные проверки. При гибких правилах команда сама решает, когда нужен запрос. Для собственного процесса укажите, где описаны правила. Мастер запишет выбор в PROJECT_CONTEXT.md. Его можно изменить позже.'
+    'main is the primary branch. A pull request asks to merge changes into it. In strict mode, configure branch protection in GitHub to require a pull request and passing checks. Flexible mode lets your team set exceptions. For custom Git delivery, provide the location of your Git rules. The wizard records your choice in PROJECT_CONTEXT.md. You can change it later.',
+    'main — основная ветка проекта. Pull request — запрос на добавление изменений в эту ветку. Для строгого режима настройте защиту ветки в GitHub. Тогда GitHub потребует запрос на слияние и успешные проверки. При гибких правилах команда сама решает, когда нужен запрос. Для своей поставки через Git укажите, где описаны правила Git. Мастер запишет выбор в PROJECT_CONTEXT.md. Его можно изменить позже.'
   )
   await select(
     'workflowMode',
@@ -26,14 +78,14 @@ export async function repository(root, a, p) {
         'Запросы на слияние с обязательными проверками. Защиту ветки настройте в GitHub',
       ],
       ['flexible', 'Flexible team rules', 'Гибкие правила команды'],
-      ['custom', 'Custom process', 'Собственный процесс'],
+      ['custom', 'Custom Git delivery rules', 'Свои правила поставки через Git'],
     ],
     workflow
   )
   if (a.workflowMode === 'custom')
     await text(
       'workflowReference',
-      tr('Path or URL of the custom rules', 'Путь или ссылка на правила команды'),
+      tr('Path or URL of the Git delivery rules', 'Путь или ссылка на правила поставки через Git'),
       readMarkdownField(context, 'Workflow reference')
     )
   note(
@@ -61,6 +113,7 @@ export async function repository(root, a, p) {
     ],
     parseCiPolicy(readFileSync(join(root, 'ci/product.json'), 'utf8')).mode
   )
+  await askTeamProcess(root, a, context, p)
   note(
     'Your product is based on AMCore. Later releases may include fixes and new features. Your team decides when to adopt them. The wizard records the starting version and your policy in PROJECT_CONTEXT.md. Download and apply updates separately. You can change the policy later. Example: “Review releases monthly.”',
     'Ваш продукт создаётся на основе AMCore. В следующих выпусках могут появляться исправления и новые возможности. Команда сама решает, когда их принять.\n\nМастер запишет исходную версию AMCore и ваше решение в PROJECT_CONTEXT.md. Обновления вы загружаете и применяете отдельно. Порядок можно изменить позже. Пример своего правила — «Проверяем релизы раз в месяц».'

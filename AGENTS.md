@@ -21,15 +21,18 @@ Claude Code reads it via the `@AGENTS.md` import in `CLAUDE.md`.
    Served locales and Console mode are build settings in
    `packages/shared/src/config/*.json`. See `PROJECT_CONTEXT.md` → _Build Settings_.
    A frontend Route Handler and a NestJS backend controller have separate roles.
-2. Detect the working-context overlay:
-   - **`ai/` directory present** → maintainer copy of the product named in
-     `PROJECT_CONTEXT.md`. ALSO read, in order: `ai/README.md` (private-repo
-     boundary and document map), `ai/STATUS.md` (current state), `ai/BACKLOG.md`
-     (only unfinished-work queue), `ai/WORKFLOW.md` (working rules), and
-     `ai/DECISIONS.md` (ADR index).
-   - **No `ai/` directory** → public contributor/product-fork mode. This file,
-     `PROJECT_CONTEXT.md`, `CONTRIBUTING.md`, and public `docs/` are complete; do
-     **not** look for private maintainer context.
+2. Use the instructions for the established checkout role:
+   - **Downstream product** → resolve [Team process](PROJECT_CONTEXT.md#team-process)
+     before task work. Read the selected file, then the task and relevant technical
+     guide. If a selected file is unavailable, name it and clarify before work
+     that depends on it. A product's own local folders do not select AMCore's
+     maintainer instructions.
+   - **AMCore maintainer work** → when the assignment and checkout establish the
+     AMCore maintainer context and its private overlay is available, also read
+     `ai/README.md`, `ai/STATUS.md`, `ai/BACKLOG.md`, `ai/WORKFLOW.md`,
+     and `ai/DECISIONS.md`.
+   - **Public contributor work** → follow this file, `CONTRIBUTING.md` and
+     public `docs/`.
 
 **Do not infer live enforcement from tracked files** — workflows, `.github/rulesets/*.json` and
 hooks _declare_ the intended policy; GitHub-side enforcement is external repository state applied

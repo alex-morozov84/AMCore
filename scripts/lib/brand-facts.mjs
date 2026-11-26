@@ -4,6 +4,7 @@ import path from 'node:path'
 import { readMarkdownField } from './actions.mjs'
 import { buildBrandAssetFacts } from './brand-asset-facts.mjs'
 import { productMetadata } from './product-metadata.mjs'
+import { TEAM_PROCESS_FIELD } from './team-process.mjs'
 import { BRAND_PATHS } from './brand-ownership.mjs'
 
 const content = (path, operationKey, params) => ({
@@ -30,6 +31,11 @@ function answeredContextFields(answers) {
     answers.workflowReference && {
       label: 'Workflow reference',
       value: answers.workflowReference,
+      insertAfterLabel: 'Workflow mode',
+    },
+    answers.teamProcess && {
+      label: TEAM_PROCESS_FIELD,
+      value: answers.teamProcess,
       insertAfterLabel: 'Workflow mode',
     },
     answers.themePersistence && {

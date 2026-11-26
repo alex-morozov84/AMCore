@@ -1,6 +1,10 @@
 // Collects init:product's answers — from flags (non-interactive/scripted use,
 // including a cold agent) or from @clack/prompts (interactive, TTY only).
 import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { EngineError, readMarkdownField } from './actions.mjs'
+import { DEFAULT_TEAM_PROCESS, teamProcessError } from './team-process.mjs'
 import { clack } from './init-engine.mjs'
 import { validateAnswers } from './brand-validate.mjs'
 import { productQuestions } from './product-questions.mjs'
@@ -16,6 +20,7 @@ const FLAG_TO_ANSWER = {
   'console-mode': 'consoleMode',
   'ci-mode': 'ciMode',
   'workflow-reference': 'workflowReference',
+  'team-process': 'teamProcess',
   'product-name': 'productName',
   purpose: 'purpose',
   'upstream-sync-policy': 'upstreamSyncPolicy',
@@ -79,7 +84,15 @@ export async function collectAnswers({ root, flags }) {
     })
     if (clack.isCancel(language)) process.exit(1)
   }
+  const tr = (en, ru) => (language === 'ru' ? ru : en)
+  if (answers.teamProcess !== undefined) {
+    const error = teamProcessError(root, answers.teamProcess, tr)
+    if (error) throw new EngineError(`--team-process: ${error}`)
+  }
   if (interactive) await productQuestions(root, answers, language ?? 'en')
+  const context = readFileSync(join(root, 'PROJECT_CONTEXT.md'), 'utf8')
+  if (readMarkdownField(context, 'Mode')?.includes('upstream-starter'))
+    answers.teamProcess ??= DEFAULT_TEAM_PROCESS
   validateAnswers(answers, language)
   return { ...answers, amcoreVersion, language: language ?? 'en', interactive }
 }

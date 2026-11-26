@@ -184,10 +184,33 @@ Run the wizard in a clean product checkout with the workspace dependencies insta
 4. Choose available themes and, when both are available, the first-visit setting. A fixed theme applies before the first page paint, including when browser storage is unavailable. Storybook keeps both themes. Choose whether to show the top navigation progress bar. [Theme behavior](#light--dark--system-modes) and [navigation progress](route-progress.md).
 5. Enable or disable the path-based Operations Console. Existing aliases and host placements are retained. To change them later, follow the [Console guide](../operations-console/configuration.md#topology) or [product administration guide](../product-admin/placement-and-sessions.md#configure-or-move-the-administration-area).
 6. Keep or replace the three install icons. Supply ready PNG files in the sizes listed in [the icon guide](../../apps/web/public/icons/README.md). Logo assets and color tokens are separate customizations.
-7. Choose the team's Git workflow and [automatic checks](../operations/ci-security.md#choose-automatic-checks-for-a-product). Configure GitHub branch protection separately. Review the settings summary. Choose **Show file changes** to inspect the full plan and return to the decision. The wizard initially selects **Exit without writing**. Choose **Apply settings** when you are ready to save. The wizard records the starting Git version when first establishing product identity.
+7. Choose the team's Git workflow, [team process](#choose-or-change-team-process) and [automatic checks](../operations/ci-security.md#choose-automatic-checks-for-a-product). Configure GitHub branch protection separately. Review the settings summary. Choose **Show file changes** to inspect the full plan and return to the decision. The wizard initially selects **Exit without writing**. Choose **Apply settings** when you are ready to save. The wizard records the starting Git version when first establishing product identity.
 8. Start Docker and run `pnpm local` from the project root. Open the URL it prints. See [the local development lifecycle](../operations/local-stands.md#develop-a-configured-product).
 
 The wizard writes the files the application and CI read. It previews locale-dependent proxy output alongside source settings and writes the approved plan together. It runs type and lint checks after writing. Prepare the shared build and generated Prisma client as described in [product adoption](../product-admin/adoption.md#initialize-a-clean-product). Source changes require a new web build. Commit or stash local edits before applying another run. Rerun the wizard to edit settings.
+
+### Choose or change team process
+
+The wizard asks which process the team and its agents should follow. Use the
+included [AMCore process](../contributing/team-workflow.md) or choose a
+repository-relative path to a readable, tracked Markdown file. For example,
+use `docs/team/Our process.md`. Repository rules and CI remain separate.
+
+First setup defaults to AMCore. On later runs, **Keep the current choice**
+preserves the saved value, even if the file has disappeared. A missing file
+appears in the preview. When the agent cannot read the chosen file, it names
+the path and asks for a correction before dependent work.
+
+In an initialized product you can change just the `Team process` line in
+[`PROJECT_CONTEXT.md`](../../PROJECT_CONTEXT.md#team-process). Set it to
+`amcore` or `file:docs/team/Our process.md`. Review and commit the change
+under your product's rules. The wizard never creates a queue or task files.
+
+The wizard can preview changes in a checkout with a root `ai/` directory.
+Its ordinary apply path blocks writes there. For a first setup, initialize
+a clean product checkout before adding such a directory. In an initialized
+product with its own directory, use the direct edit described above. The
+agent can still read an explicitly selected file tracked by the product.
 
 ### Configure a product with an agent
 
@@ -247,6 +270,7 @@ Use `--non-interactive` to suppress questions. Field flags answer individual que
 | Appearance                      | `--theme-availability both\|light\|dark`, `--theme-mode system\|light\|dark`, `--route-progress on\|off`                  |
 | Console                         | `--console-mode path\|disabled`                                                                                           |
 | Install PNGs                    | `--icon-192`, `--icon-512`, `--icon-512-maskable`                                                                         |
+| Team process                    | `--team-process amcore` or `--team-process "file:docs/team/Our process.md"`                                               |
 | Git and CI                      | `--workflow-mode`, `--workflow-reference` for custom rules, `--ci-mode normal\|full\|heavy-off`, `--upstream-sync-policy` |
 
 To replace the public logo assets, copy the appropriate PNG files into `apps/web/public` and wire them into the product interface. Follow the cookie-backed theme recipe separately if your product needs it. Edit the light and dark tokens and manifest colors together when rebranding.

@@ -26,10 +26,11 @@ function prompts(answers, language) {
     tr,
     note: (en, ru) => descriptions.push(tr(en, ru)),
     info: (en, ru) => clack.note(tr(en, ru)),
-    text: (key, message, initialValue) =>
+    text: (key, message, initialValue, validateValue) =>
       answer(key, message, async () => {
         const value = await clack.text({
           validate(input) {
+            if (validateValue) return validateValue(input ?? '')
             if (key !== 'packageName' || !input?.trim()) return
             try {
               validateAnswers({ packageName: input.trim() }, language)
@@ -40,7 +41,8 @@ function prompts(answers, language) {
           message: tr('Enter a value', 'Введите значение'),
           initialValue,
         })
-        return value === initialValue &&
+        return !validateValue &&
+          value === initialValue &&
           !['productName', 'nameEn', 'nameRu', 'workflowReference', 'packageName'].includes(key)
           ? ''
           : typeof value === 'string' && key === 'packageName'

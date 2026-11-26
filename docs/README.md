@@ -19,6 +19,9 @@ comment. If a rule is available only through an unavailable record, report the g
 
 ## Find the right guide
 
+[Start a product task or hand it off for review](contributing/team-workflow.md).
+The product's [context](../PROJECT_CONTEXT.md#team-process) points to its chosen rules.
+
 [Add product administration to your product](product-admin/adoption.md) — shop, CRM/ERP and SaaS recipes, initialization and your own interface.
 [Create a company or prepare its first administrator](product-admin/organization-establishment.md) — policies, Console/CLI/API setup and recovery.
 [Create an organization and invite its administrator](product-admin/organization-provisioning.md) — Console, protected API, mail readiness and recovery.
