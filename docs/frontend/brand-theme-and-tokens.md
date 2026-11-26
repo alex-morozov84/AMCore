@@ -201,10 +201,17 @@ preserves the saved value, even if the file has disappeared. A missing file
 appears in the preview. When the agent cannot read the chosen file, it names
 the path and asks for a correction before dependent work.
 
-In an initialized product you can change just the `Team process` line in
-[`PROJECT_CONTEXT.md`](../../PROJECT_CONTEXT.md#team-process). Set it to
-`amcore` or `file:docs/team/Our process.md`. Review and commit the change
-under your product's rules. The wizard never creates a queue or task files.
+In an initialized product, edit [`PROJECT_CONTEXT.md`](../../PROJECT_CONTEXT.md#team-process).
+Replace the `Team process` line, or add this complete line under **Identity**
+after **Workflow mode** if the field is absent:
+
+```md
+- **Team process:** file:docs/team/Our process.md
+```
+
+Use the path to your tracked Markdown file. To choose the included process,
+use `- **Team process:** amcore`. Review and commit the change under your
+product's rules. The wizard never creates a queue or task files.
 
 The wizard can preview changes in a checkout with a root `ai/` directory.
 Its ordinary apply path blocks writes there. For a first setup, initialize

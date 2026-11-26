@@ -281,7 +281,9 @@ Manual release procedure (until release automation is adopted):
    the matching GitHub Release.
 
 Release tags are immutable: never move, overwrite, or delete an existing `v*`
-tag. See the internal maintainer checklist in `ai/PROCESS.md` when `ai/` exists.
+tag. If you are working as an AMCore maintainer in a confirmed maintainer
+checkout, follow the internal release checklist in `ai/PROCESS.md` when
+available.
 
 ## Troubleshooting
 

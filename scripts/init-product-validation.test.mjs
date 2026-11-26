@@ -146,6 +146,45 @@ describe('init-product input validation', () => {
     assert.match(readFixtureFile(root, context), /file:Наш процесс\.md/)
     apply(['--team-process', 'file:New rules.md'])
     assert.match(readFixtureFile(root, context), /file:New rules\.md/)
+    commit()
+    apply(['--team-process', 'amcore'])
+    assert.equal(
+      readFixtureFile(root, context),
+      before.replace(
+        '- **Workflow reference:**',
+        '- **Team process:** amcore\n- **Workflow reference:**'
+      )
+    )
+  })
+
+  test('rejects tracked paths containing Unicode line or paragraph separators', () => {
+    fixture = createFixtureRepo()
+    const { root } = fixture
+    const context = 'PROJECT_CONTEXT.md'
+    const before = readFixtureFile(root, context)
+    const filenames = ['Team\u2028rules.md', 'Team\u2029rules.md']
+    for (const filename of filenames) writeFileSync(path.join(root, filename), '# Team rules\n')
+    git(root, ['add', '--', ...filenames])
+    git(root, [
+      '-c',
+      'user.name=test',
+      '-c',
+      'user.email=test@example.test',
+      'commit',
+      '-qm',
+      'fixture',
+    ])
+
+    for (const filename of filenames) {
+      for (const action of ['--dry-run', '--yes']) {
+        const args = [action, '--product-name', 'Shop', '--team-process', `file:${filename}`]
+        const result = runInitProduct(root, args, { AMCORE_INIT_SKIP_VERIFY: '1' })
+        assert.equal(result.status, 1, result.stdout)
+        assert.match(result.stderr, /tracked Markdown file/)
+        assert.equal(readFixtureFile(root, context), before)
+        assert.equal(git(root, ['status', '--porcelain']), '')
+      }
+    }
   })
 
   test('rejects nonportable and untracked team rules before any product writes', () => {

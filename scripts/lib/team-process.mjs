@@ -12,7 +12,7 @@ export function validTeamProcess(root, value) {
   if (
     relative !== relative.trim() ||
     !relative.toLowerCase().endsWith('.md') ||
-    /[\\:`<>[\]\p{Cc}\p{Cf}]/u.test(relative) ||
+    /[\\:`<>[\]\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(relative) ||
     relative.split('/').some((part) => !part || part === '.' || part === '..')
   )
     return false
