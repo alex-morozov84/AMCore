@@ -24,8 +24,8 @@ async function askTeamProcess(root, answers, context, { tr, select, text, note }
     ])
   if (repeat) options.unshift(['keep', 'Keep the current choice', 'Оставить текущий выбор'])
   note(
-    'Choose how the team plans, tests and reviews work. Git delivery and CI stay separate. You can change this in PROJECT_CONTEXT.md later.',
-    'Выберите порядок планирования, проверок и ревью. Режим поставки через Git и настройки CI задаются отдельно. Позже процесс можно сменить в PROJECT_CONTEXT.md.'
+    'The AMCore process explains how to track tasks and finish them. Small fixes use a focused check and one review.\nLarger changes have independent planning and review. The guide also covers previews, documentation and parallel work.\nRead docs/contributing/team-workflow.md. You can use your own Markdown file instead.\nChange the choice later in PROJECT_CONTEXT.md. Git delivery rules and CI stay separate.',
+    'Процесс AMCore описывает работу от постановки задачи до её закрытия. Для небольшого исправления достаточно целевой проверки и одного ревью.\nДля больших изменений предусмотрены независимая проверка плана и ревью результата. В руководстве также описаны показ владельцу, документация и параллельная работа.\nПодробнее — docs/contributing/team-workflow.md. Можно выбрать свой Markdown-файл.\nВыбор можно изменить в PROJECT_CONTEXT.md. Правила Git и настройки CI задаются отдельно.'
   )
   if (repeat)
     note(`Current choice: ${JSON.stringify(current)}`, `Текущий выбор: ${JSON.stringify(current)}`)
