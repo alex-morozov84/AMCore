@@ -4,11 +4,10 @@ Use this guide to keep your product changes while adopting selected AMCore relea
 An **upstream** is the original AMCore repository. Your **product** has its own repository and release policy.
 A **merge commit** records both histories, so Git can recognize changes already integrated.
 
-> **No supported starting release exists yet.** The first supported base will be a new
-> pre-beta tag after this contract is verified. Older tags, templates, ZIP copies and
-> products generated with the removed scaffolding are not supported starting points.
-> Do not substitute an old tag for the placeholders below. Commit-based experiments
-> do not establish release support.
+> **The first supported release is [v0.12.0](https://github.com/alex-morozov84/AMCore/releases/tag/v0.12.0).**
+> Use this tag to start a product or update an existing fork with AMCore history.
+> Older tags, templates, ZIP copies and products generated with the removed scaffolding
+> are not supported starting points.
 
 Rehearsal covers only disposable independent-copy scenarios.
 The private flexible route and GitHub Fork-specific behavior remain unverified.

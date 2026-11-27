@@ -14,9 +14,8 @@ When this file and the guide disagree, follow the guide and report the differenc
 1. Read `PROJECT_CONTEXT.md`. For an update, it must say `downstream-product`;
    stop if a product still says `upstream-starter`. A new product changes it only
    during initialization below.
-2. Read the guide banner. While it says that no supported starting release exists,
-   no tag is a supported target: do not create a product or update one to any tag
-   as a supported release. Report that limit instead.
+2. Read the supported release in the guide. Verify the exact tag and commit SHA
+   against the published release before using it as a starting or update target.
 3. Confirm the owner's permission for each outward action: repository creation,
    push, PR, merge, settings and network CLI access. A request to update is not
    permission to publish.
