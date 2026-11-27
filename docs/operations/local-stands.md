@@ -102,10 +102,12 @@ concurrent scenarios within a test retain their own process and stand orchestrat
 `--id <stand-id>` selects a recorded identity, never an arbitrary URL or Compose
 project. Default preview ID is `preview` within this checkout; e2e uses a fresh ID.
 After preparing and checking the acceptance scenario, `pnpm stand preview`
-starts the same Watch as `pnpm local`. Use Ctrl+C to stop it, then use
-`pnpm stand down --id <stand-id>` to stop that preview. Profile replacements
-remain in effect while editing other files. Edit the profile fixture and rerun
-the preview to change a replacement.
+starts the same Watch as `pnpm local`. Use `pnpm stand status --id <stand-id>`
+to check its `watch` field. Press Ctrl+C to stop Watch, then use
+`pnpm stand down --id <stand-id>` if you also want to stop the containers.
+Rerun the same preview command with the same ID and profile after changing
+dependencies or a profile replacement. Other watched edits apply while the
+preview stays open.
 
 E2E refuses preview-purpose IDs so tests cannot change acceptance data.
 `list` is diagnostic: resources removed concurrently after enumeration are skipped;
