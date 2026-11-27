@@ -274,38 +274,24 @@ describe('node-redis 6 client contract against Redis 7', () => {
     })
   })
 
-  describe('MULTI and pipeline are not covered by the queue timeout', () => {
+  describe('MULTI and pipeline respect the queue timeout', () => {
     it.each([
       ['exec', (client: AppRedisClient) => client.multi().incr('m:one').exec()],
       ['execAsPipeline', (client: AppRedisClient) => client.multi().incr('m:one').execAsPipeline()],
     ] as const)(
-      '%s queued during backoff waits past the timeout and runs when the connection returns',
+      '%s expires before it can be sent and is not replayed after reconnect',
       async (_name, run) => {
         const client = await connect(QUEUE_MS + 800)
         await intoBackoff(client)
 
-        // The observer is attached at once, so a rejection fails the premise with its own error.
-        const outcome: { value?: unknown; error?: unknown; settled: boolean } = { settled: false }
-        void run(client)
-          .then(
-            (value) => {
-              outcome.value = value
-            },
-            (error: unknown) => {
-              outcome.error = error
-            }
-          )
-          .finally(() => {
-            outcome.settled = true
-          })
-        await sleep(QUEUE_MS + 300) // a typed command would have expired by now
-        expect(outcome.error).toBeUndefined()
-        expect(outcome.settled).toBe(false)
+        await expect(run(client)).rejects.toBeInstanceOf(TimeoutError)
 
         proxy.refuseConnections(false)
-        await until(() => outcome.settled, 'the batch to run after reconnect')
-        expect(outcome.error).toBeUndefined()
-        expect(outcome.value).toEqual([1])
+        await until(() => client.isReady, 'the client to reconnect')
+        await expect(client.ping()).resolves.toBe('PONG')
+        expect(await raw.get('m:one')).toBeNull()
+        await expect(run(client)).resolves.toEqual([1])
+        expect(await raw.get('m:one')).toBe('1')
       },
       20000
     )
