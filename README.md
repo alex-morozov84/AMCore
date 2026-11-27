@@ -17,11 +17,13 @@ AMCore is a backend-first application starter for SaaS products, internal tools 
 
 ## Quick Start
 
-Install Git, OpenSSL and Docker with Compose v2.20.2 or newer. Docker supplies Node and pnpm.
-For [manual host development](docs/backend/api-build.md#development), follow the native setup instead.
-Agents use [managed local development](docs/operations/local-stands.md) for database writes and previews.
+For day-to-day development, [run the managed local stand](docs/operations/local-stands.md#develop-a-configured-product). From the project root, run `pnpm local` and open the printed URL. The managed stand uses Docker Compose 5.5.0 or newer and applies source edits automatically. Use `pnpm stand preview` to prepare a local acceptance scenario with the same automatic updates.
 
-For a product based on AMCore, follow [product initialization](docs/frontend/brand-theme-and-tokens.md#configure-a-new-product) and use [pnpm local](docs/operations/local-stands.md#develop-a-configured-product). See the [team workflow](docs/contributing/team-workflow.md) to start a task or hand it off for review.
+For a product based on AMCore, start with [product initialization](docs/frontend/brand-theme-and-tokens.md#configure-a-new-product). See the [team workflow](docs/contributing/team-workflow.md) for task setup and review.
+
+### Evaluate with Docker only
+
+Install Git, OpenSSL and Docker with Compose v2.20.2 or newer. Docker supplies Node and pnpm.
 
 For the Docker-only quick start below, use a fresh checkout and disposable local PostgreSQL and Redis. Compose runs migrations automatically.
 
