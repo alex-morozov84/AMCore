@@ -6,6 +6,7 @@ import { children, run as runProcess, setJournal } from './stand/process.mjs'
 import { docker } from './stand/docker.mjs'
 import { labels } from './stand/config.mjs'
 import { isProductStandId, localDispatchId, recoverLocalDispatch } from './stand/local-dispatch.mjs'
+import { localWatchStatus } from './stand/local-watch-status.mjs'
 import { localSummary } from './stand/local-summary.mjs'
 import { sourceSettings } from './stand/settings-policy.mjs'
 import { canonicalStringify } from './lib/path-algebra-canonical.mjs'
@@ -47,6 +48,8 @@ async function reportStatus(stands, selected) {
       console.log(
         `${stand.id}: ${running ? `running containers · ${stand.origins.product}` : 'no running containers'}`
       )
+      const watch = localWatchStatus(stand)
+      if (watch) console.log(`  Compose Watch: ${watch}`)
     } catch (error) {
       console.log(`${stand.id}: actual state unknown (${error.message})`)
     }

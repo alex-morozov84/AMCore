@@ -829,7 +829,8 @@ This profile copies a simulated client adapter only into the owned source
 snapshot. It refuses a normal worktree, mocked stand or E2E-purpose stand.
 It never enables backend MFA, binds a factor or grants account access. Reloading
 resets the UI example. Existing demo accounts and normal login remain separate.
-The managed inspection completes one setup/code-saving journey without tracing
+Select the saved-codes checkbox, then finish setup. The demo shows that sign-in
+protection is on. The managed inspection verifies this result without tracing
 or capturing secret steps. Do not treat simulation as backend security evidence.
 
 ### MFA in disposable browser tests
