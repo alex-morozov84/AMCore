@@ -1,12 +1,12 @@
 # ===========================================
 # Base — pinned runtime + package manager
 # ===========================================
-# Node 24 + pnpm 12.18.0 to match the repo's engines/packageManager (the root
+# Node 24 + pnpm 12.24.0 to match the repo's engines/packageManager (the root
 # package.json's `packageManager` drives the corepack version regardless of what
 # is prepared here, so they must agree — a Node 20 base broke pnpm 11).
-FROM node:24-alpine@sha256:a34ab6d7f6f4813f4d0c5469d74685604b962fbdbf5793a7bc7b4998ecb867c8 AS base
+FROM node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 AS base
 
-RUN corepack enable && corepack prepare pnpm@12.18.0 --activate
+RUN corepack enable && corepack prepare pnpm@12.24.0 --activate
 
 # pnpm store in a BuildKit cache mount shared with the api image and every other
 # build on the machine (see apps/api/Dockerfile for the rationale). Not baked
@@ -69,7 +69,7 @@ RUN BUILD_SOURCE_COMMIT="$BUILD_SOURCE_COMMIT" NODE_OPTIONS="$BUILD_NODE_OPTIONS
 # ===========================================
 # Runner — minimal, self-contained, non-root
 # ===========================================
-FROM node:24-alpine@sha256:a34ab6d7f6f4813f4d0c5469d74685604b962fbdbf5793a7bc7b4998ecb867c8 AS runner
+FROM node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 AS runner
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1

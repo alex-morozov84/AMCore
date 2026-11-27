@@ -85,7 +85,7 @@ later send the browser back to the search target.
 
 `useDebouncedDraft` stores only the **latest** expected self identity. It is
 appropriate when a newer navigation prevents an older unapplied response from
-becoming the view. In Next.js 16.4.5, a new navigate or Back/Forward restore discards the
+becoming the view. In Next.js 16.4.6, a new navigate or Back/Forward restore discards the
 pending App Router action. Recheck that behavior when changing Next.js. If a
 different transport may apply old responses, its feature adapter must first
 enforce this ordering; the shared hook does not cancel network requests.

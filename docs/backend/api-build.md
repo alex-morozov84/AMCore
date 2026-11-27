@@ -70,7 +70,7 @@ Use only disposable local services.
 
 For host package commands, use Node 24 from `.nvmrc` with the minimum patch in
 `package.json` (currently 24.15.0) and its exact `packageManager` pnpm version
-(currently 12.18.0). Check both versions before installing frozen dependencies.
+(currently 12.24.0). Check both versions before installing frozen dependencies.
 
 Use [pnpm local](../operations/local-stands.md#develop-a-configured-product) for
 the full product. For manual API diagnostics, check that `DATABASE_URL` and

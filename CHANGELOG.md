@@ -40,6 +40,11 @@ See [Create and update a product from AMCore](docs/operations/updating-a-fork.md
   integration, admin placement, audit events, deployment, recovery, secret rotation
   and MFA operations.
 
+### Changed
+
+- Update Next.js to 16.4.6 with the fragment-navigation patch, refresh the Node 24
+  API and web image pins, and update pnpm to 12.24.0.
+
 ### Fixed
 
 - Finish the account-security preview after confirming that the demo backup codes were saved.
