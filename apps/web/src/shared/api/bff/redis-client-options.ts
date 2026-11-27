@@ -3,7 +3,7 @@ import { createClient } from '@redis/client'
 import 'server-only'
 
 /**
- * Longest an ordinary command may wait in the client's queue before it is written. It covers
+ * Longest a command or batch may wait in the client's queue before dispatch. It covers
  * reconnect backoff and write backpressure. It never bounds connecting, a command that is already
  * written, or the whole request; the BFF keeps its own caller deadlines.
  */
