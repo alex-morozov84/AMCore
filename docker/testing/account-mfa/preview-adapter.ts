@@ -44,11 +44,16 @@ export function previewAdapter(scenario: Scenario): AccountMfaAdapter & { settin
     eligible: true,
     remainingCodes: available.size,
   })
-  const flow = (purpose: Flow['purpose'], state: Flow['state']): Flow => ({
+  const flow = (
+    purpose: Flow['purpose'],
+    state: Flow['state'],
+    flowBinding: string = crypto.randomUUID()
+  ): Flow => ({
     kind: 'flow',
     accountLabel,
     purpose,
     state,
+    flowBinding,
     ...((purpose === 'initial_setup' || purpose === 'login') && state === 'completed'
       ? { publication: 'confirmed' as const }
       : {}),
@@ -59,7 +64,7 @@ export function previewAdapter(scenario: Scenario): AccountMfaAdapter & { settin
   })
   const move = (state: Flow['state']) => {
     if (view.kind !== 'flow') throw new Error('DEMO_FLOW_REQUIRED')
-    view = flow(view.purpose, state)
+    view = flow(view.purpose, state, view.flowBinding)
     return view
   }
   const check = async (proof: MfaProof | undefined) => {
