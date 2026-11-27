@@ -75,6 +75,8 @@ in that case. The reporter can also be rerun with
 `node scripts/code-size-report.mjs` while the change is staged.
 
 `pnpm init:product` initializes a downstream fork's identity, brand assets and theme.
+For a new product, select and verify the supported release in the
+[fork update guide](docs/operations/updating-a-fork.md#initialize-once-from-the-supported-source-tag) before running the command.
 See [`docs/frontend/brand-theme-and-tokens.md` → Configure a new product](docs/frontend/brand-theme-and-tokens.md#configure-a-new-product).
 
 ### API-specific test commands
