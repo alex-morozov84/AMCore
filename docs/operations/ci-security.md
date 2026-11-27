@@ -588,7 +588,7 @@ against arbitrary future workload growth. Reassess capacity when the application
   round trip, and a from-scratch Grafana old-volume migration smoke.
 - **Script contracts** — job id `script-contracts`, runs `pnpm test:scripts`:
   every `scripts/lib/*.test.mjs` and `scripts/*.test.mjs`. These are unit and contract
-  tests of the repository's own tooling: the `init:brand` initializer with the engine
+  tests of the repository's own tooling: the `init:product` initializer with the engine
   core, filesystem transaction and AST core it uses, product-admin placement, lint,
   Lighthouse, migrator, API E2E and deployment contracts, and the check that Console
   tests do not spell the default Console address. They read the current public working

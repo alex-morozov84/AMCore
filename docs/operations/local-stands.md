@@ -12,6 +12,39 @@ Ordinary API deployments keep their environment override; managed CI uses this
 fixed setting to check disk headroom before dependency installation. See
 [runner disk cleanup](ci-security.md#docker-e2e-disk-preparation).
 
+## Develop a configured product
+
+Start Docker, then run `pnpm local` from the product root. Open the product URL
+in the final summary. The summary shows the enabled administration pages, service
+addresses and stand commands. PostgreSQL is reachable only inside Docker.
+Redis also has a loopback port.
+
+The stand assigns local ports, prepares its database and keys, and loads system
+data. A root `.env` is optional for this workflow. The stand preserves any
+existing root `.env`.
+
+After changing code or pulling a commit, run `pnpm local` again to rebuild and see the changes. Ordinary restarts preserve the local database and keys. Use `pnpm local status` to see the selected configuration and running containers in retained product stands and `pnpm local down` to stop product stands and retain their data.
+
+Within a checkout, `pnpm local` selects a local database from these settings:
+
+- The enabled site languages, their order, and the default site language.
+- The mode and alias of the Operations Console and of product administration.
+  An alias is a route segment such as `admin` or `manage`.
+
+Changing only the default language selects a separate database. Returning
+to the previous settings reuses the previous database if you retained it.
+Changes to code, themes, or CI keep the same database.
+
+When using a separate local HTTPS host, follow the browser trust instructions
+below. For native watch mode, see [API development](../backend/api-build.md#development).
+
+If a local switch is interrupted, run `pnpm local recover`. It releases the
+dispatcher lock after the owning process and its child operations have exited.
+It also clears interrupted startup locks that have no stand record.
+If a stand still has an interrupted per-stand operation, recover its ID with
+the stand recovery procedure below. Recovery preserves datasets unless you
+explicitly request a purge through the stand recovery procedure.
+
 ## Prerequisites and commands
 
 Install the repository's frozen dependencies. Use its supported Node/pnpm versions

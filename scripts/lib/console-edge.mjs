@@ -215,8 +215,7 @@ function caddyWithBlock(text, block) {
   return `${text.slice(0, afterComment)}${block}${text.slice(end)}`
 }
 
-export function consoleEdgeFiles(root, write = false) {
-  const settings = readConsoleEdgeSettings(root)
+export function planConsoleEdgeFiles(root, settings = readConsoleEdgeSettings(root)) {
   const wanted = new Map()
   const caddy = readFileSync(join(root, CADDY_FILE), 'utf8')
   wanted.set(CADDY_FILE, caddyWithBlock(caddy, renderConsoleCaddy(settings)))
@@ -225,6 +224,11 @@ export function consoleEdgeFiles(root, write = false) {
     NGINX_FILE,
     replaceBetween(nginx, NGINX_START, NGINX_END, renderConsoleNginxLocations(settings), NGINX_FILE)
   )
+  return wanted
+}
+
+export function consoleEdgeFiles(root, write = false) {
+  const wanted = planConsoleEdgeFiles(root)
   const stale = []
   for (const [file, content] of wanted) {
     const current = readFileSync(join(root, file), 'utf8')

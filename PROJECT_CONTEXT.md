@@ -13,11 +13,11 @@ separate product from the starter.
 - **Upstream sync policy:** N/A — this checkout is the canonical upstream.
 - **Workflow mode:** `strict` (protected `main`, PR-only, squash-only, required CI).
 - **Public workflow:** See `AGENTS.md` and `CONTRIBUTING.md`.
-- **Current maintainer status:** If `ai/` exists, read `ai/STATUS.md`.
+- **Current maintainer status:** In confirmed AMCore maintainer context, if `ai/` exists, read `ai/STATUS.md`.
 - **theme_persistence:** local-storage
 - **initialized_from_amcore_version:** N/A — this checkout is AMCore itself.
 
-One field per line, machine-editable by `pnpm init:brand` — do not fold multiple
+One field per line, machine-editable by `pnpm init:product` — do not fold multiple
 fields back into a single prose bullet.
 
 ## Mode Contract
@@ -45,6 +45,20 @@ For `downstream-product`, record at minimum:
 Do not infer mode from directory names, package names, git remotes, or the presence
 of GitHub settings. The owner of a downstream product must declare the mode here.
 
+## Team process
+
+In a product, `Team process` selects the rules for planning, implementation,
+checks and review. Use `amcore` for the [included process](docs/contributing/team-workflow.md),
+or `file:` followed by a tracked Markdown path inside this repository, for
+example `file:docs/team/Our process.md`. An absent field uses AMCore's process.
+If the selected file is missing, clarify the source before work that depends
+on it. A custom Git `Workflow reference` still governs Git delivery separately.
+
+Use the [wizard or edit the field directly](docs/frontend/brand-theme-and-tokens.md#choose-or-change-team-process).
+Record the team's queue location here when available. For a Git queue record
+its branch and path, for example `team/task-register:team/tasks/README.md`.
+Existing trackers keep their own identifiers.
+
 ## Build Settings
 
 Which locales the build serves and how the Operations Console is served are **settings
@@ -56,6 +70,10 @@ after a rebuild:
 | Served locales and the default locale                                    | `packages/shared/src/config/locales.json`       | [Locale settings](docs/frontend/i18n-and-errors.md#task-choose-the-served-locales) |
 | Operations Console mode (`disabled`, `path`, `host`) and its URL segment | `packages/shared/src/config/admin-console.json` | [Console settings](docs/operations-console/configuration.md#topology)              |
 | Product administration placement                                         | `packages/shared/src/config/product-admin.json` | [Product administration](docs/product-admin/placement-and-sessions.md)             |
+
+Theme availability is set in `apps/web/src/shared/lib/theme-availability.ts`.
+When both themes are available, `DEFAULT_THEME_SETTING` in `theme.ts` controls the
+first visit. Automatic GitHub checks follow `ci/product.json`.
 
 Storybook is part of every project, and the route-progress bar follows the
 `ROUTE_PROGRESS_ENABLED` source flag in
@@ -72,8 +90,8 @@ Two fields in this file describe the product's choices:
   initialized from, e.g. `v0.4.0`. It gives later work and upstream-sync decisions the
   fork's starting baseline.
 
-`pnpm init:brand` writes the identity, workflow, theme and
-`initialized_from_amcore_version` fields. No command edits the settings files.
+`pnpm init:product` writes product identity, workflow, the initialization baseline and selected build settings.
+Product administration placement and custom host changes follow their placement guide.
 
 ## Workflow Modes
 

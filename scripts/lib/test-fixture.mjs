@@ -1,10 +1,11 @@
 // Builds a disposable, git-initialized fixture tree mirroring just the
-// files init-brand touches, so scripts/init-brand.test.mjs can exercise the
+// files init-product touches, so scripts/init-product.test.mjs can exercise the
 // real entrypoint (via AMCORE_INIT_ROOT) instead of only its pure helpers.
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { LOCALE_CATALOGUES } from './settings-files.mjs'
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 
@@ -23,7 +24,7 @@ function write(root, relPath, content) {
 }
 
 export function createFixtureRepo() {
-  const root = mkdtempSync(path.join(tmpdir(), 'amcore-init-brand-test-'))
+  const root = mkdtempSync(path.join(tmpdir(), 'amcore-init-product-test-'))
 
   write(
     root,
@@ -77,6 +78,11 @@ export function createFixtureRepo() {
     `${JSON.stringify({ meta: { title: 'AMCore', description: 'Стартовый шаблон.' } }, null, 2)}\n`
   )
 
+  write(
+    root,
+    'packages/shared/src/config/locales.json',
+    JSON.stringify({ version: 1, enabled: LOCALE_CATALOGUES, default: 'en' }) + '\n'
+  )
   write(root, 'apps/web/public/logo-dark.png', fakePng(32, 32))
   write(root, 'apps/web/public/icons/icon-192x192.png', fakePng(192, 192))
 

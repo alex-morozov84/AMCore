@@ -306,7 +306,7 @@ together with the images.) After the rollout open
 For the first deployment, choose and commit these settings before building images, then use
 [Single-host deployment](../operations/single-host-compose.md) or the registry startup path
 in the deployment guide. Fork identity is a separate step:
-[initialize the brand](brand-theme-and-tokens.md#fork-initialization).
+[initialize the product](brand-theme-and-tokens.md#configure-a-new-product).
 
 **Recovery.** Before rollout, retain the previous settings, generated edge configuration and
 image digests. If verification fails, stop the rollout and follow the deployment guide's

@@ -1,6 +1,6 @@
 # AMCore Documentation
 
-[Local development, previews and browser tests](operations/local-stands.md). Agents use managed commands for local DB writes and previews.
+[Run a configured product locally](operations/local-stands.md#develop-a-configured-product). See also [managed development, previews and browser tests](operations/local-stands.md). Agents use managed commands for local DB writes and previews.
 
 The documentation map. The root [`README.md`](../README.md) is the project
 overview and quick start; **this page routes you to the right guide by intent**.
@@ -18,6 +18,9 @@ with this checkout. Required rules must be stated in the public guide or source
 comment. If a rule is available only through an unavailable record, report the gap.
 
 ## Find the right guide
+
+[Start a product task or hand it off for review](contributing/team-workflow.md).
+The product's [context](../PROJECT_CONTEXT.md#team-process) points to its chosen rules.
 
 [Add product administration to your product](product-admin/adoption.md) — shop, CRM/ERP and SaaS recipes, initialization and your own interface.
 [Create a company or prepare its first administrator](product-admin/organization-establishment.md) — policies, Console/CLI/API setup and recovery.
@@ -46,7 +49,7 @@ comment. If a rule is available only through an unavailable record, report the g
 | Make a page indexable by search engines, or keep the product closed to them              | [`frontend/seo.md`](frontend/seo.md)                                                                                                    |
 | Add a frontend test / pick the right layer                                               | [`frontend/testing.md`](frontend/testing.md)                                                                                            |
 | Write or review a Storybook story                                                        | [`frontend/storybook.md`](frontend/storybook.md)                                                                                        |
-| Initialize a downstream fork (rebrand, theme, icons)                                     | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#fork-initialization)                                          |
+| Initialize a product (identity, languages, theme, CI)                                    | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#configure-a-new-product)                                      |
 | Find recorded service problems and open their diagnostic source                          | [`operations-console/overview.md`](operations-console/overview.md#find-what-needs-checking)                                             |
 | Diagnose and safely control background work (or open the read-only queue board)          | [`operations-console/background-work.md`](operations-console/background-work.md), [`queue-board.md`](operations-console/queue-board.md) |
 | Check that nightly cleanups, the GeoIP update and recovery passes keep running           | [`operations-console/scheduled-jobs.md`](operations-console/scheduled-jobs.md)                                                          |
@@ -186,6 +189,8 @@ there, not here.
 [Place product administration and isolate host sessions](product-admin/placement-and-sessions.md) — configurable path alias, canonical addresses, login/logout boundaries and deployment.
 
 ## Help and contributions
+
+[Report an AMCore bug, documentation gap or reusable feature](../CONTRIBUTING.md#report-a-finding-to-amcore).
 
 Read [CONTRIBUTING.md](../CONTRIBUTING.md) before contributing.
 Use [GitHub issues](https://github.com/alex-morozov84/AMCore/issues) for reproducible bugs.

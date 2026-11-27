@@ -184,14 +184,31 @@ describe('getThemeInitScript', () => {
   it('runs and applies the stored setting when executed as a real script', () => {
     window.localStorage.setItem(THEME_STORAGE_KEY, 'dark')
 
-    expect(() => new Function(getThemeInitScript())()).not.toThrow()
+    expect(() => new Function(getThemeInitScript(null))()).not.toThrow()
 
     expect(document.documentElement.classList.contains('dark')).toBe(true)
     expect(document.documentElement.style.colorScheme).toBe('dark')
   })
 
+  it.each(['light', 'dark'] as const)(
+    'applies fixed %s even if storage is inaccessible',
+    (theme) => {
+      const storage = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new DOMException('Storage access denied', 'SecurityError')
+      })
+      try {
+        new Function(getThemeInitScript(theme))()
+        expect(storage).not.toHaveBeenCalled()
+        expect(document.documentElement.style.colorScheme).toBe(theme)
+        expect(document.documentElement.classList.contains('dark')).toBe(theme === 'dark')
+      } finally {
+        storage.mockRestore()
+      }
+    }
+  )
+
   it('falls back to the default setting when nothing is stored', () => {
-    new Function(getThemeInitScript())()
+    new Function(getThemeInitScript(null))()
 
     const expectedDark =
       DEFAULT_THEME_SETTING === 'dark' ||

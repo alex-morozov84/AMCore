@@ -116,14 +116,13 @@ Creating repositories, pushing code and changing settings require the product ow
    For a Fork, inspect `origin/main`: it must equal the selected source commit for this initial delivery.
    If it already contains later commits, do not rewind it. Use a supported tag matching that head or the independent-copy route.
 
-4. Follow [product initialization](../product-admin/adoption.md#initialize-a-clean-product) to prepare dependencies and run `pnpm init:brand`.
-   Set product name, purpose, description, workflow and upstream sync policy. Declare reviewed release merges as the sync policy.
+4. Follow [product initialization](../product-admin/adoption.md#initialize-a-clean-product) to prepare dependencies and run `pnpm init:product`.
+   Use the wizard directly or [ask an agent to guide setup in chat](../frontend/brand-theme-and-tokens.md#configure-a-product-with-an-agent).
+   Choose the [team process](../frontend/brand-theme-and-tokens.md#choose-or-change-team-process) separately from how the team accepts changes and which automatic checks to run. You can defer the update policy. Follow this guide if you later adopt supported releases.
    Run initialization before any product commit or tag namespacing. Verify `initialized_from_amcore_version` equals `SOURCE_TAG`.
    Preserve that value thereafter; it describes the starting point, not the latest update.
    Resolve verification failures using the [initializer recovery guide](../frontend/brand-theme-and-tokens.md#recover-from-a-failure).
-   Before the first push, decide how your team accepts changes. Then choose the
-   [automatic checks](ci-security.md#choose-automatic-checks-for-a-product) and
-   record the choice in `ci/product.json`. Check what could have broken by default.
+   Confirm the [automatic checks](ci-security.md#choose-automatic-checks-for-a-product) choice in `ci/product.json` before the first push.
    Commit the inspected initialization changes only after the value and checks are correct.
 
 5. **Independent copy only, before creating any product release tags:** list all copied `v*` tags,
@@ -301,7 +300,7 @@ obey mandatory intermediate releases or migrations. Break a difficult update int
 | Messages                  | Keep upstream and product keys in every catalogue. Separate product namespaces may help but do not guarantee conflict-free merges                                                                                                               |
 | Composition and exports   | Preserve product registrations and inspect upstream API changes. Type errors help; a clean merge can still remove a used export                                                                                                                 |
 | Prisma                    | Preserve shared migration files; inspect both schema changes and SQL effects. Different filenames can still create the same column                                                                                                              |
-| Identity and settings     | Preserve product identity, original provenance, workflow policy, locales, Console mode/alias and product-admin host/path. Regenerate edge mappings from the retained settings                                                                   |
+| Identity and settings     | Preserve product identity, original provenance, team process and queue references, Git workflow policy, locales, Console mode/alias and product-admin host/path. Regenerate edge mappings from the retained settings                            |
 | README and releases       | Keep product identity/introduction in README. Leave root CHANGELOG.md AMCore-owned and unedited by the product; put product notes in a separate named file such as PRODUCT-CHANGELOG.md. Product package version is not an upstream sync marker |
 
 Keep product contributor instructions and the PR template aligned with the separate product notes file.

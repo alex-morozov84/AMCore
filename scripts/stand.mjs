@@ -1,3 +1,4 @@
+import { localDispatchId } from './stand/local-dispatch.mjs'
 import { closedSignupOAuthProfile } from './stand/apple-oauth-fixture.mjs'
 import { preservedTopology } from './stand/settings-policy.mjs'
 import { projectChoices } from './stand/project.mjs'
@@ -77,6 +78,7 @@ if (lane === 'console-real-stack') topology = 'host'
 if (settingsPolicy === 'preserve' && ['up', 'preview', 'e2e'].includes(action))
   topology = preservedTopology(lane, await projectChoices(root))
 const id = value('--id', action === 'e2e' ? `e2e-${randomUUID()}` : 'preview')
+if (id === localDispatchId) throw new Error('Use pnpm local recover for the local dispatcher')
 // Explicit risk acceptance for a build whose Docker export is not proved finished;
 // recorded in the manifest as acceptance, never as proof (see local-stands guide).
 const cleanupOptions = { acceptReason: value('--accept-unresolved-build') }

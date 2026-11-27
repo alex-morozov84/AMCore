@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+import { getThemeInitScript, THEME_STORAGE_KEY } from '../../src/shared/lib/theme'
+import { fixedTheme } from '../../src/shared/lib/theme-availability'
 import { productPath } from '../shared/product-settings'
 
 /**
@@ -62,13 +64,14 @@ test('the theme-init script carries the CSP nonce and still applies the theme be
   const csp = raw.headers()['content-security-policy-report-only']
   const nonce = csp!.match(/'nonce-([^']+)'/)?.[1]
   const html = await raw.text()
-  expect(html).toContain(`<script nonce="${nonce}">(function(){try{var k=`)
+  expect(nonce).toBeTruthy()
+  expect(html).toContain(`<script nonce="${nonce}">${getThemeInitScript()}</script>`)
 
-  await page.addInitScript(() => window.localStorage.setItem('amcore-theme', 'dark'))
+  await page.addInitScript((key) => window.localStorage.setItem(key, 'dark'), THEME_STORAGE_KEY)
   await page.goto(productPath('/login'))
 
   const isDark = await page.evaluate(() => document.documentElement.classList.contains('dark'))
-  expect(isDark).toBe(true)
+  expect(isDark).toBe((fixedTheme() ?? 'dark') === 'dark')
 })
 
 test('a hostile inbound Content-Security-Policy request header cannot override the framework nonce', async ({

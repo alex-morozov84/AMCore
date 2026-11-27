@@ -44,7 +44,7 @@ function collides(segment, alias) {
   return segment === alias || segment?.startsWith('[') || segment?.startsWith('(')
 }
 
-export function inspectProductAdminPlacement(root, candidateAlias) {
+export function inspectProductAdminPlacement(root, candidateAlias, proposed = {}) {
   const config = readProductAdminPlacement(root)
   const alias = candidateAlias ?? config.alias
   if (!/^[a-z][a-z0-9_-]{0,31}$/.test(alias)) throw new Error('Invalid product-admin alias')
@@ -54,7 +54,7 @@ export function inspectProductAdminPlacement(root, candidateAlias) {
   const routeRoot = join(app, '[locale]')
   if (!existsSync(routeRoot)) throw new Error('Missing physical [locale] route folder')
   // Validated with the shared schema's rules: a wrong locales file stops here, not later.
-  const { enabled: locales, default: defaultLocale } = readLocaleSettings(root)
+  const { enabled: locales, default: defaultLocale } = proposed.locales ?? readLocaleSettings(root)
   const localized = locales.length > 1
   const ownedGroup = join(routeRoot, '(product-admin)')
   const physicalRoot = join(ownedGroup, config.alias)

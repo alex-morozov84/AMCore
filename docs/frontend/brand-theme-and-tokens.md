@@ -16,9 +16,8 @@ covers layers and routing, this one covers the visual/token layer.
    documented CSS-variable theming convention.
 
 `@custom-variant dark (&:where(.dark, .dark *));` makes Tailwind's `dark:`
-prefix follow the `.dark` class (toggled by the app's own theme switch), not
-the browser's `prefers-color-scheme` media query directly — that's what lets
-a user override their OS preference.
+prefix follow the `.dark` class. The app sets that class from the product's
+theme configuration, the saved browser preference, or the device setting.
 
 ### Token set
 
@@ -72,10 +71,16 @@ Tailwind utility, not a repeated arbitrary-value class at every call site:
 
 ## Light / dark / system modes
 
-Default is **`system`**: the resolved theme follows the OS preference unless
-the user has explicitly picked one. A downstream product that doesn't want a
-toggle can force `light` or `dark` as the fixed setting instead — see the
-[rebrand checklist](#downstream-rebrand-checklist).
+When both themes are available, AMCore uses the browser's saved theme choice.
+Without a saved choice, the product default applies. AMCore starts with
+**`system`**, which follows the device setting. A product can add a theme
+switch using `useTheme()`. The starter UI has no built-in theme switch.
+
+A light-only or dark-only product always uses that theme. The fixed theme
+leaves the saved choice intact. For example, a browser that saved dark shows
+light while the product allows only light. When the product enables both
+themes again, the browser uses dark if the saved choice is still available
+at the same site origin (scheme, host, and port).
 
 AMCore's default persistence model is **static-friendly client persistence**:
 the browser stores the user's choice in `localStorage`, the pre-hydration script
@@ -98,7 +103,7 @@ exposes it to React via `useTheme()` (`setting`, `resolvedTheme`, `setTheme`).
 ## No-flash: the pre-hydration script
 
 The locale layout runs `getThemeInitScript()` as an inline script at the
-start of the body. It applies the stored choice or the system preference
+start of the body. It applies the fixed theme or resolves the saved choice and product default
 before the page content paints. Keep the script code-owned and pass the
 request nonce. See [Browser security headers and CSP](./browser-security-and-csp.md).
 
@@ -167,123 +172,119 @@ migration mirror. If a product keeps AMCore's default strategy, do not call
   `globals.css`'s light-mode `background`/`primary` by hand if that palette
   changes.
 
-## Downstream rebrand checklist
+## Configure a new product
 
-A downstream product forks `apps/web` in place (per ADR-063's fork-in-place
-model). `pnpm init:brand` (ADR-071) automates most of this — a repeatable,
-non-destructive prompt/flag-driven script — leaving only what a script
-cannot safely do for you:
+Run the wizard in a clean product checkout with the workspace dependencies installed. For a release-based product, first follow [source-tag setup](../operations/updating-a-fork.md#initialize-once-from-the-supported-source-tag).
 
-1. **Logo** — supply your own light/dark PNGs; `init:brand` validates and
-   copies them to `public/logo-dark.png` / `logo-light.png` for you (never
-   generates them).
-2. **PWA icons** — supply each size from `public/icons/README.md`;
-   `init:brand` validates exact pixel dimensions and copies them into place.
-   `manifest.ts`'s `background_color`/`theme_color` are **not** automated —
-   update those by hand to match your new palette.
-3. **Site metadata** — `init:brand` updates `manifest.ts`'s `name`/
-   `short_name`/`description`, root `package.json`'s `name`/`description`,
-   and `app/[locale]/layout.tsx`'s actual metadata source
-   (`messages/en.json`'s `meta.title`/`meta.description`; `ru.json`'s
-   `meta.title` only — `meta.description` is never auto-translated, update
-   it by hand).
-4. **Theme tokens** — edit `globals.css`'s `:root`/`.dark` values by hand;
-   not automated. Keep the `@theme inline` bridge and the token _names_
-   stable if you can — other code depends on the names existing, not their
-   values.
-5. **Theme mode** — `init:brand` can set `DEFAULT_THEME_SETTING` in
-   `theme.ts` for you (pass the mode, or answer the prompt) if your product
-   forces `light`/`dark` only instead of `system` + a toggle; the resolution
-   logic already supports a fixed setting with no further code changes.
-   Not exposing a toggle in your UI stays a manual step.
-6. **Theme persistence strategy** — `init:brand` records your choice
-   (AMCore's default static-friendly `localStorage`, or the
-   [cookie-backed SSR variant](#cookie-backed-ssr-theme-advanced-variant))
-   in `PROJECT_CONTEXT.md`'s `theme_persistence` field. It does not generate
-   the cookie-backed SSR variant's code — that stays the manual recipe
-   linked above if you choose it.
+1. Run `pnpm init:product` and choose English or Russian for the wizard.
+2. Choose the languages the site serves. English and Russian ship with interface and email translations. One language gives pages bare paths such as `/login`. Two give pages language prefixes such as `/en/login` and `/ru/login`. [Add another language](i18n-and-errors.md#recipe-add-a-third-locale) before enabling it. Once you add another catalogue, manage product settings manually. The wizard supports English and Russian catalogues and exits before writing in a checkout with additional catalogues.
+3. Choose whether to enter the name and description once for both languages or separately for each language. The name appears in browser tabs (`<title>`). An optional description supplies `<meta name="description">`. The default language supplies the name and description for the install manifest.
+   - On first setup, if you skip a description and the catalogue still has the original AMCore description, the wizard replaces it with the product name in that catalogue. This also applies to a language you leave disabled.
+   - On later runs, temporarily disabling a language keeps its existing `meta.title` and `meta.description`. To edit them directly, use `apps/web/messages/en.json` for English or `apps/web/messages/ru.json` for Russian.
+4. Choose available themes and, when both are available, the first-visit setting. A fixed theme applies before the first page paint, including when browser storage is unavailable. Storybook keeps both themes. Choose whether to show the top navigation progress bar. [Theme behavior](#light--dark--system-modes) and [navigation progress](route-progress.md).
+5. Enable or disable the path-based Operations Console. Existing aliases and host placements are retained. To change them later, follow the [Console guide](../operations-console/configuration.md#topology) or [product administration guide](../product-admin/placement-and-sessions.md#configure-or-move-the-administration-area).
+6. Keep or replace the three install icons. Supply ready PNG files in the sizes listed in [the icon guide](../../apps/web/public/icons/README.md). Logo assets and color tokens are separate customizations.
+7. Choose the team's Git workflow, [team process](#choose-or-change-team-process) and [automatic checks](../operations/ci-security.md#choose-automatic-checks-for-a-product). Configure GitHub branch protection separately. Review the settings summary. Choose **Show file changes** to inspect the full plan and return to the decision. The wizard initially selects **Exit without writing**. Choose **Apply settings** when you are ready to save. The wizard records the starting Git version when first establishing product identity.
+8. Start Docker and run `pnpm local` from the project root. Open the URL it prints. See [the local development lifecycle](../operations/local-stands.md#develop-a-configured-product).
 
-It also records `PROJECT_CONTEXT.md`'s identity fields (`Mode`, `Product`,
-`Purpose`, upstream-sync policy, workflow mode, `initialized_from_amcore_version`)
-when you answer the corresponding prompts.
+The wizard writes the files the application and CI read. It previews locale-dependent proxy output alongside source settings and writes the approved plan together. It runs type and lint checks after writing. Prepare the shared build and generated Prisma client as described in [product adoption](../product-admin/adoption.md#initialize-a-clean-product). Source changes require a new web build. Commit or stash local edits before applying another run. Rerun the wizard to edit settings.
 
-`init:brand` finishes planning before it asks for confirmation.
-That plan includes an immutable snapshot of any supplied logo or icon, so a
-source file changed after the prompt cannot change what is applied. A confirmed
-run writes its complete filesystem plan as one transaction. When a write fails, the
-command tries to roll the tree back and its message says whether the rollback
-completed; see "Recover from a failure" below. Dry runs, cancelled prompts, and
-plans with no changes never start a transaction.
+### Choose or change team process
 
-`init:brand` prepares writes to fixed brand paths and applies them in one
-filesystem transaction. If the command cannot identify a field unambiguously,
-it stops before writing. To apply the plan, use a clean Git working tree in a
-checkout without an `ai/` folder. Confirm at the prompt or pass `--yes`.
+The wizard asks which process the team and its agents should follow. Use the
+included [AMCore process](../contributing/team-workflow.md) or choose a
+repository-relative path to a readable, tracked Markdown file. For example,
+use `docs/team/Our process.md`. Repository rules and CI remain separate.
 
-For a complete product-administration setup, see the
-[adoption guide](../product-admin/adoption.md). Install changed manifests and
-complete deferred checks before adding custom consumers. The cosmic example changes
-product-owned semantic token values while preserving theme persistence, font mapping
-and chart tokens.
+First setup defaults to AMCore. On later runs, **Keep the current choice**
+preserves the saved value, even if the file has disappeared. A missing file
+appears in the preview. When the agent cannot read the chosen file, it names
+the path and asks for a correction before dependent work.
 
-### Fork initialization
+In an initialized product, edit [`PROJECT_CONTEXT.md`](../../PROJECT_CONTEXT.md#team-process).
+Replace the `Team process` line, or add this complete line under **Identity**
+after **Workflow mode** if the field is absent:
 
-For release-based products, first follow the [source-tag and provenance order](../operations/updating-a-fork.md#initialize-once-from-the-supported-source-tag).
-Initialize at the original plain source tag before product commits or tag namespacing,
-then verify `initialized_from_amcore_version` equals that tag.
+```md
+- **Team process:** file:docs/team/Our process.md
+```
 
-Run `pnpm init:brand` while initializing a fresh downstream fork, before applying
-that fork's database migrations. It writes source files only; it never connects to or
-migrates a database. `pnpm init:brand` is the only initializer command. The commands
-that exist are the scripts in the root `package.json`.
+Use the path to your tracked Markdown file. To choose the included process,
+use `- **Team process:** amcore`. Review and commit the change under your
+product's rules. The wizard never creates a queue or task files.
 
-Every flag is optional, and a field you do not pass keeps its current value. In an
-interactive terminal without value flags the command asks for the values instead.
+The wizard can preview changes in a checkout with a root `ai/` directory.
+Its ordinary apply path blocks writes there. For a first setup, initialize
+a clean product checkout before adding such a directory. In an initialized
+product with its own directory, use the direct edit described above. The
+agent can still read an explicitly selected file tracked by the product.
 
-| Flag                                              | What it writes                                                                                                                                                                             |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--product-name`                                  | `PROJECT_CONTEXT.md` `Product` (and `Mode: downstream-product` while it still says `upstream-starter`), `manifest.ts` `name`/`short_name`, `meta.title` in both catalogues                 |
-| `--product-description`                           | root `package.json` `description`, `manifest.ts` `description`, `en.json` `meta.description`                                                                                               |
-| `--purpose`, `--upstream-sync-policy`             | `PROJECT_CONTEXT.md` `Purpose` and `Upstream sync policy`. Pass your own sentences. Without the flag the current text stays; the interactive prompt shows the current text as its default. |
-| `--workflow-mode`                                 | `PROJECT_CONTEXT.md` workflow mode: `strict`, `flexible` or `custom`                                                                                                                       |
-| `--theme-mode`                                    | `DEFAULT_THEME_SETTING` in `theme.ts`: `system`, `light` or `dark`                                                                                                                         |
-| `--theme-persistence`                             | `PROJECT_CONTEXT.md` `theme_persistence`: `local-storage` or `cookie-ssr` (a record; it does not generate the cookie variant)                                                              |
-| `--package-name`                                  | root `package.json` `name`                                                                                                                                                                 |
-| `--logo-dark`, `--logo-light`                     | paths to your PNG files, copied to `public/logo-dark.png` and `public/logo-light.png`                                                                                                      |
-| `--icon-192`, `--icon-512`, `--icon-512-maskable` | paths to your PNG files with the exact pixel size, copied into `public/icons/`                                                                                                             |
-| `--dry-run`                                       | prints the plan and diffs without writing any file                                                                                                                                         |
-| `--yes`                                           | applies the plan without the confirmation prompt                                                                                                                                           |
+### Configure a product with an agent
 
-For a real product pass at least `--product-name` and `--product-description`, plus
-`--purpose` and `--upstream-sync-policy`: a field you leave out keeps the starter's text,
-so `Purpose` would still describe AMCore. `--package-name` is also optional; without it the
-root package keeps the name `amcore`.
+Ask the agent to set up your product in chat. You can give it the product name
+and first feature in the same request. The agent carries that request through setup.
 
-After it writes, the command runs `pnpm typecheck` and `pnpm lint` as a check. They need
-installed dependencies and the generated Prisma client and shared build; the setup block in
-the [adoption guide](../product-admin/adoption.md#initialize-a-clean-product) prepares them.
+1. Confirm the product directory and intended repository visibility. If you are
+   creating a product, check the supported starting release in the
+   [fork guide](../operations/updating-a-fork.md). Agree on a specific commit
+   separately for a local trial. Repository creation and remote delivery require
+   their own authorization.
+2. The agent opens `pnpm init:product` in an interactive terminal it can keep
+   open across chat turns. It starts without answer flags and enters earlier
+   answers only when their questions appear. It explains defaults before
+   accepting them. When it needs an answer, it leaves the wizard open and
+   ends its chat turn so you can reply. Choose English or Russian for setup
+   separately from the site's languages. The wizard's options depend on
+   earlier answers. The agent enters free text literally.
+   The wizard has no question for the team's purpose. The agent keeps any
+   purpose you give in the conversation for later product work. For first setup,
+   it shows that `PROJECT_CONTEXT.md` will contain `To be defined.` for Purpose.
+   The site description still goes to the site and install metadata.
+3. At **Apply these product settings?**, the agent selects **Show file changes**
+   and returns to the menu. It uses the actual preview to report the product
+   directory, affected files and effective settings. It checks what is saved
+   and explains example addresses and deferred work. For replacement icons it
+   identifies the source, size and destination. It leaves the wizard open
+   and ends its chat turn. You can then approve that preview for that directory.
+4. The agent checks the directory, Git branch and commit before selecting
+   **Apply settings** in the same terminal session. The wizard keeps the
+   prepared writes, including icon contents, in that session. On refusal,
+   the agent selects **Exit without writing**. If the answers, checkout or
+   session change before applying, it prepares a fresh preview and asks again.
+   If applying was interrupted, it checks the files and transaction journal
+   using [failure recovery](#recover-from-a-failure) before attempting a retry.
+5. The agent reports whether files were written and what the checks found.
+   If verification fails after writing, the agent identifies the failed check,
+   explains that the files are already changed, and follows
+   [failure recovery](#recover-from-a-failure). It holds off on applying again
+   and launching. After successful checks, it runs `pnpm local` if you requested
+   or agreed to launch and checks the printed URL. If launch is unavailable, it gives the command and the
+   missing prerequisite. The agent explains what is available and returns to
+   the feature you originally requested.
 
-The first run also writes `initialized_from_amcore_version` while it still says `N/A`. The
-value is the Git tag of the current commit, or the short commit SHA when the commit has
-no tag. `Canonical upstream` stays the AMCore URL, because AMCore is the original upstream.
+If the agent cannot keep the terminal open, it hands you the answers collected
+so far. Open `pnpm init:product` in the product directory, enter the answers,
+and review the new preview before confirming there. Approval of a previous
+preview expires with its session. Separate `--dry-run` and `--yes` runs each
+build a new plan.
 
-The command does not choose the served locales or the Operations Console mode: those are
-settings files, listed in `PROJECT_CONTEXT.md` → "Build Settings". It never edits the color tokens in `globals.css` or
-`manifest.ts` `background_color`/`theme_color`; update those by hand (checklist items 2 and 4).
+### Scripted initialization
 
-Run it again whenever a value must change. Pass only the flags to change, with `--dry-run`
-first. A plan with no changes writes nothing. Commit or stash your own work first: after it
-prints the plan and before it asks for confirmation, the command refuses to write into a tree
-with uncommitted changes (the message starts with "working tree is not clean"). Untracked files
-that Git does not ignore count as changes. The command checks the tree and the
-planned destinations again before writing. If a destination changed after the
-plan appeared, run the command again and review the fresh diff.
+Use `--non-interactive` to suppress questions. Field flags answer individual questions. `--setup-language en|ru` chooses only the wizard language. Use `--dry-run` for a preview, or `--yes` to authorize a noninteractive write. On first setup, provide a name for the default site language, including for a preview. Omitted fields keep their current values unless first initialization requires starter metadata replacement.
 
-When replacing a PNG, the destination must already be a regular file. If it is
-missing, restore the starter PNG before running the command again. An installed
-PNG with matching bytes and permissions needs no write.
+| Setting                         | Flags                                                                                                                     |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Identity and purpose            | `--product-name`, `--name-en`, `--name-ru`, `--purpose`, `--package-name`                                                 |
+| Site languages and descriptions | `--locales en,ru`, `--default-locale ru`, `--description-en`, `--description-ru`                                          |
+| Appearance                      | `--theme-availability both\|light\|dark`, `--theme-mode system\|light\|dark`, `--route-progress on\|off`                  |
+| Console                         | `--console-mode path\|disabled`                                                                                           |
+| Install PNGs                    | `--icon-192`, `--icon-512`, `--icon-512-maskable`                                                                         |
+| Team process                    | `--team-process amcore` or `--team-process "file:docs/team/Our process.md"`                                               |
+| Git and CI                      | `--workflow-mode`, `--workflow-reference` for custom rules, `--ci-mode normal\|full\|heavy-off`, `--upstream-sync-policy` |
 
-#### Recover from a failure
+To replace the public logo assets, copy the appropriate PNG files into `apps/web/public` and wire them into the product interface. Follow the cookie-backed theme recipe separately if your product needs it. Edit the light and dark tokens and manifest colors together when rebranding.
+
+### Recover from a failure
 
 Read the last message of the command before you do anything else. Do not assume that an error
 means nothing was written.
@@ -295,7 +296,7 @@ means nothing was written.
    next run on purpose. Keep the journal and the tree as they are. The message lists the recovery
    steps: restore the recorded states in reverse order, check the tree, and only then remove the
    journal. Never delete the journal only to get past the block. The tree was clean before the
-   run and the command writes only the paths named in the flag table, so `git status` and
+   run and the command writes only the paths shown in the preview, so `git status` and
    `git diff` show exactly what changed; compare them with the recorded states in the journal
    before you restore anything. If the message does not list the steps, stop and ask the
    maintainers of your fork; do not guess.

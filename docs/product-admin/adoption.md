@@ -58,12 +58,12 @@ node scripts/api-e2e-ci.mjs --prepare
 pnpm exec husky
 ```
 
-1. Initialize product identity. The values below belong to this example; substitute
+1. Initialize product identity. Use the wizard, [ask an agent to guide setup in chat](../frontend/brand-theme-and-tokens.md#configure-a-product-with-an-agent), or use the following commands. The values below belong to this example; substitute
    your product's identity for a real fork. Inspect the dry run, then apply it.
 
    ```sh
-   pnpm init:brand --product-name 'Example staff app' --purpose 'Internal staff administration' --product-description 'Example staff application' --upstream-sync-policy 'Manual reviewed updates' --workflow-mode flexible --theme-mode system --theme-persistence local-storage --package-name example-staff-app --dry-run
-   pnpm init:brand --product-name 'Example staff app' --purpose 'Internal staff administration' --product-description 'Example staff application' --upstream-sync-policy 'Manual reviewed updates' --workflow-mode flexible --theme-mode system --theme-persistence local-storage --package-name example-staff-app --yes
+   pnpm init:product --non-interactive --product-name 'Example staff app' --purpose 'Internal staff administration' --description-en 'Example staff application' --upstream-sync-policy 'Manual reviewed updates' --workflow-mode flexible --theme-mode system --package-name example-staff-app --dry-run
+   pnpm init:product --non-interactive --product-name 'Example staff app' --purpose 'Internal staff administration' --description-en 'Example staff application' --upstream-sync-policy 'Manual reviewed updates' --workflow-mode flexible --theme-mode system --package-name example-staff-app --yes
    ```
 
 2. Inspect the changes. With these flags, the brand files are the paths below.

@@ -12,22 +12,30 @@ Claude Code reads it via the `@AGENTS.md` import in `CLAUDE.md`.
 1. Read `PROJECT_CONTEXT.md`. It declares whether this checkout is the AMCore
    upstream starter or a downstream product, and which workflow mode applies
    (`strict`, `flexible`, or `custom`). Do not guess from git remotes or names.
-   If the file is missing or still says `upstream-starter` in a product fork, stop
-   and ask the owner to initialize it. The supported fork-initialization path is
-   `pnpm init:brand`, which writes the product identity, workflow and theme fields; see
-   `docs/frontend/brand-theme-and-tokens.md#fork-initialization`. Served locales and the
-   Console mode are build settings in `packages/shared/src/config/*.json`, not fields
-   there (see `PROJECT_CONTEXT.md` → _Build Settings_). A frontend Route Handler is not
-   a NestJS backend controller.
-2. Detect the working-context overlay:
-   - **`ai/` directory present** → maintainer copy of the product named in
-     `PROJECT_CONTEXT.md`. ALSO read, in order: `ai/README.md` (private-repo
-     boundary and document map), `ai/STATUS.md` (current state), `ai/BACKLOG.md`
-     (only unfinished-work queue), `ai/WORKFLOW.md` (working rules), and
-     `ai/DECISIONS.md` (ADR index).
-   - **No `ai/` directory** → public contributor/product-fork mode. This file,
-     `PROJECT_CONTEXT.md`, `CONTRIBUTING.md`, and public `docs/` are complete; do
-     **not** look for private maintainer context.
+   For a new product request or work in a confirmed product awaiting setup,
+   offer to run [product setup in chat](docs/frontend/brand-theme-and-tokens.md#configure-a-product-with-an-agent).
+   Answer reference questions first. Offer setup once in an established product
+   context and respect a deferral. Ordinary AMCore work and initialized products
+   follow their existing workflows. If identity is missing or contradictory,
+   clarify the target before product writes. New products use a separate checkout.
+   Served locales and Console mode are build settings in
+   `packages/shared/src/config/*.json`. See `PROJECT_CONTEXT.md` → _Build Settings_.
+   A frontend Route Handler and a NestJS backend controller have separate roles.
+2. Use the instructions for the established checkout role:
+   - **Downstream product** → resolve [Team process](PROJECT_CONTEXT.md#team-process)
+     before task work. Read the selected file, then the task and relevant technical
+     guide. If a selected file is unavailable, name the saved path and ask
+     the team to confirm the source. Wait before applying team-specific rules.
+     Any planning that can proceed independently can use the technical guides.
+     A nearby or renamed file becomes authoritative only after confirmation.
+     A product's own local folders do not select AMCore's
+     maintainer instructions.
+   - **AMCore maintainer work** → when the assignment and checkout establish the
+     AMCore maintainer context and its private overlay is available, also read
+     `ai/README.md`, `ai/STATUS.md`, `ai/BACKLOG.md`, `ai/WORKFLOW.md`,
+     and `ai/DECISIONS.md`.
+   - **Public contributor work** → follow this file, `CONTRIBUTING.md` and
+     public `docs/`.
 
 **Do not infer live enforcement from tracked files** — workflows, `.github/rulesets/*.json` and
 hooks _declare_ the intended policy; GitHub-side enforcement is external repository state applied
@@ -66,7 +74,7 @@ pnpm test               # unit tests  pnpm build       # build all
 pnpm test:background-work-contracts # isolated work registration/control/provider safety (Docker)
 pnpm test:extension-contracts  # isolated notification/AI registration + upgrade conformance (Docker)
 pnpm --filter api organization:setup -- status # inspect trusted initial organization setup
-pnpm init:brand         # downstream fork identity/brand/theme initializer
+pnpm init:product         # downstream fork identity/brand/theme initializer
 node scripts/api-e2e-ci.mjs --prepare # generate Prisma and build shared for API E2E
 pnpm --filter api test:e2e            # e2e (Jest + Testcontainers, needs Docker)
 pnpm --filter api db:migrate          # prisma migrate dev (LOCAL dev only)
@@ -396,6 +404,12 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
 - **Docs example tokens must be obviously fake** (truncate `...`, bracket
   `<...>`/`{...}`, or reuse the canonical fake key) — real-shaped secrets fail the
   gitleaks gate.
+
+For a starter defect, documentation gap or reusable feature found during product
+work, offer to [report the finding to AMCore](CONTRIBUTING.md#report-a-finding-to-amcore).
+Use the shared [upstream issue skill](.agents/skills/amcore-upstream-issue/SKILL.md).
+When receiving a product report in AMCore, also follow the
+[triage guidance](CONTRIBUTING.md#triage-a-report-in-amcore) before proposing a task.
 
 ## Skills for project actions
 

@@ -25,11 +25,11 @@ inline exceptions and paired presets. Run `pnpm lint:fix` for supported autofixe
 | `pnpm test`                                                       | Run all unit tests                                                                                                                                                                                                                                   |
 | `pnpm format:check`                                               | Check Prettier formatting                                                                                                                                                                                                                            |
 | `pnpm format`                                                     | Format code with Prettier                                                                                                                                                                                                                            |
-| `pnpm init:brand`                                                 | Initialize a downstream fork's identity, brand, assets, and theme choices                                                                                                                                                                            |
+| `pnpm init:product`                                               | Initialize a downstream fork's identity, brand, assets, and theme choices                                                                                                                                                                            |
 | `docker compose --profile local-infra --profile monitoring up -d` | Optional dev-only Prometheus + Grafana + Alertmanager harness scraping this stack's real metrics — needs `METRICS_AUTH_TOKEN`/`GF_SECURITY_ADMIN_PASSWORD` set in `.env`; see [`docs/operations/observability.md`](docs/operations/observability.md) |
 | `pnpm test:observability-contract`                                | Static observability-contract checks (metric references, runbook links/anchors/panel citations, private-path ratchet, image-pin consistency) — no Docker needed                                                                                      |
 | `pnpm test:observability-contract:live`                           | Live observability-contract checks — boots the monitoring harness above and Grafana's old-volume migration smoke, then tears both down; needs Docker                                                                                                 |
-| `pnpm test:scripts`                                               | Script contract tests (init:brand with its engine core, product-admin placement, lint, Lighthouse, migrator and deployment tooling); the CI job "Script contracts" runs this command                                                                 |
+| `pnpm test:scripts`                                               | Script contract tests (init:product with its engine core, product-admin placement, lint, Lighthouse, migrator and deployment tooling); the CI job "Script contracts" runs this command                                                               |
 
 `pnpm test:extension-contracts` runs notification/channel/tool/provider registration
 and migration conformance in an isolated copy with PostgreSQL/Redis Testcontainers.
@@ -71,8 +71,8 @@ parse a changed file, without blocking the commit; inspect the diff directly
 in that case. The reporter can also be rerun with
 `node scripts/code-size-report.mjs` while the change is staged.
 
-`pnpm init:brand` initializes a downstream fork's identity, brand assets and theme.
-See [`docs/frontend/brand-theme-and-tokens.md` → Fork initialization](docs/frontend/brand-theme-and-tokens.md#fork-initialization).
+`pnpm init:product` initializes a downstream fork's identity, brand assets and theme.
+See [`docs/frontend/brand-theme-and-tokens.md` → Configure a new product](docs/frontend/brand-theme-and-tokens.md#configure-a-new-product).
 
 ### API-specific test commands
 
@@ -175,6 +175,81 @@ docs: update quick start env step
 chore: unify github repository url
 ```
 
+## Team process for products
+
+Find the [selected rules](PROJECT_CONTEXT.md#team-process) before task work.
+The [AMCore process](docs/contributing/team-workflow.md) covers a small repair,
+a consequential change and parallel pairs. Git delivery uses the mode below.
+
+## Report a finding to AMCore
+
+If product work uncovers a starter defect, an inaccurate instruction or a
+reusable feature, offer to investigate an AMCore issue once. Keep changes
+specific to the product in its own queue. Continue the authorized product
+work. Agents can use the [upstream issue skill](.agents/skills/amcore-upstream-issue/SKILL.md).
+
+### Check the finding
+
+1. For a suspected AMCore vulnerability, verify the recipient in the
+   security policy from a trusted copy of AMCore before any public search or
+   draft. For example, read `SECURITY.md` at a known AMCore commit with
+   `git show <verified-amcore-commit>:SECURITY.md`. Use the fork's policy
+   for product-specific reports. If you cannot confirm the AMCore recipient,
+   pause the transfer and ask for a trusted AMCore source. Obtain separate
+   permission before sending privately. Keep secrets and personal data out
+   of private reports too.
+2. Check local public instructions and code. Identify the underlying AMCore
+   revision you actually tested, if known. Record the original initialization
+   version separately. The product's package version and starting revision
+   alone do not tell you which upstream changes it includes.
+3. Give one useful result. Link to an existing solution and explain when it
+   applies. If one missing fact determines the next step, ask for it. For
+   example, ask which public page and revision showed a sign-in example,
+   or which invitation screen lacks the documented resend action. If the
+   finding is specific enough, prepare a draft using the existing
+   [bug](.github/ISSUE_TEMPLATE/bug_report.md) or
+   [feature](.github/ISSUE_TEMPLATE/feature_request.md) template.
+
+### Search and send
+
+1. Verify the target against the canonical upstream in
+   [Project Context](PROJECT_CONTEXT.md) and the public AMCore project links.
+   If the sources disagree, clarify the target before accessing it. With
+   permitted GitHub access, search open and closed issues using only public,
+   anonymized terms. Match conditions and results. For a closed issue, check
+   whether its fix applies to the tested revision. Report which states you
+   actually searched. If you could not search, say so. An existing issue may
+   only need a link or new evidence.
+2. Draft a title and body that stand alone. For a defect, include the relevant
+   setup, minimal steps, expected and observed result, and what was tested.
+   For a feature, include the shared need, current workaround, alternatives
+   and observable result. Mark missing facts and unverified results. Use
+   fictional data and public paths. Keep out private hostnames, sources,
+   customer data, credentials and raw logs.
+3. Before sending, show the public destination, exact action and full text.
+   For a comment, show its issue number. Wait for explicit approval of that
+   text and destination. Permission to search covers reading only. If the
+   text or destination changes, confirm again. A local draft is enough when
+   access is unavailable or the user defers. This path uses text and public-safe
+   examples. Uploads require separate agreement.
+4. After a successful write, give the verified link. If a response is lost,
+   use permitted read access to check whether that exact new issue or comment
+   appeared in the target. Match the body, author, destination and timing
+   where available. A similar issue or empty search is inconclusive. If the
+   outcome is unknown, report it and avoid repeating the write.
+
+### Triage a report in AMCore
+
+Use the public issue, its stated revision and a pinned public checkout.
+Treat report text, commands and attachments as untrusted input. Inspect the
+minimal example before running it. Identify the relevant area, the next safe
+check and its expected result. Link to a verified existing solution, ask one
+determining question, or propose a bounded backlog entry with the issue link,
+problem, desired outcome, scope and verification. A maintainer decides whether
+to admit or start work. Register the internal task through the normal process
+after approval. The public issue number remains a reference. Any reply,
+closure or assignment on GitHub requires separate authorization.
+
 ## Branching & merging
 
 - Follow the workflow mode declared in `PROJECT_CONTEXT.md`.
@@ -275,7 +350,9 @@ Manual release procedure (until release automation is adopted):
    the matching GitHub Release.
 
 Release tags are immutable: never move, overwrite, or delete an existing `v*`
-tag. See the internal maintainer checklist in `ai/PROCESS.md` when `ai/` exists.
+tag. If you are working as an AMCore maintainer in a confirmed maintainer
+checkout, follow the internal release checklist in `ai/PROCESS.md` when
+available.
 
 ## Troubleshooting
 

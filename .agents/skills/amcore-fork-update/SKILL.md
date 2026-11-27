@@ -23,13 +23,10 @@ When this file and the guide disagree, follow the guide and report the differenc
 
 ## Create a product
 
-Before the first push, ask how the team accepts changes. Wait for the answer.
-Then ask what CI should check: what could have broken (recommended), everything
-applicable, or only quick checks. Explain that quick checks can miss a broken
-browser sign-in and show the time example in the
-[CI guide](../../../docs/operations/ci-security.md#choose-automatic-checks-for-a-product).
-Record the owner's choice before delivery. A Fork's first PR uses the starter
-check mode. The chosen mode applies after merge.
+Offer [product setup in chat](../../../docs/frontend/brand-theme-and-tokens.md#configure-a-product-with-an-agent)
+when the user asks to create a product. Retain the initial request while the
+wizard collects identity, team process, Git delivery and CI choices. Follow the fork guide for
+first delivery and the chat setup instructions for approval of local writes.
 
 Follow these guide sections in order:
 
@@ -48,7 +45,8 @@ Follow these guide sections in order:
    [Update to a selected release](../../../docs/operations/updating-a-fork.md#update-to-a-selected-release)
    step by step. Read every intervening release note first.
 2. Resolve conflicts with [the conflict table](../../../docs/operations/updating-a-fork.md#resolve-common-conflicts).
-   Never take a whole side for identity, permission, data or the lockfile.
+   Preserve the product’s team process and queue references. Never take a whole
+   side for identity, permission, data or the lockfile.
 3. For any migration change, follow
    [Preserve database history](../../../docs/operations/updating-a-fork.md#preserve-database-history-and-rehearse-data-changes)
    on disposable databases before rollout.

@@ -24,9 +24,9 @@ function publicRoutePattern(routes) {
 }
 
 /** Snippets belong inside the separate administration host, never the site's host. */
-export function renderProductAdminEdge(root) {
+export function renderProductAdminEdge(root, proposed) {
   const { alias, mode, localized, locales, assets, defaultLocale, routes } =
-    inspectProductAdminPlacement(root)
+    inspectProductAdminPlacement(root, undefined, proposed)
   const heading =
     '# Generated from product-admin placement. Regenerate with scripts/render-product-admin-edge.mjs.\n'
   if (mode === 'path')
@@ -134,11 +134,15 @@ location / { proxy_pass http://web:3000; }
   }
 }
 
+export function planProductAdminEdgeFiles(root, proposed) {
+  const rendered = renderProductAdminEdge(root, proposed)
+  return new Map(Object.entries(outputs).map(([kind, file]) => [file, rendered[kind]]))
+}
+
 export function productAdminEdgeFiles(root, write = false) {
-  const rendered = renderProductAdminEdge(root)
-  for (const [kind, file] of Object.entries(outputs)) {
-    if (write) writeFileSync(join(root, file), rendered[kind])
-    else if (readFileSync(join(root, file), 'utf8') !== rendered[kind])
+  for (const [file, content] of planProductAdminEdgeFiles(root)) {
+    if (write) writeFileSync(join(root, file), content)
+    else if (readFileSync(join(root, file), 'utf8') !== content)
       throw new Error(`Stale product-admin edge output: ${file}`)
   }
 }

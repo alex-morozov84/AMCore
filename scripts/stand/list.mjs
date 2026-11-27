@@ -2,9 +2,11 @@ import { readdir, access } from 'node:fs/promises'
 import { run } from './process.mjs'
 import { engine } from './docker.mjs'
 import { stateRoot, load } from './state.mjs'
+import { localDispatchId } from './local-dispatch.mjs'
 
 export async function list() {
   for (const entry of await readdir(stateRoot).catch(() => [])) {
+    if (entry === localDispatchId) continue
     try {
       const m = await load(entry)
       console.log(`${entry}: ${m.state} (${m.uuid})`)
