@@ -35,6 +35,8 @@ versions they name. For current source-update instructions, see
 
 ### Fixed
 
+- Reject source snapshots that pass through linked directories. A failed snapshot preserves the previous copy.
+
 - Require existing PNG destinations in `init:product` and skip identical assets.
   Refuse to apply a plan if a destination changed after the preview.
 

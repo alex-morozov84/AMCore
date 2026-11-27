@@ -398,10 +398,11 @@ reports; the deliberately public demo credentials above are a separate contract.
 Runtime records and source snapshots live under ignored `.amcore/stands/` with
 private permissions. Source admission uses tracked build inputs plus nonignored
 untracked source, excluding `.env*` except `.env.example`, secrets, other worktrees,
-dependencies and generated runtime output. Source symlinks are refused; replace a
-required public build input with an ordinary file rather than dereferencing
-private/foreign files. Refresh rebuilds from
-current source while retaining preview data. Unexpected account/role state fails
+dependencies and generated runtime output. Use ordinary files and directories
+for build inputs. The snapshot rejects symbolic links along source paths and
+leaves the previous snapshot available if copying fails. Linux needs the standard
+`/proc/self/fd` interface for source isolation. Refresh rebuilds from current
+source while retaining preview data. Unexpected account/role state fails
 instead of silently resetting the reviewer's scenario.
 
 ### Operator sign-in on a preview
