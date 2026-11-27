@@ -90,5 +90,6 @@ await writeExample(context, files)
 exampleInstructions(context, 'shop', '--fixture organization-shop ')
 if (process.argv.includes('--preview'))
   console.log(
-    'Preview: pnpm stand preview --id t063-custom-team --profile organization; then pnpm stand status --id t063-custom-team'
+    'Preview: pnpm stand preview --id t063-custom-team --profile organization\n' +
+      'In a second terminal: pnpm stand status --id t063-custom-team'
   )

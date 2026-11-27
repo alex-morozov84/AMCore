@@ -6,7 +6,10 @@ Thanks for your interest in contributing. This document explains how to set up t
 
 ## Getting Started
 
-Choose one setup:
+Use [managed local development](docs/operations/local-stands.md#develop-a-configured-product)
+for day-to-day work. Run `pnpm local` from the project root.
+
+For other tasks:
 
 - [Docker Quick Start](README.md#quick-start) runs the full stack in containers.
 - [Manual host setup](docs/backend/api-build.md#development) covers manual API diagnostics.
