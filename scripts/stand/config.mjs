@@ -1,7 +1,9 @@
+import { watchDefinition } from './watch.mjs'
 import { managedReadiness } from '../runner-disk/policy.mjs'
 import { mfaE2EEnvironment } from './mfa-e2e.mjs'
 import { operatorMfaEnvironment } from './operator-mfa.mjs'
 import { consoleSummaryServices } from './console-summary-fixture.mjs'
+import { isDeepStrictEqual } from 'node:util'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createHash, createHmac } from 'node:crypto'
@@ -99,7 +101,7 @@ export async function configuration(m) {
       FRONTEND_URL: m.origins.product,
       PRODUCT_ADMIN_ORIGIN: m.origins.staff ?? '',
       WEB_FRONTEND_CONTEXT_KEY: app.WEB_FRONTEND_CONTEXT_KEY,
-      NODE_ENV: 'production',
+      NODE_ENV: m.watchExpected ? 'development' : 'production',
       API_URL: 'http://api:5002',
       REDIS_URL: 'redis://redis:6379',
       WEB_TRUSTED_ORIGINS: [m.origins.product, m.origins.staff, siteOrigin]
@@ -171,6 +173,10 @@ export async function configuration(m) {
     yaml += `  ${service}:\n    environment: ${overridden(environment)}\n    labels:\n${labelLines(m, '      ')}`
     if (builtServices.includes(service))
       yaml += `    build:\n      labels:\n${labelLines(m, '        ')}`
+    if (m.watchExpected && ['api', 'worker', 'web'].includes(service)) {
+      yaml += '      target: development\n'
+      yaml += stringify(watchDefinition(m, service)).trimEnd().replace(/^/gm, '    ') + '\n'
+    }
     if (service === 'seed')
       yaml +=
         `      context: ${JSON.stringify(m.snapshot)}\n      dockerfile: apps/api/Dockerfile\n      target: build\n` +
@@ -356,6 +362,18 @@ export function validateModel(m) {
       if (mount.type === 'bind' && !mount.source.startsWith(`${m.snapshot}/docker/`))
         throw new Error('Foreign bind mount')
     if (s.build?.context && s.build.context !== m.snapshot) throw new Error('Foreign build root')
+    const watch =
+      m.watchExpected && ['api', 'worker', 'web'].includes(name)
+        ? watchDefinition(m, name).develop
+        : undefined
+    const observed = s.develop && {
+      ...s.develop,
+      watch: s.develop.watch?.map(({ exec, ...rule }) =>
+        exec === undefined || isDeepStrictEqual(exec, { command: null }) ? rule : { ...rule, exec }
+      ),
+    }
+    if (!isDeepStrictEqual(observed, watch) || (watch && s.build?.target !== 'development'))
+      throw new Error(`Unexpected Watch configuration for ${name}`)
     // Built images must carry the full ownership tuple so disposal can prove them;
     // no other service may claim build labels.
     const built = Object.entries(labels(m)).every(

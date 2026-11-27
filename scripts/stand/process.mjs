@@ -70,7 +70,7 @@ function recordChildren() {
 export function run(
   command,
   args,
-  { cwd, env = cleanEnvironment(), capture = false, input, signal, graceful = false } = {}
+  { cwd, env = cleanEnvironment(), capture = false, input, signal, graceful = false, onOutput } = {}
 ) {
   if (processDeadline !== undefined) {
     if (processDeadline <= Date.now())
@@ -84,7 +84,11 @@ export function run(
       cwd,
       env,
       detached: true,
-      stdio: [input === undefined ? 'inherit' : 'pipe', capture ? 'pipe' : 'inherit', 'pipe'],
+      stdio: [
+        input === undefined ? 'inherit' : 'pipe',
+        capture || onOutput ? 'pipe' : 'inherit',
+        'pipe',
+      ],
     })
     child.standCwd = cwd
     child.standStarted = new Date().toISOString()
@@ -140,11 +144,14 @@ export function run(
     let output = ''
     let error = ''
     child.stdout?.on('data', (chunk) => {
-      output += chunk
+      if (capture) output += chunk
+      else process.stdout.write(chunk)
+      onOutput?.(chunk, 'stdout')
     })
     child.stderr?.on('data', (chunk) => {
       error = (error + chunk).slice(-8000)
       if (!capture) process.stderr.write(chunk)
+      onOutput?.(chunk, 'stderr')
     })
     child.on('error', (error) => {
       clearInterval(monitor)

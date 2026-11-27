@@ -1,3 +1,7 @@
+import { engine } from './stand/docker.mjs'
+import { watchStand } from './stand/watch.mjs'
+import { localWatchStatus } from './stand/local-watch-status.mjs'
+import { localSummary } from './stand/local-summary.mjs'
 import { localDispatchId } from './stand/local-dispatch.mjs'
 import { closedSignupOAuthProfile } from './stand/apple-oauth-fixture.mjs'
 import { preservedTopology } from './stand/settings-policy.mjs'
@@ -83,11 +87,11 @@ if (id === localDispatchId) throw new Error('Use pnpm local recover for the loca
 // recorded in the manifest as acceptance, never as proof (see local-stands guide).
 const cleanupOptions = { acceptReason: value('--accept-unresolved-build') }
 let interrupted = false
-for (const signal of ['SIGINT', 'SIGTERM'])
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'])
   process.once(signal, async () => {
     interrupted = true
     requestCancellation()
-    process.exitCode = signal === 'SIGINT' ? 130 : 143
+    process.exitCode = { SIGINT: 130, SIGTERM: 143, SIGHUP: 129 }[signal]
     try {
       await stopChildren()
     } catch (error) {
@@ -97,7 +101,7 @@ for (const signal of ['SIGINT', 'SIGTERM'])
 async function execute() {
   if (action === 'help') {
     console.log(
-      `pnpm stand up|preview|e2e|status|list|down|recover|closeout [--id ID] [--purge] [--accept-unresolved-build "<reason>"]\ne2e --lane ${lanes.join('|')}\nManaged local stands; never owner .env. Native pnpm dev is outside these guards.`
+      `pnpm stand up|preview|e2e|status|list|down|recover|closeout [--id ID] [--purge] [--accept-unresolved-build "<reason>"]\ne2e --lane ${lanes.join('|')}\nManaged local stands; never owner .env. Manual host package commands are outside these guards.`
     )
     return
   }
@@ -113,6 +117,7 @@ async function execute() {
         {
           id,
           state: m.state,
+          watch: localWatchStatus(m),
           origins: m.origins,
           sourceHash: m.sourceHash,
           stale: (await snapshot(m.worktree)) !== m.sourceHash,
@@ -143,7 +148,15 @@ async function execute() {
   if (action !== 'e2e' && lane === 'mocked') throw new Error('Mocked lane is e2e-only')
   if (args.includes('--proxy-smoke') && topology !== 'host')
     throw new Error('Proxy smoke unavailable in this fork')
-  const held = await lease(id, action)
+  const watch =
+    action === 'preview' || (action === 'up' && Boolean(value('--local-dispatch-token')))
+  if (action === 'preview') await engine({ watch: true })
+  const held = await lease(id, action).catch((error) => {
+    if (action !== 'down') throw error
+    throw new Error(`${error.message}. Stop Watch in its terminal first if it is running.`, {
+      cause: error,
+    })
+  })
   setJournal(`${root}/.amcore/stands/${id}/lease/children.json`)
   let m
   try {
@@ -192,6 +205,8 @@ async function execute() {
         },
         settingsPolicy
       )
+    if (watch !== Boolean(m.watchExpected)) delete m.images
+    m.watchExpected = watch
     if (lane !== 'mocked') await boot(m, !existing)
     if (interrupted) throw new Error('Interrupted startup')
     if (action === 'e2e') {
@@ -222,7 +237,9 @@ async function execute() {
     } else if (action === 'preview') {
       const { preview } = await import('./stand/preview.mjs')
       await preview(m, value('--profile', 'default'))
-    } else console.log(`Stand ${id}: ${m.origins.product}`)
+    } else if (watch) console.log(localSummary(m))
+    else console.log(`Stand ${id}: ${m.origins.product}`)
+    if (watch) await watchStand(m)
   } finally {
     await stopChildren()
     allowCleanup()
@@ -244,7 +261,8 @@ async function execute() {
     }
   }
 }
-execute().catch((e) => {
-  console.error(e.message)
-  if (!interrupted) process.exitCode = 1
+execute().catch((error) => {
+  if (interrupted) return
+  console.error(error.message)
+  process.exitCode = 1
 })

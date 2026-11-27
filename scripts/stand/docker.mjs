@@ -1,7 +1,7 @@
 import { run } from './process.mjs'
 import { withPinnedEngine } from './docker-session.mjs'
 
-export async function engine() {
+export async function engine({ watch = false } = {}) {
   const context = (await run('docker', ['context', 'show'], { capture: true })).trim()
   const [info] = JSON.parse(await run('docker', ['context', 'inspect', context], { capture: true }))
   const endpoint = info.Endpoints.docker.Host
@@ -14,6 +14,10 @@ export async function engine() {
   if (!(major > 2 || (major === 2 && (minor > 24 || (minor === 24 && patch >= 4))))) {
     throw new Error('Managed stands require Compose >=2.24.4')
   }
+  if (watch && !(major > 5 || (major === 5 && minor >= 5)))
+    throw new Error(
+      'Auto-update requires Docker Compose >=5.5.0. Upgrade Docker Compose and retry.'
+    )
   return { context, endpoint }
 }
 export function withDockerEngine(m, action) {

@@ -36,7 +36,7 @@ WORKDIR /app
 # ===========================================
 # Build — install (incl. dev), generate, build, deploy
 # ===========================================
-FROM base AS build
+FROM base AS source
 
 # pnpm may reinstall before scripts after COPY; every install must keep the lockfile frozen.
 ENV pnpm_config_frozen_lockfile=true
@@ -70,6 +70,17 @@ COPY scripts/typecheck-native.mjs ./scripts/typecheck-native.mjs
 COPY scripts/write-mfa-artifact.mjs ./scripts/write-mfa-artifact.mjs
 RUN pnpm --filter @amcore/shared build
 RUN pnpm --filter api db:generate
+FROM source AS development
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --create-home --uid 1001 --gid nodejs nestjs && \
+    mkdir -p /data/geoip /app/uploads && \
+    chown -R nestjs:nodejs /app/apps/api /app/packages/shared /data/geoip /app/uploads
+USER nestjs
+RUN corepack install
+WORKDIR /app/apps/api
+CMD ["sh", "-c", "pnpm --filter @amcore/shared build && exec pnpm --filter api exec nest start --watch --no-shell"]
+
+FROM source AS build
 ARG BUILD_SOURCE_COMMIT
 # Optional build-only Node options (see apps/web/Dockerfile); scoped to this RUN.
 ARG BUILD_NODE_OPTIONS=""

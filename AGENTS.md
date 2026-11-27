@@ -68,7 +68,7 @@ Keep rule ownership explicit when adding rules or inline exceptions.
 
 ```bash
 pnpm install            # install all
-pnpm dev                # run all apps (or: pnpm --filter api dev)
+pnpm local              # run the managed product with automatic updates
 pnpm lint               # lint        pnpm typecheck   # types
 pnpm test               # unit tests  pnpm build       # build all
 pnpm test:background-work-contracts # isolated work registration/control/provider safety (Docker)

@@ -18,6 +18,8 @@ versions they name. For current source-update instructions, see
 
 ### Added
 
+- Run `pnpm local` from the root for automatic updates. Acceptance previews use the same Watch. The root `pnpm dev` script was removed.
+
 - Initialize a product in English or Russian with `pnpm init:product`. Start the configured product locally with `pnpm local`.
 
 - Add a public contact form protection guide and an opt-in AMCore example.

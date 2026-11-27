@@ -88,7 +88,7 @@ always present. An optional automatic-HTTPS reverse proxy sits behind the
 below. The switch is `COMPOSE_PROFILES` in `.env`. The Docker stack reads
 its DB/Redis from `COMPOSE_DATABASE_URL` / `COMPOSE_REDIS_URL` (default: bundled
 services), kept separate from the host `DATABASE_URL` / `REDIS_URL` used by
-`pnpm dev`, so a host `.env` cannot misconfigure the containers.
+host package commands, so a host `.env` cannot misconfigure the containers.
 
 For a complete production deployment on one server, follow
 [Single-host production with Docker Compose](single-host-compose.md); size the host
@@ -314,7 +314,7 @@ backup, see [Backup & restore](./backup-restore.md)).
    not prove an old process cannot write to it later). The check is a tripwire on
    the connection name, not a permanent fence: it cannot see a client with another
    name, so keep every old process and auto-restart stopped until the new version
-   starts. In local development, stop `pnpm dev` / the local API before
+   starts. In local development, stop the local API before
    `pnpm --filter api db:migrate` for the same reason. If a migration
    fails, read its name from Prisma's failure output. Stop the writer, then mark
    that failed migration rolled back with
@@ -978,7 +978,7 @@ The same image runs as different roles via `PROCESS_ROLE`:
 - **`web`** — HTTP API + enqueues jobs; no BullMQ processors, no cron.
 - **`worker`** — BullMQ processors + cron; **health + metrics** HTTP (no
   business routes, no Bull Board), so k8s can probe and Prometheus can scrape it.
-- **`all`** — both in one process (default; host `pnpm dev` / single-node).
+- **`all`** — both in one process (default for manual API startup and single-node installs).
 
 The reference `docker-compose.yml` runs `api` (`PROCESS_ROLE=web`) and a separate
 `worker` (`PROCESS_ROLE=worker`); an email enqueued by the API is processed by the

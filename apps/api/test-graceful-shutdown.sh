@@ -10,7 +10,7 @@ echo ""
 
 # Start the application in the background
 echo "1️⃣  Starting application..."
-pnpm dev &
+pnpm --filter api dev &
 APP_PID=$!
 
 # Wait for the application to start
