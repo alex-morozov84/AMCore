@@ -6,12 +6,12 @@ export function localWatchStatus(stand, processes = processTable) {
   if (!stand.watchExpected) return
   try {
     const [, ...args] = composeArguments(stand)
-    const invocation = ` ${args.join(' ')} watch `
+    const invocation = ` ${args.join(' ')} watch`
     return processes().some(
       ({ uid, command }) =>
         uid === process.getuid() &&
         ['docker', 'docker-compose'].includes(basename(command.split(' ', 1)[0])) &&
-        command.includes(invocation)
+        (command.endsWith(invocation) || command.includes(`${invocation} `))
     )
       ? 'running'
       : 'stopped'

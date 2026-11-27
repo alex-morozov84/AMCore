@@ -16,6 +16,16 @@ const row = {
 }
 
 test('reports only the expected Compose Watch for this stand', () => {
+  const bare = { ...row, command: row.command.replace(' --no-up web', '') }
+  const other = { ...bare, command: `${bare.command}er` }
+  assert.equal(
+    localWatchStatus(stand, () => [bare]),
+    'running'
+  )
+  assert.equal(
+    localWatchStatus(stand, () => [other]),
+    'stopped'
+  )
   assert.equal(
     localWatchStatus(stand, () => [row]),
     'running'
