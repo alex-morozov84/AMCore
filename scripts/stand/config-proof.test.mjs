@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { rm, readFile, writeFile } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
-import { composeArguments } from './docker.mjs'
+import { composeArguments, engine } from './docker.mjs'
 import { create } from './create.mjs'
 import { configuration, validateModel, labels, builtServices } from './config.mjs'
 import { directory } from './state.mjs'
@@ -341,3 +341,39 @@ for (const [profile, fixture, topology, consoleMode, staffMode, provider, mail] 
     }
   })
 }
+
+test('preview Watch uses checkout inputs and preserves MFA replacements', async (t) => {
+  try {
+    await engine({ watch: true })
+  } catch (error) {
+    if (!error.message.startsWith('Auto-update requires Docker Compose')) throw error
+    t.skip(error.message)
+    return
+  }
+  const id = `watch-model-${randomUUID()}`
+  try {
+    const stand = await create(id, 'preview', 'path', false, 'account-mfa-ui')
+    stand.watchExpected = true
+    await configuration(stand)
+    for (const name of ['web', 'api', 'worker']) {
+      const service = stand.model.services[name]
+      assert.equal(service.build.target, 'development')
+      assert.equal(service.build.context, stand.snapshot)
+      const rules = service.develop.watch
+      assert.equal(rules.length, name === 'web' ? 4 : 2)
+      for (const rule of rules) assert.ok(rule.path.startsWith(`${stand.worktree}/`))
+      const shared = rules.find((rule) => rule.target === '/app/packages/shared/src')
+      assert.equal(shared.action, 'sync+restart')
+      assert.ok(shared.ignore.includes('config/locales.json'))
+    }
+    const web = stand.model.services.web.develop.watch[0]
+    assert.ok(web.ignore.includes('_app/account-security/ui/client.tsx'))
+    assert.ok(web.ignore.includes('_app/account-security/ui/preview-adapter.ts'))
+    assert.equal(stand.model.services.migrate.develop, undefined)
+    assert.equal(stand.model.services.seed.develop, undefined)
+    web.path = stand.snapshot
+    assert.throws(() => validateModel(stand), /Unexpected Watch configuration/)
+  } finally {
+    await rm(directory(id), { recursive: true, force: true })
+  }
+})

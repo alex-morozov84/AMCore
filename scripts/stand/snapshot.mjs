@@ -1,7 +1,8 @@
-import { copyFile, lstat, mkdir, readFile, readlink } from 'node:fs/promises'
-import { dirname, join, resolve, relative } from 'node:path'
+import { chmod, lstat, mkdir, mkdtemp, realpath, rename, rm, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 import { createHash } from 'node:crypto'
 import { run } from './process.mjs'
+import { readSnapshotSource } from './snapshot-source.mjs'
 
 const excluded = new Set([
   '.git',
@@ -36,7 +37,7 @@ export function admitSource(path) {
     )
   )
 }
-export async function snapshot(root, destination) {
+async function collect(root, destination) {
   const files = (
     await run('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
       cwd: root,
@@ -49,23 +50,36 @@ export async function snapshot(root, destination) {
     .sort()
   const hash = createHash('sha256')
   for (const file of files) {
-    const source = join(root, file)
-    const target = destination ? join(destination, file) : undefined
-    const info = await lstat(source).catch((e) => {
-      if (e.code !== 'ENOENT') throw e
-    })
-    if (!info) continue
-    if (info.isSymbolicLink()) {
-      const link = resolve(dirname(source), await readlink(source))
-      throw new Error(`Source symlink requires explicit admission: ${relative(root, link)}`)
-    }
-    if (!info.isFile()) throw new Error(`Unexpected source entry: ${file}`)
-    const content = await readFile(source)
-    hash.update(file).update('\0').update(content).update('\0')
+    const source = await readSnapshotSource(root, file)
+    if (!source) continue
+    hash.update(file).update('\0').update(source.content).update('\0')
     if (destination) {
+      const target = join(destination, file)
       await mkdir(dirname(target), { recursive: true })
-      await copyFile(source, target)
+      await writeFile(target, source.content, { mode: source.mode })
+      await chmod(target, source.mode)
     }
   }
   return hash.digest('hex')
+}
+
+export async function snapshot(root, destination) {
+  // Resolve external aliases such as macOS /var once, while refusing a symlink as the checkout itself.
+  const rootInfo = await lstat(root, { bigint: true })
+  if (!rootInfo.isDirectory())
+    throw new Error('Snapshot checkout must be a directory, not a symlink')
+  const sourceRoot = await realpath(root)
+  const sourceInfo = await lstat(sourceRoot, { bigint: true })
+  if (sourceInfo.dev !== rootInfo.dev || sourceInfo.ino !== rootInfo.ino)
+    throw new Error('Snapshot checkout changed during resolution')
+  if (!destination) return collect(sourceRoot)
+  await mkdir(dirname(destination), { recursive: true })
+  const staging = await mkdtemp(join(dirname(destination), '.snapshot-'))
+  try {
+    const hash = await collect(sourceRoot, staging)
+    await rename(staging, destination)
+    return hash
+  } finally {
+    await rm(staging, { recursive: true, force: true })
+  }
 }

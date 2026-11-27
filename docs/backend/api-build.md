@@ -72,38 +72,16 @@ For host package commands, use Node 24 from `.nvmrc` with the minimum patch in
 `package.json` (currently 24.15.0) and its exact `packageManager` pnpm version
 (currently 12.18.0). Check both versions before installing frozen dependencies.
 
-For a managed rebuild-and-run loop with automatic local credentials, see [pnpm local](../operations/local-stands.md#develop-a-configured-product). The native watch setup follows below.
-
-For the bundled PostgreSQL, set `DATABASE_URL="postgresql://amcore:amcore@localhost:5432/amcore?schema=public"`
-in root `.env`. An exported `DATABASE_URL` takes precedence. Check the file value first.
-The shell guard below stops before installation or migration if an exported value differs.
-Use the same shell for the shared web/API key, native frontend origins and startup:
+Use [pnpm local](../operations/local-stands.md#develop-a-configured-product) for
+the full product. For manual API diagnostics, check that `DATABASE_URL` and
+`REDIS_URL` target the disposable services before starting the API. An exported
+variable overrides the API's root `.env`.
 
 ```bash
-test "${DATABASE_URL-postgresql://amcore:amcore@localhost:5432/amcore?schema=public}" = 'postgresql://amcore:amcore@localhost:5432/amcore?schema=public' &&
-WEB_FRONTEND_CONTEXT_KEY="$(openssl rand -hex 32)" &&
-test -n "$WEB_FRONTEND_CONTEXT_KEY" &&
-export WEB_FRONTEND_CONTEXT_KEY &&
-export FRONTEND_URL=http://localhost:3002 WEB_TRUSTED_ORIGINS=http://localhost:3002 &&
-# Migrate only a disposable local development database.
-pnpm install --frozen-lockfile &&
-docker compose up -d postgres redis &&
-pnpm --filter api db:migrate &&
-export REDIS_URL="redis://localhost:6379" &&
-pnpm dev
+pnpm install --frozen-lockfile
+pnpm --filter @amcore/shared build
+pnpm --filter api dev
 ```
-
-The API reads root `.env`; exported values override it. Web does not read that
-file, so export `WEB_FRONTEND_CONTEXT_KEY` and `REDIS_URL` in the shell running
-`pnpm dev`. Strict Turbo passes those and `FRONTEND_URL`, `PRODUCT_ADMIN_ORIGIN`,
-`WEB_TRUSTED_ORIGINS`; it builds shared before dependent dev processes.
-Native web listens on port 3002. `FRONTEND_URL` and `WEB_TRUSTED_ORIGINS` must
-name the address where you open web (normally `http://localhost:3002`), not the
-Docker web address (http://localhost:3000). Export changed origin settings so API and web agree.
-Without a key, web refuses startup. With mismatched keys or missing web Redis
-configuration, startup can succeed but session bootstrap returns 503. A listening
-process is not working authentication. For separate package starts,
-run `pnpm --filter @amcore/shared build` first. Then `pnpm --filter api dev` runs Nest in watch mode.
 
 On failure, retain the first error and stop before retrying migrations or changing database state.
 

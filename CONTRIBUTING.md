@@ -6,10 +6,13 @@ Thanks for your interest in contributing. This document explains how to set up t
 
 ## Getting Started
 
-Choose one setup:
+Use [managed local development](docs/operations/local-stands.md#develop-a-configured-product)
+for day-to-day work. Run `pnpm local` from the project root.
+
+For other tasks:
 
 - [Docker Quick Start](README.md#quick-start) runs the full stack in containers.
-- [Manual host setup](docs/backend/api-build.md#development) covers host dependencies, environment variables, migrations and `pnpm dev`.
+- [Manual host setup](docs/backend/api-build.md#development) covers manual API diagnostics.
 
 See [the lint policy guide](packages/eslint-config/README.md) for engine ownership,
 inline exceptions and paired presets. Run `pnpm lint:fix` for supported autofixes.
@@ -18,7 +21,7 @@ inline exceptions and paired presets. Run `pnpm lint:fix` for supported autofixe
 
 | Command                                                           | Description                                                                                                                                                                                                                                          |
 | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm dev`                                                        | Start all apps in dev mode                                                                                                                                                                                                                           |
+| `pnpm local`                                                      | Start the managed product with automatic updates                                                                                                                                                                                                     |
 | `pnpm build`                                                      | Build all apps                                                                                                                                                                                                                                       |
 | `pnpm lint`                                                       | Run Oxlint + ESLint and web Stylelint                                                                                                                                                                                                                |
 | `pnpm typecheck`                                                  | Run TypeScript check                                                                                                                                                                                                                                 |

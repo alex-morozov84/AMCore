@@ -3,14 +3,16 @@ import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { lease, load, root, stateRoot } from './stand/state.mjs'
 import { children, run as runProcess, setJournal } from './stand/process.mjs'
-import { docker } from './stand/docker.mjs'
+import { docker, engine } from './stand/docker.mjs'
 import { labels } from './stand/config.mjs'
 import { isProductStandId, localDispatchId, recoverLocalDispatch } from './stand/local-dispatch.mjs'
-import { localSummary } from './stand/local-summary.mjs'
+import { localWatchStatus } from './stand/local-watch-status.mjs'
 import { sourceSettings } from './stand/settings-policy.mjs'
 import { canonicalStringify } from './lib/path-algebra-canonical.mjs'
 import { consoleEdgeFiles } from './lib/console-edge.mjs'
 import { productAdminEdgeFiles } from './lib/product-admin-edge.mjs'
+
+const cancellation = new globalThis.AbortController()
 
 function run(action, id, token, options = []) {
   return runProcess(
@@ -24,7 +26,7 @@ function run(action, id, token, options = []) {
       token,
       ...options,
     ],
-    { cwd: root, env: process.env }
+    { cwd: root, env: process.env, signal: cancellation.signal, graceful: true }
   )
 }
 
@@ -47,6 +49,8 @@ async function reportStatus(stands, selected) {
       console.log(
         `${stand.id}: ${running ? `running containers · ${stand.origins.product}` : 'no running containers'}`
       )
+      const watch = localWatchStatus(stand)
+      if (watch) console.log(`  Compose Watch: ${watch}`)
     } catch (error) {
       console.log(`${stand.id}: actual state unknown (${error.message})`)
     }
@@ -90,9 +94,15 @@ async function main() {
     const stands = await productStands()
     return reportStatus(stands, await configuredId(stands).catch(() => undefined))
   }
+  if (action === 'up') await engine({ watch: true })
   const { release, token } = await lease(localDispatchId, action).catch((error) => {
-    throw new Error(`${error.message}. If interrupted, use pnpm local recover.`, { cause: error })
+    throw new Error(
+      `${error.message}. If Watch is running, stop it in its terminal. If interrupted, use pnpm local recover.`,
+      { cause: error }
+    )
   })
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'])
+    process.once(signal, () => cancellation.abort(signal))
   setJournal(join(stateRoot, localDispatchId, 'lease', 'children.json'))
   let id
   try {
@@ -116,9 +126,12 @@ async function main() {
     }
     if (id) {
       await run('up', id, token, ['--settings-policy', 'preserve'])
-      console.log(localSummary(await load(id)))
     }
   } catch (error) {
+    if (cancellation.signal.aborted) {
+      process.exitCode = { SIGINT: 130, SIGTERM: 143, SIGHUP: 129 }[cancellation.signal.reason]
+      return
+    }
     await productStands()
       .then((stands) => reportStatus(stands, id))
       .catch(() => console.log('Actual stand state unavailable. Run pnpm local status.'))

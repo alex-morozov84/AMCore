@@ -18,6 +18,8 @@ versions they name. For current source-update instructions, see
 
 ### Added
 
+- Run `pnpm local` from the root for automatic updates. Acceptance previews use the same Watch. The root `pnpm dev` script was removed.
+
 - Initialize a product in English or Russian with `pnpm init:product`. Start the configured product locally with `pnpm local`.
 
 - Add a public contact form protection guide and an opt-in AMCore example.
@@ -34,6 +36,10 @@ versions they name. For current source-update instructions, see
   and MFA operations.
 
 ### Fixed
+
+- Finish the account-security preview after confirming that the demo backup codes were saved.
+
+- Reject source snapshots that pass through linked directories. A failed snapshot preserves the previous copy.
 
 - Require existing PNG destinations in `init:product` and skip identical assets.
   Refuse to apply a plan if a destination changed after the preview.

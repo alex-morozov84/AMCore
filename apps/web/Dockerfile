@@ -22,7 +22,7 @@ WORKDIR /app
 # does not create a `node_modules` for dependency-less workspace packages
 # (e.g. packages/typescript-config), so the old cross-stage COPY failed. The
 # install layer still caches because manifests are copied before sources.
-FROM base AS build
+FROM base AS source
 
 # pnpm may reinstall before scripts after COPY; every install must keep the lockfile frozen.
 ENV pnpm_config_frozen_lockfile=true
@@ -51,6 +51,13 @@ COPY docker/nginx/operations-console.conf ./docker/nginx/operations-console.conf
 RUN pnpm --filter @amcore/shared build
 
 ENV NEXT_TELEMETRY_DISABLED=1
+FROM source AS development
+RUN chown -R node:node /app/apps/web /app/packages/shared
+USER node
+RUN corepack install
+CMD ["sh", "-c", "pnpm --filter @amcore/shared build && exec pnpm --filter web exec next dev --hostname 0.0.0.0 --port 3000"]
+
+FROM source AS build
 ARG BUILD_SOURCE_COMMIT
 ARG NEXT_DEPLOYMENT_ID
 ENV NEXT_DEPLOYMENT_ID=${NEXT_DEPLOYMENT_ID}

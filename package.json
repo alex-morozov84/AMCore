@@ -16,7 +16,6 @@
   },
   "packageManager": "pnpm@12.18.0",
   "scripts": {
-    "dev": "turbo dev",
     "build": "turbo build",
     "check:route-budgets": "node scripts/check-route-budgets.mjs",
     "lint": "turbo lint && node scripts/lint.mjs --scope root scripts",

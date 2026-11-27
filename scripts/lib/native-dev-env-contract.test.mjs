@@ -6,10 +6,11 @@ const turbo = JSON.parse(readFileSync('turbo.json', 'utf8'))
 const example = readFileSync('.env.example', 'utf8')
 
 // Turborepo's strict environment mode (the default) filters a task's runtime variables.
-// Web reads no .env file, so `pnpm dev` must pass these shell values through. They
+// Web reads no .env file, so a manually invoked Turbo task must pass these shell values through. They
 // stay out of the task hash and out of globalEnv, never become NEXT_PUBLIC_*, and strict
 // mode itself stays on. The origins are inputs of the placement fingerprint the API verifies.
 test('native dev passes the web-to-API settings through strict mode and builds shared first', () => {
+  assert.equal(JSON.parse(readFileSync('package.json', 'utf8')).scripts.dev, undefined)
   assert.deepEqual(turbo.tasks.dev.passThroughEnv, [
     'WEB_FRONTEND_CONTEXT_KEY',
     'REDIS_URL',

@@ -11,7 +11,7 @@
 #   choose STORAGE_DRIVER=s3 (+ creds) or explicitly keep local with the shared
 #   persistent local_storage volume and a public API URL.
 #   `required:false` makes the optional dependency skip. (The host DATABASE_URL /
-#   REDIS_URL are for `pnpm dev` and do not affect this stack.)
+#   REDIS_URL are for host package commands and do not affect this stack.)
 #
 # Optional bundled edge (COMPOSE_PROFILES=...,edge): an automatic-HTTPS Caddy
 # reverse proxy in front of `api`. This REPLACES a reverse proxy — use only if
@@ -85,7 +85,7 @@ x-app-env: &app-env
   GEOIP_ENABLED: ${GEOIP_ENABLED:-true}
   GEOIP_DB_PATH: ${GEOIP_DB_PATH:-/data/geoip/dbip-city-lite.mmdb}
   # COMPOSE_* are decoupled from the host DATABASE_URL/REDIS_URL (which are for
-  # `pnpm dev`), so a host `.env` can never poison the container config. Unset →
+  # host package commands), so a host `.env` can never poison the container config. Unset →
   # bundled services; set COMPOSE_DATABASE_URL/COMPOSE_REDIS_URL for managed DB/Redis.
   DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgresql://amcore:amcore@postgres:5432/amcore}
   REDIS_URL: ${COMPOSE_REDIS_URL:-redis://redis:6379}
@@ -403,8 +403,8 @@ services:
       # CSRF trusted-origin allowlist (ADR-068) for the browser<->Next
       # boundary. Defaults to THIS service's own published origin
       # (localhost:3000) — deliberately different from origin-guard.ts's
-      # bare-`pnpm dev` default (localhost:3002, matching `next dev --port
-      # 3002`). The two dev entry points publish on different ports; each
+      # host web package default (localhost:3002, matching `next dev --port
+      # 3002`). The containers and host web publish on different ports; each
       # environment's WEB_TRUSTED_ORIGINS must match how the browser
       # actually reaches this stack.
       WEB_TRUSTED_ORIGINS: ${WEB_TRUSTED_ORIGINS:-http://localhost:3000}

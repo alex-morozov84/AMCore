@@ -69,7 +69,7 @@ export function AccountSecurityClient(_props: { placement: unknown }) {
           onExit={() => setLeft(true)}
           onComplete={() => {
             adapter.settings()
-            void controller.inspect()
+            void controller.resetToSettings()
           }}
         />
       )}

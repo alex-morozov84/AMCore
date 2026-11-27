@@ -49,6 +49,9 @@ export function previewAdapter(scenario: Scenario): AccountMfaAdapter & { settin
     accountLabel,
     purpose,
     state,
+    ...((purpose === 'initial_setup' || purpose === 'login') && state === 'completed'
+      ? { publication: 'confirmed' as const, flowBinding: crypto.randomUUID() }
+      : {}),
     generation,
     expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
     requiredProofs: [],

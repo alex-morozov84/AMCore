@@ -2,7 +2,7 @@
 
 Use managed commands when a checkout's ordinary `.env` points to a remote database
 or another checkout is running. They create their own Postgres/Redis resources,
-ports and configuration. Native `pnpm dev` and ordinary `docker compose` retain
+ports and configuration. Host package commands and ordinary `docker compose` retain
 their manual environment semantics; these commands do not guard arbitrary shell
 or database operations.
 
@@ -14,16 +14,39 @@ fixed setting to check disk headroom before dependency installation. See
 
 ## Develop a configured product
 
-Start Docker, then run `pnpm local` from the product root. Open the product URL
-in the final summary. The summary shows the enabled administration pages, service
-addresses and stand commands. PostgreSQL is reachable only inside Docker.
+Start Docker with Compose 5.5.0 or newer. Run `pnpm local` from the product
+root. Wait for `Auto-update ready`, then open the product URL. The summary shows
+the enabled administration pages, service addresses and stand commands. PostgreSQL is reachable only inside Docker.
 Redis also has a loopback port.
 
 The stand assigns local ports, prepares its database and keys, and loads system
 data. A root `.env` is optional for this workflow. The stand preserves any
 existing root `.env`.
 
-After changing code or pulling a commit, run `pnpm local` again to rebuild and see the changes. Ordinary restarts preserve the local database and keys. Use `pnpm local status` to see the selected configuration and running containers in retained product stands and `pnpm local down` to stop product stands and retain their data.
+Edit files in the same checkout. Compose Watch applies edits from `apps/web/src`,
+`apps/web/messages`, `apps/web/public`, `apps/api/src` and `packages/shared/src`.
+Web and API code update in place. Shared changes restart web, API and worker.
+Compose watches only the source formats used there. In `public`, these are JS,
+PNG and ICO files.
+Use Watch only in a trusted local checkout. Keep source files in the checkout.
+While Watch is running, avoid replacing a watched directory with a symbolic
+link to a directory outside the checkout. Compose can copy files through that
+link. Files it copies into `public` can be opened at the stand URL.
+Keep private files outside watched directories. A Git ignore rule alone does
+not exclude a file from live updates.
+
+Press Ctrl+C in the launch terminal to stop Watch. The containers stay running.
+Use `pnpm local status` from another terminal to inspect both states. After
+stopping Watch, use `pnpm local down` to stop the containers and keep their data.
+
+Restart with `pnpm local` after changing dependencies, Prisma or build settings.
+If the command reports a source change during startup, run it again. Each
+launch takes a fresh snapshot. The existing stand retains its URL, database
+and keys when its product settings stay the same.
+
+To upgrade an existing managed stand, keep its checkout and `.amcore` directory.
+Run `pnpm local` from that checkout after updating. Open the same URL and check
+a known record. Use the ordinary stop command if needed, without `--purge`.
 
 Within a checkout, `pnpm local` selects a local database from these settings:
 
@@ -48,8 +71,10 @@ explicitly request a purge through the stand recovery procedure.
 ## Prerequisites and commands
 
 Install the repository's frozen dependencies. Use its supported Node/pnpm versions
-and Docker Compose **2.24.4 or newer** for Docker lanes. The ordinary reference
-stack retains its separate version floor. Install Playwright Chromium with
+and Docker Compose **5.5.0 or newer** for `pnpm local` and `pnpm stand preview`.
+Docker E2E and manual snapshot starts require **2.24.4 or newer**. The ordinary reference
+stack retains its separate version floor. For acceptance previews, build the host shared package with
+`pnpm --filter @amcore/shared build`. Install Playwright Chromium with
 `pnpm --filter web exec playwright install chromium`. Sandbox permissions remain
 necessary for Docker, network installs, browser processes and local listening
 ports. Keep long runs in a foreground terminal with visible output.
@@ -60,22 +85,30 @@ Test files run sequentially by default because they share the host network:
 Docker network changes can interrupt Chromium's transport checks. Deliberate
 concurrent scenarios within a test retain their own process and stand orchestration.
 
-| Goal                                 | Command                                      | Data lifetime                                           |
-| ------------------------------------ | -------------------------------------------- | ------------------------------------------------------- |
-| Develop against local infrastructure | `pnpm stand up`                              | Persistent preview data                                 |
-| Prepare accounts and prove login     | `pnpm stand preview`                         | Persistent; repeated preview verifies existing accounts |
-| Browser mocks and server MSW         | `pnpm stand e2e --lane mocked`               | Per-run source/output, no Docker                        |
-| Full product/browser stack           | `pnpm stand e2e --lane real-stack`           | Fresh disposable database                               |
-| HTTPS Console host stack             | `pnpm stand e2e --lane console-real-stack`   | Fresh disposable host-mode database                     |
-| Inspect selected preview             | `pnpm stand status`                          | Read-only                                               |
-| Current operator sign-in code        | `pnpm stand code --id <stand-id>`            | Read-only; prints one code, never the secret            |
-| List records and labelled resources  | `pnpm stand list`                            | Read-only, includes missing-source orphans              |
-| Stop preview                         | `pnpm stand down`                            | Retains named volumes                                   |
-| Delete preview data explicitly       | `pnpm stand down --purge`                    | Deletes only proved-owned resources, built images too   |
-| Recover interrupted run              | `pnpm stand recover --id <stand-id> --purge` | Requires stopped children and resource ownership        |
+| Goal                                | Command                                      | Data lifetime                                           |
+| ----------------------------------- | -------------------------------------------- | ------------------------------------------------------- |
+| Start a preview from a snapshot     | `pnpm stand up`                              | Persistent preview data                                 |
+| Prepare accounts and prove login    | `pnpm stand preview`                         | Persistent; repeated preview verifies existing accounts |
+| Browser mocks and server MSW        | `pnpm stand e2e --lane mocked`               | Per-run source/output, no Docker                        |
+| Full product/browser stack          | `pnpm stand e2e --lane real-stack`           | Fresh disposable database                               |
+| HTTPS Console host stack            | `pnpm stand e2e --lane console-real-stack`   | Fresh disposable host-mode database                     |
+| Inspect selected preview            | `pnpm stand status`                          | Read-only                                               |
+| Current operator sign-in code       | `pnpm stand code --id <stand-id>`            | Read-only; prints one code, never the secret            |
+| List records and labelled resources | `pnpm stand list`                            | Read-only, includes missing-source orphans              |
+| Stop preview                        | `pnpm stand down`                            | Retains named volumes                                   |
+| Delete preview data explicitly      | `pnpm stand down --purge`                    | Deletes only proved-owned resources, built images too   |
+| Recover interrupted run             | `pnpm stand recover --id <stand-id> --purge` | Requires stopped children and resource ownership        |
 
 `--id <stand-id>` selects a recorded identity, never an arbitrary URL or Compose
 project. Default preview ID is `preview` within this checkout; e2e uses a fresh ID.
+After preparing and checking the acceptance scenario, `pnpm stand preview`
+starts the same Watch as `pnpm local`. Use `pnpm stand status --id <stand-id>`
+to check its `watch` field. Press Ctrl+C to stop Watch, then use
+`pnpm stand down --id <stand-id>` if you also want to stop the containers.
+Rerun the same preview command with the same ID and profile after changing
+dependencies or a profile replacement. Other watched edits apply while the
+preview stays open.
+
 E2E refuses preview-purpose IDs so tests cannot change acceptance data.
 `list` is diagnostic: resources removed concurrently after enumeration are skipped;
 Docker connection or permission failures are still reported. Listing grants no
@@ -398,10 +431,11 @@ reports; the deliberately public demo credentials above are a separate contract.
 Runtime records and source snapshots live under ignored `.amcore/stands/` with
 private permissions. Source admission uses tracked build inputs plus nonignored
 untracked source, excluding `.env*` except `.env.example`, secrets, other worktrees,
-dependencies and generated runtime output. Source symlinks are refused; replace a
-required public build input with an ordinary file rather than dereferencing
-private/foreign files. Refresh rebuilds from
-current source while retaining preview data. Unexpected account/role state fails
+dependencies and generated runtime output. Use ordinary files and directories
+for build inputs. The snapshot rejects symbolic links along source paths and
+leaves the previous snapshot available if copying fails. Linux needs the standard
+`/proc/self/fd` interface for source isolation. Refresh rebuilds from current
+source while retaining preview data. Unexpected account/role state fails
 instead of silently resetting the reviewer's scenario.
 
 ### Operator sign-in on a preview
@@ -470,7 +504,7 @@ Limits: a stand with the Console on its own host (**host topology**: the Console
 separate from the product) and the `account-mfa-ui` profile (which keeps the protocol only
 prepared) do not get this; the `user` profile has no operator. Review a Console screen in path
 mode unless the change is about the host itself; host behavior has its own `e2e` lanes. A bare
-`next start` or `pnpm dev` without the managed stand has no database protocol either, so operator
+A manually started web or API process has no managed database protocol, so operator
 sign-in is unavailable there.
 
 ## Target and cleanup safety
@@ -828,7 +862,8 @@ This profile copies a simulated client adapter only into the owned source
 snapshot. It refuses a normal worktree, mocked stand or E2E-purpose stand.
 It never enables backend MFA, binds a factor or grants account access. Reloading
 resets the UI example. Existing demo accounts and normal login remain separate.
-The managed inspection completes one setup/code-saving journey without tracing
+Select the saved-codes checkbox, then finish setup. The demo shows that sign-in
+protection is on. The managed inspection verifies this result without tracing
 or capturing secret steps. Do not treat simulation as backend security evidence.
 
 ### MFA in disposable browser tests

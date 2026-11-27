@@ -9,7 +9,7 @@ compiler API tools or declaration generation.
 ## Commands and outputs
 
 Run `pnpm --filter @amcore/shared build` after changing shared contracts.
-Run `pnpm --filter @amcore/shared dev` to rebuild on source changes.
+The [managed dev stand](../operations/local-stands.md#develop-a-configured-product) rebuilds shared and restarts its consumers on changes. For package-only work, use `pnpm --filter @amcore/shared dev`.
 Each build cleans `dist` before emitting dual ES2022 Node formats. The build is
 unbundled: `dist` mirrors `src` module by module.
 

@@ -23,7 +23,7 @@ export async function boot(m, fresh, steps = defaults) {
         attempt === 2
       )
         throw error
-      const hash = m.sourceHash
+      const { sourceHash: hash, watchExpected } = m
       // The old allocation is purged first, including the images it built. The new
       // identity rebuilds (from the build cache) instead of inheriting images that
       // carry the old stand's ownership labels.
@@ -40,6 +40,7 @@ export async function boot(m, fresh, steps = defaults) {
       if (hash !== next.sourceHash)
         throw new Error('Source changed during bind recovery; start a fresh review iteration')
       adoptAllocation(m, next)
+      m.watchExpected = watchExpected
       console.log(`Bind race: new owned allocation ${attempt + 2}/3; images rebuild from cache`)
     }
   }
