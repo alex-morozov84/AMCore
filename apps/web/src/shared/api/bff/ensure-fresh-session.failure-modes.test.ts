@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ensureFreshSession } from './ensure-fresh-session'
 import { SessionRefreshUnsafeError } from './errors'
 import type { UpstreamRefreshFn } from './session-vault.types'
-import { FakeVaultStore, makeEntry } from './test-fakes'
+import { FakeVaultStore, makeEntry } from './test-fakes.testkit'
 import { FailingRenewalLock, RejectingRenewalLock, SimpleLock } from './test-lock-fakes'
 
 // See ensure-fresh-session.basic.test.ts for why `server-only` needs mocking.

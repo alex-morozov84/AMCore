@@ -1,11 +1,18 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
 
+import { testAccessToken } from './access-token.testkit'
 import { ensureFreshSession } from './ensure-fresh-session'
 import { SessionLockTimeoutError } from './errors'
 import type { UpstreamRefreshFn } from './session-vault.types'
-import { FakeVaultStore, freshRefresh, makeEntry } from './test-fakes'
+import { FakeVaultStore, freshRefresh, makeEntry } from './test-fakes.testkit'
 import { QueuedFakeLock, SimpleLock, TtlAwareFakeLock } from './test-lock-fakes'
+
+const atMineToken = testAccessToken('at-mine', 2_000_000_000_000)
+
+const atOtherWriterToken = testAccessToken('at-other-writer', 2_000_000_000_000)
+
+const at2Token = testAccessToken('at-2', 2_000_000_000_000)
 
 // See ensure-fresh-session.basic.test.ts for why `server-only` needs mocking.
 vi.mock('server-only', () => ({}))
@@ -24,8 +31,8 @@ describe('ensureFreshSession — single-flight refresh protocol', () => {
     ])
 
     expect(upstreamRefresh).toHaveBeenCalledTimes(1)
-    expect(first.accessToken).toBe('at-2')
-    expect(second.accessToken).toBe('at-2')
+    expect(first.refreshToken).toBe('rt-2')
+    expect(second.accessToken).toBe(first.accessToken)
   })
 
   it('a version mismatch on write does not overwrite a newer vault entry', async () => {
@@ -38,12 +45,12 @@ describe('ensureFreshSession — single-flight refresh protocol', () => {
     const upstreamRefresh: UpstreamRefreshFn = vi.fn(async () => {
       await store.setIfVersionMatches('s1', 1, {
         ...stale,
-        accessToken: 'at-other-writer',
+        accessToken: atOtherWriterToken,
         refreshToken: 'rt-other-writer',
         accessTokenExpiresAt: Date.now() + 120_000,
       })
       return {
-        accessToken: 'at-mine',
+        accessToken: atMineToken,
         accessTokenExpiresAt: Date.now() + 60_000,
         refreshToken: 'rt-mine',
       }
@@ -56,7 +63,7 @@ describe('ensureFreshSession — single-flight refresh protocol', () => {
       upstreamRefresh,
     })
 
-    expect(result.accessToken).toBe('at-other-writer')
+    expect(result.accessToken).toBe(atOtherWriterToken)
   })
 
   it('lock renewal keeps a second caller from entering refresh once the original TTL would have expired', async () => {
@@ -102,12 +109,12 @@ describe('ensureFreshSession — single-flight refresh protocol', () => {
       await expect(secondAttempt).rejects.toBeInstanceOf(SessionLockTimeoutError)
 
       resolveUpstream({
-        accessToken: 'at-2',
+        accessToken: at2Token,
         accessTokenExpiresAt: Date.now() + 60_000,
         refreshToken: 'rt-2',
       })
       await vi.advanceTimersByTimeAsync(0)
-      await expect(firstPending).resolves.toMatchObject({ accessToken: 'at-2' })
+      await expect(firstPending).resolves.toMatchObject({ accessToken: at2Token })
     } finally {
       vi.useRealTimers()
     }

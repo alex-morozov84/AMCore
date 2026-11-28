@@ -2,7 +2,7 @@ import { cookies } from 'next/headers'
 import { vi } from 'vitest'
 
 import type { VaultEntry } from './session-vault.types'
-import { makeBrowserEntry } from './test-fakes'
+import { makeBrowserEntry } from './test-fakes.testkit'
 
 export function mockSessionCookie(value: string | undefined) {
   vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-sessions-test-key-at-least-32-characters>')

@@ -1,12 +1,14 @@
 import type { UserResponse } from '@amcore/shared'
 
+import { testAccessToken } from './access-token.testkit'
 import type { UpstreamRefreshFn, VaultEntry, VaultStore } from './session-vault.types'
 
 export function makeEntry(overrides: Partial<VaultEntry> = {}): VaultEntry {
+  const expiresAt = overrides.accessTokenExpiresAt ?? Date.now() + 60_000
   return {
     refreshToken: 'rt-1',
-    accessToken: 'at-1',
-    accessTokenExpiresAt: Date.now() + 60_000,
+    accessToken: testAccessToken('at-1', expiresAt),
+    accessTokenExpiresAt: expiresAt,
     userSnapshot: {} as unknown as UserResponse,
     version: 1,
     ...overrides,
@@ -44,12 +46,14 @@ export class FakeVaultStore implements VaultStore {
   }
 }
 
-export const freshRefresh = (): ReturnType<UpstreamRefreshFn> =>
-  Promise.resolve({
-    accessToken: 'at-2',
-    accessTokenExpiresAt: Date.now() + 60_000,
+export const freshRefresh = (): ReturnType<UpstreamRefreshFn> => {
+  const refreshExpiry = Date.now() + 60_000
+  return Promise.resolve({
+    accessToken: testAccessToken('at-2', refreshExpiry),
+    accessTokenExpiresAt: refreshExpiry,
     refreshToken: 'rt-2',
   })
+}
 
 /** Explicit published browser fixture; makeEntry still permits unbound negative cases. */
 export function makeBrowserEntry(overrides: Partial<VaultEntry> = {}): VaultEntry {

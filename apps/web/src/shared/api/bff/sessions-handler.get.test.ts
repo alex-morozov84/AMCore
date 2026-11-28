@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ensureFreshSession } from './ensure-fresh-session'
 import { SessionNotFoundError, SessionVaultUnavailableError } from './errors'
 import { handleGetSessions } from './sessions-handler'
-import { fakeVaultEntry, mockSessionCookie } from './sessions-handler.test-helpers'
-import { browserTestHeaders } from './test-fakes'
+import { fakeVaultEntry, mockSessionCookie } from './sessions-handler.test-helpers.testkit'
+import { browserTestHeaders } from './test-fakes.testkit'
 
 vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({ cookies: vi.fn(), headers: vi.fn(async () => new Headers()) }))
@@ -60,7 +60,7 @@ describe('handleGetSessions', () => {
 
   it('forwards to the backend with both Bearer and refresh_token Cookie, preserving the query string', async () => {
     mockSessionCookie('sess-1')
-    vi.mocked(ensureFreshSession).mockResolvedValue(fakeVaultEntry())
+    vi.mocked(ensureFreshSession).mockResolvedValue({ ...fakeVaultEntry(), accessToken: 'at-1' })
     const fetchMock = vi
       .fn()
       .mockResolvedValue(

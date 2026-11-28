@@ -71,10 +71,10 @@ const user = {
   lastLoginAt: null,
 } as UserResponse
 
-/** A structurally valid access token: only its `sub` and `sid` claims are read by the BFF. */
+/** A structurally valid access token: its identity and expiry claims are read by the BFF. */
 const accessToken = () => {
   const part = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url')
-  return `${part({ alg: 'none' })}.${part({ sub: user.id, sid: 'issued-session-1' })}.signature`
+  return `${part({ alg: 'none' })}.${part({ sub: user.id, sid: 'issued-session-1', exp: 2_000_000_000 })}.signature`
 }
 
 const request = () =>

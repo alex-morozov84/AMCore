@@ -15,7 +15,7 @@ import {
 } from './invitation-session-publication'
 import { InvitationBackendError } from './invitation-upstream'
 import type { InvitationVaultFlow } from './invitation-vault-record'
-import { ACCESS_TOKEN_LIFETIME_MS } from './vault-constants'
+import { readAccessTokenExpiry } from './issued-access-token'
 
 import 'server-only'
 
@@ -37,12 +37,14 @@ export async function publishInvitedCredentials(input: {
     credentials.data.user.id
   )
   if (input.oauth && input.oauth.backendSessionId !== backendId) throw invitationFlowChanged()
+  const accessTokenExpiresAt = readAccessTokenExpiry(credentials.data.accessToken)
+  if (accessTokenExpiresAt === null) throw new InvitationBackendError(503, false)
   const entry = {
     ...(snapshot.webContext ? { audience: snapshot.webContext.audience } : {}),
     ...(input.browserBinding ? { browser: input.browserBinding } : {}),
     accessToken: credentials.data.accessToken,
     refreshToken: credentials.refreshToken,
-    accessTokenExpiresAt: Date.now() + ACCESS_TOKEN_LIFETIME_MS,
+    accessTokenExpiresAt,
     userSnapshot: credentials.data.user,
     version: 1,
   }

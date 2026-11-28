@@ -9,6 +9,7 @@ interface TestUser {
 }
 interface Entry {
   version: number
+  accessToken: string
   accessTokenExpiresAt: number
   refreshToken: string
   userSnapshot: TestUser
@@ -44,7 +45,7 @@ function ownedEntry(raw: string | null, user: TestUser): Entry {
   return entry
 }
 
-const EXPIRE_OWNED = `
+const REWRITE_OWNED = `
 if redis.call('GET', KEYS[1]) ~= ARGV[1] then return 0 end
 if redis.call('PTTL', KEYS[1]) <= 0 then return 0 end
 redis.call('SET', KEYS[1], ARGV[2], 'XX', 'KEEPTTL')
@@ -75,8 +76,8 @@ export async function proveOwnedRefresh(
     const before = ownedEntry(raw, user)
     const ttl = await client.pTTL(key)
     if (ttl <= 0) throw new Error('Test session has no positive TTL')
-    const expired = { ...JSON.parse(raw!), accessTokenExpiresAt: Date.now() - 60_000 }
-    const result = await client.eval(EXPIRE_OWNED, {
+    const expired = { ...before, accessToken: 'unreadable-test-token' }
+    const result = await client.eval(REWRITE_OWNED, {
       keys: [key],
       arguments: [raw!, JSON.stringify(expired)],
     })
@@ -85,7 +86,7 @@ export async function proveOwnedRefresh(
     const remaining = await client.pTTL(key)
     if (
       mutated.version !== before.version ||
-      mutated.accessTokenExpiresAt !== expired.accessTokenExpiresAt ||
+      mutated.accessToken !== expired.accessToken ||
       remaining <= 0 ||
       remaining > ttl
     )

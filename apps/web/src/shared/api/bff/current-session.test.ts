@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ContextRequestError } from './context-errors'
 import { getCurrentVaultSession } from './current-session'
-import { FakeVaultStore, makeEntry } from './test-fakes'
+import { FakeVaultStore, makeEntry } from './test-fakes.testkit'
 
 vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({
@@ -93,10 +93,11 @@ describe('getCurrentVaultSession', () => {
     // would fail to compile/run without them.
     mockCookieStore('sess-1')
     const store = new FakeVaultStore()
-    store.seed('sess-1', boundEntry({ accessTokenExpiresAt: Date.now() - 1000 }))
+    const entry = boundEntry({ accessTokenExpiresAt: Date.now() - 1000 })
+    store.seed('sess-1', entry)
 
     const result = await getCurrentVaultSession(store)
 
-    expect(result?.entry.accessToken).toBe('at-1')
+    expect(result?.entry).toBe(entry)
   })
 })

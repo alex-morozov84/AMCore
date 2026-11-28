@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { ContextRequestError } from './context-errors'
 import { ensureFreshSession } from './ensure-fresh-session'
-import { FakeVaultStore, freshRefresh, makeEntry } from './test-fakes'
+import { FakeVaultStore, freshRefresh, makeEntry } from './test-fakes.testkit'
 import { SimpleLock } from './test-lock-fakes'
 
 vi.mock('server-only', () => ({}))

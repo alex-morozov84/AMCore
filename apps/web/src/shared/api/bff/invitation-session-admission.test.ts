@@ -3,7 +3,7 @@ import { expect, it, vi } from 'vitest'
 
 import type { ContextExecutorDeps } from './context-executor'
 import { invitationIncomingSession } from './invitation-request-snapshot'
-import { makeEntry } from './test-fakes'
+import { makeEntry } from './test-fakes.testkit'
 
 vi.mock('server-only', () => ({}))
 function fixture(entry: ReturnType<typeof makeEntry> | null) {

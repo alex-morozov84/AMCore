@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { testAccessToken } from './access-token.testkit'
 import { publishInvitedCredentials } from './invitation-auth-publication'
 import { publishInvitationAuth } from './invitation-auth-transition'
 import { invitationIssuedSessionId } from './invitation-issued-session'
@@ -30,7 +31,10 @@ function input(): Parameters<typeof publishInvitedCredentials>[0] {
     },
     attempt: { id: 'i'.repeat(22), fence: 'z'.repeat(22), expiresAt: Date.now() + 60000 },
     credentials: {
-      data: { user: { id: 'user-example' }, accessToken: '<test-access>' },
+      data: {
+        user: { id: 'user-example' },
+        accessToken: testAccessToken('user-example', 2_000_000_000_000),
+      },
       refreshToken: '<test-refresh>',
     },
     signal: new AbortController().signal,
@@ -55,6 +59,11 @@ describe('server-only credential publication orchestration', () => {
     const result = await publishInvitedCredentials(input())
     expect(result.sessionId).toBe('s'.repeat(43))
     expect(result.binding.flowRevision).toBe(3)
+    expect(stageInvitationSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entry: expect.objectContaining({ accessTokenExpiresAt: 2_000_000_000_000 }),
+      })
+    )
     expect(publishInvitationSession).toHaveBeenCalledWith(
       'a'.repeat(64),
       4,
@@ -86,6 +95,9 @@ describe('server-only credential publication orchestration', () => {
     const missing = input()
     missing.credentials.refreshToken = null
     await expect(publishInvitedCredentials(missing)).rejects.toThrow()
+    const invalidExpiry = input()
+    invalidExpiry.credentials.data.accessToken = 'opaque'
+    await expect(publishInvitedCredentials(invalidExpiry)).rejects.toThrow()
     const canceled = input()
     canceled.signal = AbortSignal.abort()
     await expect(publishInvitedCredentials(canceled)).rejects.toThrow()

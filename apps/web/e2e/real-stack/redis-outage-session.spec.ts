@@ -129,9 +129,8 @@ test('a replayed stale refresh token is rejected by the backend and ends the sto
 
     // Put the already-rotated token back with an expired access token: a reuse the backend detects.
     await rewriteEntry(cookie, (entry) => ({
-      ...entry,
+      ...ageAccessToken(entry),
       refreshToken: first.refreshToken,
-      accessTokenExpiresAt: Date.now() - 60_000,
     }))
     const rejected = await context.request.get('/api/auth/me', { timeout: 15_000 })
     expect(rejected.status()).toBe(401)

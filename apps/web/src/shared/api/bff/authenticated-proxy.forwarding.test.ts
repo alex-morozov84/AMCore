@@ -2,10 +2,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { proxyToBackend } from './authenticated-proxy'
-import { makeRequest, mockCookieStore } from './authenticated-proxy.test-helpers'
+import { makeRequest, mockCookieStore } from './authenticated-proxy.test-helpers.testkit'
 import { ensureFreshSession } from './ensure-fresh-session'
 import { isTrustedOrigin } from './origin-guard'
-import { makeBrowserEntry } from './test-fakes'
+import { makeBrowserEntry } from './test-fakes.testkit'
 
 vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({ cookies: vi.fn(), headers: vi.fn(async () => new Headers()) }))
@@ -17,7 +17,7 @@ describe('proxyToBackend — request/response forwarding once authenticated', ()
   beforeEach(() => {
     vi.mocked(isTrustedOrigin).mockReturnValue(true)
     mockCookieStore('sess-1')
-    vi.mocked(ensureFreshSession).mockResolvedValue(makeBrowserEntry())
+    vi.mocked(ensureFreshSession).mockResolvedValue(makeBrowserEntry({ accessToken: 'at-1' }))
   })
 
   afterEach(() => {

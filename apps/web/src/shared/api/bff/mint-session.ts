@@ -2,9 +2,9 @@ import { randomBytes } from 'node:crypto'
 
 import type { UserResponse } from '@amcore/shared'
 
+import { readAccessTokenExpiry } from './issued-access-token'
 import type { VaultStore } from './session-vault.types'
 import { redisVaultStore } from './session-vault-store'
-import { ACCESS_TOKEN_LIFETIME_MS } from './vault-constants'
 
 import 'server-only'
 
@@ -29,12 +29,14 @@ export async function mintSession(
   params: MintSessionParams,
   store: VaultStore = redisVaultStore
 ): Promise<MintedSession> {
+  const accessTokenExpiresAt = readAccessTokenExpiry(params.accessToken)
+  if (accessTokenExpiresAt === null) throw new TypeError('API access token has no usable expiry')
   const sessionId = randomBytes(32).toString('base64url')
 
   await store.create(sessionId, {
     accessToken: params.accessToken,
     refreshToken: params.refreshToken,
-    accessTokenExpiresAt: Date.now() + ACCESS_TOKEN_LIFETIME_MS,
+    accessTokenExpiresAt,
     userSnapshot: params.user,
   })
 

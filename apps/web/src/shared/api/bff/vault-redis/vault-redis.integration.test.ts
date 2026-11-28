@@ -2,6 +2,7 @@ import type { UserResponse } from '@amcore/shared'
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { testAccessToken } from '../access-token.testkit'
 import { ensureFreshSession } from '../ensure-fresh-session'
 import { SessionLockTimeoutError, SessionVaultUnavailableError } from '../errors'
 import { createRedisVaultLock } from '../session-lock-factory'
@@ -223,9 +224,10 @@ describe('refresh owner across processes on a real lock', () => {
       timing: { stageMs: 20_000, owner: { acquireMs: 800 } },
     })
     await expect(second).rejects.toBeInstanceOf(SessionLockTimeoutError)
+    const expiresAt = Date.now() + 60_000
     release({
-      accessToken: 'at-2',
-      accessTokenExpiresAt: Date.now() + 60_000,
+      accessToken: testAccessToken('rotated', expiresAt),
+      accessTokenExpiresAt: expiresAt,
       refreshToken: 'rt-2',
     })
     await expect(first).resolves.toMatchObject({ refreshToken: 'rt-2', version: 2 })

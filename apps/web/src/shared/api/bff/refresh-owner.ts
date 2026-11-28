@@ -9,6 +9,7 @@ import {
   SessionVaultUnavailableError,
   UpstreamRotationUnprovenError,
 } from './errors'
+import { isAccessTokenFresh } from './issued-access-token'
 import { startLockRenewal } from './lock-renewal'
 import { hasSessionAudience, type SessionAudience } from './session-audience'
 import type {
@@ -47,7 +48,6 @@ export const OWNER_TIMING: OwnerTiming = {
 
 /** Longest the binding probe may wait, whatever is left of the owner budget. */
 const PROBE_MAX_MS = 10_000
-const REFRESH_SAFETY_MARGIN_MS = 30 * 1000
 
 export interface OwnerDeps<TRecord extends VaultRecord> {
   expectedAudience?: SessionAudience
@@ -114,7 +114,7 @@ export async function runRefreshOwner<TRecord extends VaultRecord>(
     const current = await readOne()
     if (!current) throw new SessionNotFoundError('unavailable')
     await step(() => deps.verifyBinding(current, probe()))
-    if (current.accessTokenExpiresAt > deps.now() + REFRESH_SAFETY_MARGIN_MS) return current
+    if (isAccessTokenFresh(current.accessToken, deps.now())) return current
 
     // Raced against lease loss: it moves on whether or not the call honors abort.
     const result = await step(() => {

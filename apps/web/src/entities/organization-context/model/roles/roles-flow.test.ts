@@ -9,7 +9,7 @@ import { contextRoute } from '@/shared/api/bff/context-route'
 import { contextSessionBinding } from '@/shared/api/bff/context-session'
 import { productContextDeps } from '@/shared/api/bff/product-context-deps'
 import { roleRouteBody, roleRouteInput } from '@/shared/api/bff/role-route'
-import { FakeVaultStore, freshRefresh, makeBrowserEntry } from '@/shared/api/bff/test-fakes'
+import { FakeVaultStore, freshRefresh, makeBrowserEntry } from '@/shared/api/bff/test-fakes.testkit'
 import { SimpleLock } from '@/shared/api/bff/test-lock-fakes'
 
 import {

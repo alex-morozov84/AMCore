@@ -13,6 +13,7 @@ import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 
 export interface VaultEntry {
   version: number
+  accessToken: string
   accessTokenExpiresAt: number
   refreshToken: string
   userSnapshot: { id: string }
@@ -47,7 +48,7 @@ export async function readEntry(cookie: string): Promise<VaultEntry | null> {
   return raw ? (JSON.parse(raw) as VaultEntry) : null
 }
 
-/** Rewrites only this test-created entry, keeping its TTL; used to age the access token or replay a stale refresh token. */
+/** Rewrites only this test-created entry, keeping its TTL; used to prepare a stale access token or replay an old refresh token. */
 export async function rewriteEntry(
   cookie: string,
   change: (entry: VaultEntry) => VaultEntry
@@ -66,7 +67,7 @@ export async function rewriteEntry(
 
 export const ageAccessToken = (entry: VaultEntry): VaultEntry => ({
   ...entry,
-  accessTokenExpiresAt: Date.now() - 60_000,
+  accessToken: 'unreadable-test-token',
 })
 
 export function pauseRedis(ms: number): void {
@@ -117,7 +118,7 @@ export function refreshHoldActive(): boolean {
   return granted.trim() === '1'
 }
 
-export function holdRefreshInProgress(ms: number): Promise<void> {
+export function holdRefreshInProgress(ms: number, cancellable = false): Promise<void> {
   const script = resolve(process.cwd(), '../../scripts/stand/exec.mjs')
   const query = `LOCK TABLE core.invitation_auth_handoffs IN ACCESS EXCLUSIVE MODE; SELECT pg_sleep(${ms / 1000});`
   return new Promise((done, fail) =>
@@ -134,7 +135,11 @@ export function holdRefreshInProgress(ms: number): Promise<void> {
           AMCORE_STAND_TOKEN: process.env.AMCORE_STAND_TOKEN,
         },
       },
-      (error) => (error ? fail(error) : done())
+      (error, _stdout, stderr) => {
+        if (error && !(cancellable && stderr.includes('canceling statement due to user request')))
+          fail(error)
+        else done()
+      }
     )
   )
 }

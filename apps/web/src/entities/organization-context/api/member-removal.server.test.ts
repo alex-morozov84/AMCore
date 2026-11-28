@@ -12,7 +12,7 @@ import {
 } from '@/shared/api/bff/context-route-input'
 import { contextSessionBinding } from '@/shared/api/bff/context-session'
 import { productContextDeps } from '@/shared/api/bff/product-context-deps'
-import { FakeVaultStore, freshRefresh, makeBrowserEntry } from '@/shared/api/bff/test-fakes'
+import { FakeVaultStore, freshRefresh, makeBrowserEntry } from '@/shared/api/bff/test-fakes.testkit'
 import { SimpleLock } from '@/shared/api/bff/test-lock-fakes'
 import { ApiRequestError } from '@/shared/api/http-client'
 

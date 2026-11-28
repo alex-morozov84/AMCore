@@ -140,7 +140,7 @@ function upstream(
     codesSaved = false,
     codeGeneration = 1
   let invited: { attemptId: string; cleanupKey: string } | undefined
-  const accessToken = `fakeheader.${Buffer.from(JSON.stringify({ sub: user.id, sid: 'session-A' })).toString('base64url')}.fakesignature`
+  let accessToken = `fakeheader.${Buffer.from(JSON.stringify({ sub: user.id, sid: 'session-A', exp: 2_000_000_000 })).toString('base64url')}.fakesignature`
   const view = () => ({
     contextId: 'context-A',
     generation,
@@ -390,6 +390,7 @@ function upstream(
         throw new Error('Expected durable staged journal')
       const entry = await context().store.get(retained.record.vaultId)
       expect(entry?.refreshToken).toBe('1'.repeat(64))
+      expect(entry?.accessTokenExpiresAt).toBe(2_000_000_000_000)
       expect(entry?.browser?.generation).toBe(generation)
       expect(body.receipt).toBe(receipt)
       expect(body.operationId).toBe(operationId)
@@ -443,6 +444,9 @@ function upstream(
     send,
     requirePassword: () => {
       needsPassword = true
+    },
+    omitAccessTokenExpiry: () => {
+      accessToken = `fakeheader.${Buffer.from(JSON.stringify({ sub: user.id, sid: 'session-A' })).toString('base64url')}.fakesignature`
     },
     obsolete: () => {
       generation += 1
@@ -1119,6 +1123,18 @@ describe('Browser password/MFA publication with actual Redis', () => {
       status: 401,
       errorCode: 'AUTH_CONTEXT_CHANGED',
     })
+  })
+
+  it('retires a browser issuance without usable expiry before acknowledgement or cookie', async () => {
+    const backend = upstream()
+    backend.omitAccessTokenExpiry()
+
+    await expect(signIn()).rejects.toMatchObject({ status: 503 })
+    expect(browser.cookies.amcore_session).toBeUndefined()
+    const record = await readBrowserAuthAttempt(request('/').headers, context())
+    expect(record?.record.state).toBe('cleanup_needed')
+    expect(record?.record).not.toHaveProperty('vaultId')
+    expect(backend.counts()).toMatchObject({ acknowledgements: 0, retirements: 1, refreshes: 0 })
   })
 
   it('retains exact parent/operation before credential-response loss and compensates without publishing a cookie', async () => {

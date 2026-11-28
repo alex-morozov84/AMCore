@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { proxyToBackend } from './authenticated-proxy'
-import { makeRequest } from './authenticated-proxy.test-helpers'
+import { makeRequest } from './authenticated-proxy.test-helpers.testkit'
 import { ensureFreshSession } from './ensure-fresh-session'
 import { isTrustedOrigin } from './origin-guard'
 import { createUpstreamRefresh } from './upstream-refresh'

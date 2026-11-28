@@ -18,7 +18,7 @@ import {
   FakeVaultStore,
   freshRefresh,
   makeBrowserEntry,
-} from '@/shared/api/bff/test-fakes'
+} from '@/shared/api/bff/test-fakes.testkit'
 import { SimpleLock } from '@/shared/api/bff/test-lock-fakes'
 
 import {
