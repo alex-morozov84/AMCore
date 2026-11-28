@@ -10,7 +10,7 @@ import {
 } from './invitation-surface'
 import { type InvitationOwnerRecord, invitationOwnerRecordSchema } from './invitation-vault-record'
 import type { ProductWebContext } from './product-web-context.server'
-import { getWebRedisClient } from './redis-client'
+import { sharedRedis } from './shared-redis'
 
 import 'server-only'
 
@@ -58,7 +58,7 @@ export const invitationOwnerStore = {
   ): Promise<void> {
     if (context?.frontend !== 'admin') return
     await withInvitationStorage(async () => {
-      const redis = await getWebRedisClient()
+      const redis = sharedRedis()
       const key = invitationOwnerKey(hash, context)
       const raw = await redis.get(key)
       if (raw === null) return
@@ -91,12 +91,14 @@ export const invitationOwnerStore = {
     assertInvitationSurface(parsed, context)
     if (parsed.version !== 1) throw new ContextRequestError(400, 'BAD_REQUEST')
     return withInvitationStorage(async () => {
-      const result = await (
-        await getWebRedisClient()
-      ).set(invitationOwnerKey(hash, context), JSON.stringify(parsed), {
-        condition: 'NX',
-        expiration: { type: 'PXAT', value: parsed.expiresAt },
-      })
+      const result = await sharedRedis().set(
+        invitationOwnerKey(hash, context),
+        JSON.stringify(parsed),
+        {
+          condition: 'NX',
+          expiration: { type: 'PXAT', value: parsed.expiresAt },
+        }
+      )
       return result === 'OK'
     })
   },
@@ -106,7 +108,7 @@ export const invitationOwnerStore = {
     context?: ProductWebContext
   ): Promise<InvitationOwnerRecord | null> {
     return withInvitationStorage(async () => {
-      const raw = await (await getWebRedisClient()).get(invitationOwnerKey(hash, context))
+      const raw = await sharedRedis().get(invitationOwnerKey(hash, context))
       if (raw === null) return null
       const record = invitationOwnerRecordSchema.parse(JSON.parse(raw))
       assertInvitationSurface(record, context)
@@ -123,9 +125,7 @@ export const invitationOwnerStore = {
     const record = invitationOwnerRecordSchema.parse({ ...next, version: expectedVersion + 1 })
     assertInvitationSurface(record, context)
     return withInvitationStorage(async () => {
-      const result = await (
-        await getWebRedisClient()
-      ).eval(OWNER_CAS, {
+      const result = await sharedRedis().eval(OWNER_CAS, {
         keys: [invitationOwnerKey(hash, context)],
         arguments: [String(expectedVersion), JSON.stringify(record)],
       })

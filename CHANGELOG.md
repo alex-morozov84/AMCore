@@ -15,7 +15,9 @@ versions they name. For current source-update instructions, see
 ### Fixed
 
 - Save the invitation registration page language in the new profile.
-
+- Local development images prepare the pnpm executable during the build so
+  preview services can start without downloading it.
+- Bound waits for shared web Redis records and let operators retry an unconfirmed Console sign-out.
 - Explain rate limits and show the server’s wait when available. The own API
   keys page lets users retry the session check from the page.
 

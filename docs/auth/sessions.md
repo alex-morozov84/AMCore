@@ -85,8 +85,14 @@ The product `amcore_session` and `web:session:v1:*` remain unchanged. Neither
 side reads the other cookie or namespace. Console admission is additionally a
 live `SUPER_ADMIN` policy probe on every protected request, so a role demotion
 takes effect on the next request even when the stored access token is still
-within its normal lifetime. Console logout deletes only this console vault
-entry and cookie.
+within its normal lifetime. Confirmed Console logout ends the selected session.
+The stale cookie no longer grants access.
+
+If the Console shows **Sign-out was not confirmed**, use **Retry sign-out** when
+the button is available. The Console checks the original receipt and can retry
+only for the session that started it. A later session keeps its own access.
+If the message appears by itself, the result is still unconfirmed and the
+Console offers no retry for that receipt.
 
 ---
 

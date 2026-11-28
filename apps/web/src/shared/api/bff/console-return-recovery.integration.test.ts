@@ -8,7 +8,8 @@ vi.mock('server-only', () => ({}))
 
 import { readBrowserAuthAttempt } from './browser-auth-attempt'
 import { handleBrowserBootstrap } from './browser-bootstrap-handler'
-import { anchorDigest, returnEntrySchema } from './console-return-entry'
+import { anchorDigest, logoutConsoleReturnEntry, returnEntrySchema } from './console-return-entry'
+import * as mfaSettings from './mfa-settings-handler'
 import { resolveProductWebContext } from './product-web-context.server'
 import { getWebRedisClient } from './redis-client'
 import { redisFixtureSite, redisFixtureStaff } from './redis-integration-origins.testkit'
@@ -96,6 +97,16 @@ it.each([false, true])(
           operationId: entry.operationId,
           returnEntryId: id,
         })
+      if (url.endsWith('/logout-with-receipt'))
+        return Response.json({
+          state: 'logged_out',
+          operationId: entry.operationId,
+          returnEntryId: id,
+          beforeGeneration: 1,
+          afterGeneration: 2,
+          contextId: entry.browser.contextId,
+          audience: entry.audience,
+        })
       throw new Error('Unexpected upstream request')
     })
     vi.stubGlobal('fetch', upstream)
@@ -124,5 +135,39 @@ it.each([false, true])(
         ([url]) => !url.endsWith('/bootstrap') && !url.endsWith('/logout-result')
       )
     ).toEqual([])
+    const source = vi.spyOn(mfaSettings, 'settingsSource').mockResolvedValueOnce({
+      sourceFingerprint: competitor ? 'f'.repeat(64) : entry.sourceFingerprint,
+      contextSession: entry.sourceIntent,
+      entry: { refreshToken: '<fake-test-refresh-token>' },
+    } as Awaited<ReturnType<typeof mfaSettings.settingsSource>>)
+    const remove = vi.spyOn(context.store, 'delete').mockResolvedValueOnce(undefined)
+    const retry = new Request(`${redisFixtureSite}/api/auth/logout`, {
+      method: 'POST',
+      headers: {
+        ...Object.fromEntries(first.headers),
+        cookie: `amcore_browser_context=${anchor}; amcore_session=${'g'.repeat(43)}`,
+        'x-amcore-context-session': entry.sourceIntent,
+        'x-amcore-return-entry': id,
+      },
+      body: JSON.stringify({ returnEntryId: id }),
+    })
+    try {
+      if (competitor) {
+        await expect(logoutConsoleReturnEntry(retry, context)).rejects.toMatchObject({
+          errorCode: 'AUTH_CONTEXT_CHANGED',
+        })
+      } else {
+        const response = await logoutConsoleReturnEntry(retry, context)
+        expect(response.status).toBe(200)
+        expect(await response.json()).toEqual({ returnEntryId: id, state: 'logged_out' })
+        expect(response.headers.get('set-cookie')).toBeNull()
+      }
+      const retries = upstream.mock.calls.filter(([url]) => url.endsWith('/logout-with-receipt'))
+      expect(retries).toHaveLength(competitor ? 0 : 1)
+      expect(remove).toHaveBeenCalledTimes(competitor ? 0 : 1)
+    } finally {
+      source.mockRestore()
+      remove.mockRestore()
+    }
   }
 )

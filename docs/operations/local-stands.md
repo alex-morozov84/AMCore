@@ -102,8 +102,9 @@ concurrent scenarios within a test retain their own process and stand orchestrat
 `--id <stand-id>` selects a recorded identity, never an arbitrary URL or Compose
 project. Default preview ID is `preview` within this checkout; e2e uses a fresh ID.
 After preparing and checking the acceptance scenario, `pnpm stand preview`
-starts the same Watch as `pnpm local`. Use `pnpm stand status --id <stand-id>`
-to check its `watch` field. Press Ctrl+C to stop Watch, then use
+starts the same Watch as `pnpm local`. A build failure appears in the launch
+terminal before Watch starts. Use `pnpm stand status --id <stand-id>` to check
+the `watch` field of a running preview. Press Ctrl+C to stop Watch, then use
 `pnpm stand down --id <stand-id>` if you also want to stop the containers.
 Rerun the same preview command with the same ID and profile after changing
 dependencies or a profile replacement. Other watched edits apply while the

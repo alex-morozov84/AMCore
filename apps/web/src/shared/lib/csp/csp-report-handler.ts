@@ -1,4 +1,4 @@
-import { getWebRedisClient } from '@/shared/api/bff/redis-client'
+import { CspRedisCapacityError, sharedRedis } from '@/shared/api/bff/shared-redis'
 import { resolveTrustedClientIp } from '@/shared/api/bff/trusted-client-ip'
 
 import { isCspReportRateLimited } from './csp-report-rate-limit'
@@ -9,25 +9,7 @@ import 'server-only'
 
 const MAX_BODY_BYTES = 16 * 1024
 const ACCEPTED_CONTENT_TYPES = new Set(['application/csp-report', 'application/reports+json'])
-const REDIS_ACQUIRE_TIMEOUT_MS = 250
-
-/**
- * `getWebRedisClient()`'s underlying `connect()` never rejects when Redis
- * is unreachable — its `reconnectStrategy` (ADR-068's session vault,
- * correctly, wants indefinite retry-with-backoff there) just keeps trying
- * forever. Awaiting it directly here would hang this request indefinitely
- * whenever Redis is down, defeating the entire fail-open design. Racing it
- * against a short timeout instead — found by actually testing this against
- * an unreachable Redis, not assumed.
- */
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<never>((_resolve, reject) => {
-      setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms)
-    }),
-  ])
-}
+const REDIS_TIMEOUT_MS = 250
 
 // Used as the rate-limit bucket key when no trusted client-IP header is
 // configured (WEB_TRUSTED_CLIENT_IP_HEADER, ADR-072) — a documented
@@ -61,16 +43,11 @@ export async function handleCspReport(request: Request): Promise<Response> {
 
   const clientKey = resolveTrustedClientIp(request.headers) ?? UNATTRIBUTED_CLIENT_KEY
   try {
-    const redis = await withTimeout(getWebRedisClient(), REDIS_ACQUIRE_TIMEOUT_MS)
-    if (await isCspReportRateLimited(redis, clientKey)) {
+    if (await isCspReportRateLimited(sharedRedis(REDIS_TIMEOUT_MS, true), clientKey))
       return new Response(null, { status: 204 })
-    }
   } catch (error) {
-    // Redis itself unreachable or slow to (re)connect (not just the
-    // rate-limit check failing internally, which isCspReportRateLimited
-    // already fails open on) — still accept the report rather than hang or
-    // 500 a public endpoint over an outage in an unrelated dependency.
-    console.error('[csp-report] Redis unavailable, skipping rate limit', error)
+    if (error instanceof CspRedisCapacityError) return new Response(null, { status: 204 })
+    console.error('[csp-report] Redis unavailable, skipping rate limit')
   }
 
   const reports = parseCspReport(contentType, rawBody)

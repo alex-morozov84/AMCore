@@ -16,8 +16,8 @@ import {
 } from './invitation-surface'
 import { type InvitationOwnerRecord, invitationOwnerRecordSchema } from './invitation-vault-record'
 import type { ProductWebContext } from './product-web-context.server'
-import { getWebRedisClient } from './redis-client'
 import type { VaultRecord } from './session-vault.types'
+import { sharedRedis } from './shared-redis'
 import { VAULT_TTL_SECONDS } from './vault-constants'
 
 import 'server-only'
@@ -122,12 +122,14 @@ export async function stageInvitationSession(input: {
     ...(input.oauth ? { oauth: input.oauth } : {}),
   }
   await withInvitationStorage(async () => {
-    const result = await (
-      await getWebRedisClient()
-    ).set(stagingKey(sessionId, input.context), JSON.stringify(record), {
-      condition: 'NX',
-      expiration: { type: 'PXAT', value: input.deadline },
-    })
+    const result = await sharedRedis().set(
+      stagingKey(sessionId, input.context),
+      JSON.stringify(record),
+      {
+        condition: 'NX',
+        expiration: { type: 'PXAT', value: input.deadline },
+      }
+    )
     if (result !== 'OK') throw new SessionVaultUnavailableError(undefined)
   })
   return sessionId
@@ -145,9 +147,7 @@ export async function publishInvitationSession(
   const parsed = invitationOwnerRecordSchema.parse({ ...next, version: expectedVersion + 1 })
   assertInvitationSurface(parsed, context)
   return withInvitationStorage(async () => {
-    const result = await (
-      await getWebRedisClient()
-    ).eval(PUBLISH, {
+    const result = await sharedRedis().eval(PUBLISH, {
       keys: [
         invitationOwnerKey(ownerHash, context),
         stagingKey(sessionId, context),
@@ -172,9 +172,7 @@ export async function discardInvitationSession(
   context?: ProductWebContext
 ): Promise<void> {
   await withInvitationStorage(async () => {
-    await (
-      await getWebRedisClient()
-    ).eval(
+    await sharedRedis().eval(
       `
       local raw = redis.call('GET', KEYS[1])
       if not raw then return 0 end

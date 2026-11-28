@@ -30,7 +30,7 @@ export type WebRedisClient = ReturnType<typeof createWebRedisClient>
 // instead of racing to open multiple sockets.
 let clientPromise: Promise<WebRedisClient> | undefined
 
-/** Lazily connects a shared Redis client for the BFF session vault. */
+/** Lazily connects the shared client. Runtime record accesses use sharedRedis. */
 export async function getWebRedisClient(): Promise<WebRedisClient> {
   if (!clientPromise) {
     const client = createWebRedisClient()

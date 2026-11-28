@@ -6,7 +6,11 @@ vi.mock('server-only', () => ({}))
 vi.mock('./origin-guard', () => ({ isTrustedConsoleOrigin: vi.fn() }))
 vi.mock('@/shared/api/bff/browser-login-handler', () => ({ handleBrowserPassword: vi.fn() }))
 
+vi.mock('@/shared/api/bff/redis-client', () => ({ getWebRedisClient: vi.fn() }))
+
+import { pendingAuthCookie } from '@/shared/api/bff/browser-auth-attempt'
 import { handleBrowserPassword } from '@/shared/api/bff/browser-login-handler'
+import { getWebRedisClient, type WebRedisClient } from '@/shared/api/bff/redis-client'
 import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
 import { stubProductOrigins } from '@/test/product-origins'
 
@@ -93,5 +97,37 @@ describe('Console login shares exact-attempt browser publication', () => {
     const response = await handleConsoleLogin(request())
     expect(response.status).toBe(503)
     expect(response.headers.get('set-cookie')).toBeNull()
+  })
+
+  it('dispatches no Redis command if login is cancelled while waiting for connection', async () => {
+    const real = await vi.importActual<{ handleBrowserPassword: typeof handleBrowserPassword }>(
+      '@/shared/api/bff/browser-login-handler'
+    )
+    vi.mocked(handleBrowserPassword).mockImplementationOnce(real.handleBrowserPassword)
+    const pending = Promise.withResolvers<WebRedisClient>()
+    const connecting = Promise.withResolvers<void>()
+    vi.mocked(getWebRedisClient).mockImplementationOnce(() => {
+      connecting.resolve()
+      return pending.promise
+    })
+    const get = vi.fn().mockResolvedValue(null)
+    const controller = new AbortController()
+    const incoming = new Request(request(), { signal: controller.signal })
+    const cookie = pendingAuthCookie(consoleBrowserContext(incoming))
+    incoming.headers.set('cookie', `${cookie.name}=${'a'.repeat(43)}`)
+
+    const login = handleConsoleLogin(incoming)
+    expect(await Promise.race([connecting.promise.then(() => true), login.then(() => false)])).toBe(
+      true
+    )
+    controller.abort()
+    pending.resolve({
+      isReady: true,
+      withCommandOptions: () => ({ get }),
+    } as unknown as WebRedisClient)
+    const response = await login
+    expect(response.status).toBe(503)
+    expect(response.headers.get('set-cookie')).toBeNull()
+    expect(get).not.toHaveBeenCalled()
   })
 })

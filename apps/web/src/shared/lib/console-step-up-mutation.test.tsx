@@ -93,8 +93,10 @@ describe('MFA source continuation', () => {
     expiresAt: new Date(Date.now() + 60000).toISOString(),
     requiredProofs: ['second_factor' as const],
   }
-  it('does not retry the sensitive action after password-only 202; retries once after MFA completion', async () => {
-    vi.mocked(consoleApi.stepUp).mockResolvedValue(flow)
+  it('restarts after a lost start and retries the sensitive action only after MFA', async () => {
+    vi.mocked(consoleApi.stepUp)
+      .mockRejectedValueOnce(new TypeError('lost start response'))
+      .mockResolvedValueOnce(flow)
     vi.mocked(consoleApi.stepUpProof).mockResolvedValue(undefined)
     const mutationFn = vi.fn().mockRejectedValueOnce(stale).mockResolvedValue('sent')
     const view = renderHook(() => useStepUpMutation({ mutationFn, onSuccess: vi.fn() }), {
@@ -106,6 +108,13 @@ describe('MFA source continuation', () => {
     await act(async () => {
       await view.result.current.submitStepUp('<fake-password>')
     })
+    expect(view.result.current.stepUp).toMatchObject({ kind: 'error', terminal: false })
+    expect(mutationFn).toHaveBeenCalledTimes(1)
+    expect(consoleApi.stepUpProof).not.toHaveBeenCalled()
+    await act(async () => {
+      await view.result.current.submitStepUp('<fake-password>')
+    })
+    expect(consoleApi.stepUp).toHaveBeenCalledTimes(2)
     expect(view.result.current.stepUp.kind).toBe('proof')
     expect(mutationFn).toHaveBeenCalledTimes(1)
     await act(async () => {

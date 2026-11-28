@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
+import { SessionVaultUnavailableError } from './errors'
 import {
   admitInvitationFlow,
   newInvitationOwner,
@@ -14,16 +15,21 @@ import {
   createInvitationVerificationSelector,
   readInvitationVerificationSelector,
 } from './invitation-verification-store'
-import { getWebRedisClient } from './redis-client'
+import * as redisClient from './redis-client'
+import { createBffRedisClient } from './redis-client-options'
+import { redisTransportStall } from './vault-redis/test-redis-transport-stall'
 
 vi.mock('server-only', () => ({}))
 let container: StartedRedisContainer | undefined
+let proxy: Awaited<ReturnType<typeof redisTransportStall>>
 beforeAll(async () => {
   container = await new RedisContainer('redis:7-alpine').start()
-  process.env.REDIS_URL = container.getConnectionUrl()
+  proxy = await redisTransportStall(container.getHost(), container.getMappedPort(6379))
+  process.env.REDIS_URL = `redis://127.0.0.1:${proxy.port}`
 }, 60000)
 afterAll(async () => {
-  if (container) await (await getWebRedisClient()).close()
+  if (container) await (await redisClient.getWebRedisClient()).close()
+  await proxy?.close()
   await container?.stop()
 })
 
@@ -98,5 +104,32 @@ describe('verification return selector authority on real Redis', () => {
     expect(await invitationOwnerStore.compareAndSet(hash, 1, next)).toBe(true)
     expect(await consumeInvitationVerificationSelector(id, hash, 2, record)).toBe(false)
     expect(await readInvitationVerificationSelector(id, hash, record.origin)).not.toBeNull()
+  })
+})
+
+describe('verification return selector after an uncertain Redis result', () => {
+  it.each(['reply held', 'command held'])('keeps the selector one-use when %s', async (fault) => {
+    const { hash, record, id } = await fixture()
+    const direct = createBffRedisClient(container!.getConnectionUrl())
+    await direct.connect()
+    const connection = vi.spyOn(redisClient, 'getWebRedisClient')
+    const consume = () => consumeInvitationVerificationSelector(id, hash, 1, record)
+    const read = () => readInvitationVerificationSelector(id, hash, record.origin)
+    try {
+      if (fault === 'reply held') proxy.holdReplies()
+      else proxy.holdCommands()
+      await expect(consume()).rejects.toBeInstanceOf(SessionVaultUnavailableError)
+      connection.mockResolvedValueOnce(direct)
+      expect(await read()).toEqual(fault === 'reply held' ? null : record)
+      connection.mockResolvedValueOnce(direct)
+      expect(await consume()).toBe(fault === 'command held')
+      proxy.release()
+      expect(await read()).toBeNull()
+      expect(await consume()).toBe(false)
+    } finally {
+      connection.mockRestore()
+      proxy.release()
+      await direct.close()
+    }
   })
 })

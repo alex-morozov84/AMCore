@@ -279,11 +279,14 @@ mechanism**, and deliberately does not grow into one:
   `application/reports+json` (current) — anything else is a silent `204`.
 - Caps the body at 16KB, checked against both `Content-Length` and the
   actual bytes read.
-- Applies a best-effort Redis fixed-window rate limit (20 requests/10s per
-  client, or a shared bucket if `WEB_TRUSTED_CLIENT_IP_HEADER` — see
-  `docs/frontend/api-consumption.md` — is not configured), failing open on
-  any Redis trouble rather than ever hanging or `500`ing this public
-  endpoint.
+- Applies a Redis fixed-window rate limit of 20 requests per 10 s. With no
+  trusted client IP header, all requests use one bucket. The first increment
+  sets the window expiry atomically.
+- Waits up to 250 ms for Redis. Up to eight CSP operations can occupy places
+  in the shared Redis limit. At that capacity, the next report receives
+  `204` without a log entry. An in-flight operation keeps its place after
+  the HTTP timeout until the command settles. A report admitted to Redis
+  can still be logged when Redis is unavailable.
 - Logs a normalized, **allowlisted** summary via `console.warn` — no new
   storage, no dashboard. Query strings, `referrer`, `user_agent`, and the
   echoed-back policy text are dropped; the violation sample is truncated to

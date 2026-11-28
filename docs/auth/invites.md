@@ -168,8 +168,10 @@ creates an organization/member or marks email verified. Expiry/reissue before
 its account-creation transaction commits prevents creation. The user, first
 session, authentication handoff and verification token commit in one transaction;
 the final expiry check runs after all of them. If the account was
-committed but the response was lost, sign in or reset its password; do not replay
-registration blindly. A later reissue can leave an ordinary account without access.
+committed but the response was lost, sign in from the ordinary sign-in page.
+Use the same account, then reopen the original invitation email. If you forgot
+the account password, reset it before signing in. A later reissue can leave an
+ordinary account without access.
 
 `AUTH_PUBLIC_SIGNUP_ENABLED=true` is the default. Set it to `false` to close
 ordinary email and new-account OAuth registration. Existing accounts can still

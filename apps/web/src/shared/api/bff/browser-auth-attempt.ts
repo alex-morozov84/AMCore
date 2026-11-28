@@ -20,8 +20,8 @@ import {
 } from './browser-binding.server'
 import { SessionVaultUnavailableError } from './errors'
 import type { ProductWebContext } from './product-web-context.server'
-import { getWebRedisClient } from './redis-client'
 import type { VaultRecord } from './session-vault.types'
+import { sharedRedis } from './shared-redis'
 import { VAULT_TTL_SECONDS } from './vault-constants'
 
 import 'server-only'
@@ -154,9 +154,7 @@ export async function createBrowserAuthAttempt(
   }
   if (record.expiresAt <= Date.now()) throw changedBrowserContext()
   const saved = await storage(async () => {
-    const result = await (
-      await getWebRedisClient()
-    ).set(attemptKey(handle, context), JSON.stringify(record), {
+    const result = await sharedRedis().set(attemptKey(handle, context), JSON.stringify(record), {
       condition: 'NX',
       expiration: { type: 'PXAT', value: record.expiresAt },
     })
@@ -164,9 +162,7 @@ export async function createBrowserAuthAttempt(
   })
   if (saved !== 'OK') {
     if (!identity) throw new SessionVaultUnavailableError(undefined)
-    const raw = await storage(async () =>
-      (await getWebRedisClient()).get(attemptKey(handle, context))
-    )
+    const raw = await storage(async () => sharedRedis().get(attemptKey(handle, context)))
     const existing = browserAuthAttemptSchema.parse(JSON.parse(raw ?? 'null'))
     if (
       existing.id !== record.id ||
@@ -237,9 +233,7 @@ export async function readBrowserAuthAttempt(
 ): Promise<{ handle: string; record: BrowserAuthAttempt } | null> {
   const handle = readBrowserCapability(source, pendingAuthCookie(context).name)
   if (!handle) return null
-  const raw = await storage(async () =>
-    (await getWebRedisClient()).get(attemptKey(handle, context))
-  )
+  const raw = await storage(async () => sharedRedis().get(attemptKey(handle, context)))
   if (!raw) {
     if (options.allowExpired) return null
     throw changedBrowserContext()
@@ -387,7 +381,7 @@ async function writeBrowserAuthAttempt(
     keys.push(`${context.namespace}:${parsed.vaultId}`)
   }
   const result = await storage(async () =>
-    (await getWebRedisClient()).eval(CAS, {
+    sharedRedis().eval(CAS, {
       keys,
       arguments: [
         String(current.version),
