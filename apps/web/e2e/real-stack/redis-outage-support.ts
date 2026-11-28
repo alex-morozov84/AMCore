@@ -118,7 +118,7 @@ export function refreshHoldActive(): boolean {
   return granted.trim() === '1'
 }
 
-export function holdRefreshInProgress(ms: number): Promise<void> {
+export function holdRefreshInProgress(ms: number, cancellable = false): Promise<void> {
   const script = resolve(process.cwd(), '../../scripts/stand/exec.mjs')
   const query = `LOCK TABLE core.invitation_auth_handoffs IN ACCESS EXCLUSIVE MODE; SELECT pg_sleep(${ms / 1000});`
   return new Promise((done, fail) =>
@@ -135,7 +135,11 @@ export function holdRefreshInProgress(ms: number): Promise<void> {
           AMCORE_STAND_TOKEN: process.env.AMCORE_STAND_TOKEN,
         },
       },
-      (error) => (error ? fail(error) : done())
+      (error, _stdout, stderr) => {
+        if (error && !(cancellable && stderr.includes('canceling statement due to user request')))
+          fail(error)
+        else done()
+      }
     )
   )
 }

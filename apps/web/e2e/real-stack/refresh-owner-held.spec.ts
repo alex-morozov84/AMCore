@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { activeTarget } from '../support/managed-target.mjs'
+import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
 import {
   ageAccessToken,
@@ -17,11 +17,11 @@ import {
 // A refresh the API has already received is held by locking the backend invitation handoff table,
 // which only the refresh takes. Callers are refused at their own 3 s admission bound while the
 // single refresh owner keeps going, and the backend sees exactly one rotation (a rotation adds one
-// session row). The hold stays under the backend's 5 s transaction limit, so the refresh succeeds.
+// session row). The first case explicitly releases the test transaction after observing the hold.
 // Bounds are for this fault class on this machine, not guarantees.
 test.describe.configure({ mode: 'serial' })
 
-const HOLD_MS = 4500
+const HOLD_BACKSTOP_MS = 8000
 const CALLER_BOUND_MS = 3000 + 1000 // 3 s contract + one HTTP round trip and scheduling
 
 test('a running refresh survives its callers leaving and the backend rotates exactly once', async ({
@@ -38,7 +38,7 @@ test('a running refresh survives its callers leaving and the backend rotates exa
     expect(sessionRows(userId)).toBe(1)
     await rewriteEntry(cookie, ageAccessToken)
 
-    const held = holdRefreshInProgress(HOLD_MS)
+    const held = holdRefreshInProgress(HOLD_BACKSTOP_MS, true)
     for (let i = 0; i < 25 && !refreshHoldActive(); i++) await sleep(100)
     expect(refreshHoldActive()).toBe(true)
 
@@ -50,11 +50,26 @@ test('a running refresh survives its callers leaving and the backend rotates exa
     expect(responses.map((r) => r.status())).toEqual([503, 503, 503, 503])
     expect(performance.now() - started).toBeLessThan(CALLER_BOUND_MS)
 
-    // The callers are gone and the refresh is still held: nothing was published or rotated yet.
+    // Observe the unmodified Redis entry, then check SQL state and release the exact test holder.
     expect((await readEntry(cookie))?.version).toBe(before.version)
-    expect(sessionRows(userId)).toBe(1)
-
+    const observed = guardedSql(
+      `WITH held_state AS MATERIALIZED (
+         SELECT holder.pid,
+           (SELECT count(*) FROM core.sessions WHERE "userId" = :'uid') AS sessions,
+           (SELECT count(*) FROM pg_locks waiter
+            WHERE NOT waiter.granted AND waiter.relation = holder.relation
+              AND holder.pid = ANY(pg_blocking_pids(waiter.pid))) AS waiters
+         FROM pg_locks holder JOIN pg_stat_activity activity ON activity.pid = holder.pid
+         WHERE holder.relation = 'core.invitation_auth_handoffs'::regclass
+           AND holder.mode = 'AccessExclusiveLock' AND holder.granted
+           AND activity.wait_event = 'PgSleep'
+           AND activity.query = format('SELECT pg_sleep(%s);', :'seconds')
+       )
+       SELECT sessions, waiters, pg_cancel_backend(pid) FROM held_state;`,
+      { uid: userId, seconds: HOLD_BACKSTOP_MS / 1000 }
+    )
     await held
+    expect(observed.trim()).toBe('1|1|t')
     // The owner finishes on its own and publishes one new version.
     await expect(async () => {
       expect((await readEntry(cookie))?.version).toBe(before.version + 1)
