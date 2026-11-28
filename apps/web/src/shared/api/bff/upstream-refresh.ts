@@ -1,4 +1,4 @@
-import type { BrowserAudience } from '@amcore/shared'
+import { AuthErrorCode, type BrowserAudience } from '@amcore/shared'
 
 import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 
@@ -26,7 +26,8 @@ const REFRESH_COOKIE_NAME = 'refresh_token'
  * same `401 TOKEN_INVALID` — no separate signal to distinguish reuse from a
  * plain invalid/expired token, so both map to `code: 'invalid'` here, which
  * is exactly the class `ensureFreshSession` treats as "delete the vault."
- * Network failures and non-401 responses carry `code: 'network'`, so callers
+ * A confirmed rotation timeout preserves its API error code. Other transient
+ * responses and network failures carry `code: 'network'`, so callers
  * can distinguish known authentication-infrastructure unavailability from an
  * unrelated implementation defect. Unexpected response shapes stay uncoded.
  */
@@ -62,6 +63,8 @@ export function createUpstreamRefresh(
         body && typeof body === 'object' && 'errorCode' in body ? body.errorCode : null
       if (errorCode === 'AUTH_CONTEXT_CHANGED' || errorCode === 'SESSION_CHANGED')
         throw new ContextRequestError(401, 'AUTH_CONTEXT_CHANGED')
+      if (response.status === 503 && errorCode === AuthErrorCode.REFRESH_TRANSACTION_TIMEOUT)
+        throw new ContextRequestError(503, AuthErrorCode.REFRESH_TRANSACTION_TIMEOUT)
       const code = response.status === 401 ? 'invalid' : 'network'
       throw Object.assign(new Error(`Upstream refresh failed with status ${response.status}`), {
         code,

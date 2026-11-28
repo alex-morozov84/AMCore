@@ -1536,6 +1536,18 @@ describe('OpenAPI success surface (e2e)', () => {
     }
   )
 
+  it('documents transaction expiry on POST /auth/refresh', () => {
+    expect(document.paths['/auth/refresh']?.post?.responses?.['503']).toMatchObject({
+      description: expect.stringContaining('REFRESH_TRANSACTION_TIMEOUT'),
+      content: {
+        'application/json': { schema: { $ref: '#/components/schemas/HttpExceptionResponse' } },
+      },
+      headers: {
+        'Retry-After': { description: expect.stringContaining('only for DATABASE_POOL_TIMEOUT') },
+      },
+    })
+  })
+
   it.each([
     ['/auth/refresh', '200'],
     ['/auth/logout', '204'],

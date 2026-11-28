@@ -69,6 +69,7 @@
     "STEP_UP_METHOD_UNAVAILABLE": "Для этого аккаунта подтверждение паролем недоступно.",
     "RESOURCE_ALREADY_EXISTS": "Такая запись уже существует.",
     "API_KEY_ALREADY_EXISTS": "API-ключ с таким названием уже существует.",
+    "REFRESH_TRANSACTION_TIMEOUT": "Не удалось обновить сессию вовремя. Повторите попытку.",
     "DATABASE_POOL_TIMEOUT": "Сервис занят. Попробуйте через мгновение.",
     "API_KEY_SCOPE_INVALID_FORMAT": "Скоуп должен быть в формате action:Subject.",
     "API_KEY_SCOPE_UNKNOWN_ACTION": "Неизвестное действие в скоупе.",
