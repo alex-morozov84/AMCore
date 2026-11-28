@@ -236,13 +236,11 @@ That chain does not establish a reference-capacity comparison. Whether the host
 and data match Capacity remains your comparison of those fields. The report and manifest omit keys, cookies and passwords. Keep the work
 directory private and review raw artifacts before sharing them.
 
-For each step, compare both `out/steps/<step>/containers.before` and
-`containers.after` with the expected container inventory for the recorded
-project and Compose profiles. Record that inventory before measuring. The
-collector can leave a partial list if `docker inspect` fails. Matching lists
-do not establish completeness. If either list is incomplete or its
-completeness is unknown, exclude the step from capacity estimates even if
-the report marks it `valid`.
+The runner expects one running container per long-running service in the
+active Compose profiles and checks both snapshots against that inventory. A failed or incomplete starting snapshot
+blocks the step. A failed or incomplete final snapshot makes it an invalid
+measurement. For reports from older harnesses, verify both snapshots against
+the recorded project and profiles before using the result for a capacity estimate.
 
 | Class                 | When                                                                                                                                                              | Use it as                                            |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |

@@ -14,11 +14,35 @@ case "${1:-}" in
       die "no test-entry access log in caddy:/data"
     ;;
   containers)
-    # The id reveals a container recreated under the same name during the step.
-    ids=$(lt_compose ps -q)
+    services=$(lt_compose config --services) || die "cannot read configured services"
+    ids=$(lt_compose ps -q --no-trunc) || die "cannot list running containers"
     [ -n "$ids" ] || die "no running containers in this project"
+    # Keep the inspect status and validate the whole snapshot before publishing it.
     # shellcheck disable=SC2086 # one argument per container id
-    docker inspect -f '{{.Name}} {{.Id}} {{.RestartCount}} {{.State.OOMKilled}}' $ids | sed 's#^/##'
+    snapshot=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.service"}} {{.Name}} {{.Id}} {{.RestartCount}} {{.State.OOMKilled}}' $ids) ||
+      die "cannot inspect running containers"
+    # This topology has one replica per long-running service. One-shot tasks
+    # do not belong in a measurement, even if their profiles are enabled.
+    rows=$(printf '%s\n' "$snapshot" | INVENTORY_SERVICES="$services" INVENTORY_IDS="$ids" awk '
+      BEGIN {
+        n = split(ENVIRON["INVENTORY_SERVICES"], names, "\n")
+        for (i = 1; i <= n; i++)
+          if (names[i] != "" && names[i] !~ /^(migrate|system-seed|restore|restore-drill|load-fixture)$/)
+            expected[names[i]] = 1
+        n = split(ENVIRON["INVENTORY_IDS"], listed, "\n")
+        for (i = 1; i <= n; i++) wanted[listed[i]] = 1
+      }
+      NF != 5 || !($1 in expected) || seenService[$1]++ ||
+        $2 !~ /^\// || seenName[$2]++ || !($3 in wanted) || seenId[$3]++ ||
+        $4 !~ /^[0-9]+$/ || $5 !~ /^(true|false)$/ { bad = 1; next }
+      { print substr($2, 2), $3, $4, $5 }
+      END {
+        for (service in expected) if (!seenService[service]) bad = 1
+        for (id in wanted) if (!seenId[id]) bad = 1
+        if (bad) exit 1
+      }
+    ') || die "container inventory does not match the configured project"
+    printf '%s\n' "$rows"
     ;;
   manifest) # key=value lines, no secrets
     echo "commit=$(git rev-parse HEAD 2> /dev/null || echo unknown)"

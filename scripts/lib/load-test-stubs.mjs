@@ -22,7 +22,9 @@ if (args[0] === 'volume') return console.log(cfg.volumeLabel ?? '')
 if (args[0] === 'compose') {
   const sub = args.find((a) => ['ps', 'exec', 'cp', 'config', 'up', 'run', 'port', 'build'].includes(a))
   if (sub === 'run') log('compose-run-env COMPOSE_PROJECT_NAME=' + (process.env.COMPOSE_PROJECT_NAME ?? ''))
+  if (sub === 'config' && args.includes('--services')) return console.log('api\\nweb\\nmigrate')
   if (sub === 'config') return console.log(JSON.stringify(cfg.config ?? {}))
+  if (sub === 'ps' && cfg.inventory === 'missing-service') return console.log('id-api')
   if (sub === 'ps') return console.log(args.includes('postgres') ? 'pg1' : 'id-api\\nid-web')
   if (sub === 'exec') {
     // server-stats.sh logs: a tar stream of the test-entry access log for this step.
@@ -45,6 +47,12 @@ if (args[0] === 'compose') {
   return
 }
 if (args[0] === 'inspect' && args[1] === 'pg1') return console.log(JSON.stringify(cfg.inspect ?? []))
+if (args[0] === 'inspect' && args[2]?.includes('com.docker.compose.service')) {
+  console.log('api /api id-api 0 false')
+  if (cfg.inventory !== 'missing-service' && (!cfg.inventory || !fs.existsSync(cfg.windowStart))) console.log('web /web id-web 0 false')
+  else if (cfg.inventory === 'inspect-failed') process.exitCode = 23
+  return
+}
 if (args[0] === 'inspect') return console.log('api id-api 0 false\\nweb id-web 0 false')
 if (args[0] === 'stats') {
   if (cfg.stats === 'fail') process.exit(1)

@@ -14,9 +14,11 @@ versions they name. For current source-update instructions, see
 
 ### Fixed
 
+- Replay completed idempotent responses with an empty stored body.
 - Web sessions refresh access tokens according to their API-issued expiry.
 - Scheduled job failure logs use bounded error codes without exception text.
 - Invitation cleanup reports confirmed deletions when a later transaction fails.
+- Load-test measurements now reject failed or incomplete container snapshots.
 
 ## [0.12.1] - 2026-11-28
 

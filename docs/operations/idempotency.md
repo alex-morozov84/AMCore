@@ -44,22 +44,17 @@ both the key and exact input when retrying the same operation.
 
 For the same scope and key, while its Redis record remains valid:
 
-| Record                                      | Result                                                                  |
-| ------------------------------------------- | ----------------------------------------------------------------------- |
-| None                                        | Reserve the key and run the handler.                                    |
-| Completed, matching fingerprint             | Replay the stored response, subject to the empty-body limitation below. |
-| Completed, different fingerprint            | `422 IDEMPOTENCY_KEY_REUSE`.                                            |
-| In-flight reservation, with any fingerprint | `409 IDEMPOTENCY_CONFLICT`.                                             |
+| Record                                      | Result                                                      |
+| ------------------------------------------- | ----------------------------------------------------------- |
+| None                                        | Reserve the key and run the handler.                        |
+| Completed, matching fingerprint             | Replay the stored response, including an empty stored body. |
+| Completed, different fingerprint            | `422 IDEMPOTENCY_KEY_REUSE`.                                |
+| In-flight reservation, with any fingerprint | `409 IDEMPOTENCY_CONFLICT`.                                 |
 
 A replay returns the stored status, body and `content-type`, with
 `Idempotency-Replayed: true`. It does not restore `set-cookie`, authorization,
 security or per-request correlation headers. The replay marker is generated
 for the replay; it is not another persisted response header.
-
-**Current limitation:** a completed stored record whose body is the empty string
-is mapped to conflict rather than replay. Do not depend on empty-body replay.
-This limitation concerns the stored representation; it does not establish the
-result of every HTTP adapter's empty or 204 response.
 
 ## Failure and recovery
 
@@ -107,7 +102,7 @@ preview(@Body() body: PreviewDto) {
 ```
 
 After implementing that endpoint, a caller can repeat the exact POST body with
-the same valid key. A completed, non-empty stored response replays; a changed
+the same valid key. A completed stored response replays; a changed
 body with that key is rejected. This is not proof of safe business mutation.
 
 ## Organization creation uses a separate domain result
