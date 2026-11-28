@@ -33,6 +33,13 @@ in Redis and sends it to `apps/api` only on server-to-server calls. The session
 model below is still the backend source of truth; the difference is where the
 raw token lives in the bundled web client.
 
+The web server schedules access-token refresh from the expiry in each token issued
+by the API. When 30 seconds or less remain, a protected request enters the normal
+refresh flow. The web server reads the token expiry for sessions already in Redis,
+even if the stored estimate differs. If it cannot read the expiry from a retained
+token, it uses the same refresh flow after checking the session binding. The API
+still verifies the token and decides whether to grant access.
+
 One user can have many sessions. They're fully independent — a session is one
 login's refresh-token lineage, not "one per device": logging in twice on the
 same device (a second browser profile, an incognito window, a repeated

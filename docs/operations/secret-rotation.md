@@ -31,7 +31,7 @@ Access JWTs expire after `JWT_ACCESS_EXPIRATION` (default `15m`). Refresh tokens
 are random opaque values stored by hash in PostgreSQL; they do not use `JWT_SECRET`.
 Rotation alone does not revoke them or their session families.
 
-The BFF checks the vault's recorded access-token expiry with a 30-second safety
+The BFF checks the expiry in the issued access token with a 30-second safety
 margin. It does not detect a signing-key change. Its authenticated proxy forwards
 an API response once; it does not force refresh and replay an API 401. The default
 Query policy does not retry 401 either. Users can therefore see 401 responses
@@ -51,10 +51,10 @@ uses the new secret. Avoid a rolling mixed-key fleet.
    `JWT_SECRET` requires at least 32 characters. Distribute the replacement
    without exposing its value in arguments or logs.
 2. Plan the access-token error window with the actual clients. With the default
-   TTL, retained old tokens can fail until normal refresh. The shipped BFF records
-   a fixed 15-minute access-token lifetime. Changing only `JWT_ACCESS_EXPIRATION`
-   does not update that estimate. Do not shorten the backend TTL as a browser-error
-   mitigation without verifying matching client behavior.
+   TTL, retained old tokens can fail until normal refresh. Changing
+   `JWT_ACCESS_EXPIRATION` affects tokens issued after that change. Use the
+   existing tokens' deadlines to estimate the error window. Verify client behavior
+   before using a shorter lifetime for new tokens.
 3. Switch the entire serving API fleet together. Use a verified blue-green
    traffic switch, or close ingress, drain requests and recreate every serving
    API/worker replica before reopening. A plain Compose recreate is not an

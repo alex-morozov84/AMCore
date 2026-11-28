@@ -14,6 +14,7 @@ versions they name. For current source-update instructions, see
 
 ### Fixed
 
+- Web sessions refresh access tokens according to their API-issued expiry.
 - Scheduled job failure logs use bounded error codes without exception text.
 - Invitation cleanup reports confirmed deletions when a later transaction fails.
 

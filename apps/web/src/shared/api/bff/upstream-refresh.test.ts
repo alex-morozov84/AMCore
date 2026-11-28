@@ -1,7 +1,12 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { testAccessToken } from './access-token.testkit'
 import { createUpstreamRefresh as createBoundRefresh } from './upstream-refresh'
+
+const atNewToken = testAccessToken('at-new', 2_000_000_000_000)
+
+const atToken = testAccessToken('at', 2_000_000_000_000)
 const browser = {
   contextId: '62dde074-27ae-42fb-a7c3-229c32566d57',
   generation: 3,
@@ -73,7 +78,7 @@ describe('upstreamRefresh', () => {
       fakeResponse({
         ok: true,
         status: 200,
-        body: { accessToken: 'at-new' },
+        body: { accessToken: atNewToken },
         setCookieHeaders: ['refresh_token=rt-new; Path=/; HttpOnly'],
       })
     )
@@ -81,9 +86,9 @@ describe('upstreamRefresh', () => {
 
     const result = await upstreamRefresh('rt-old', new AbortController().signal)
 
-    expect(result.accessToken).toBe('at-new')
+    expect(result.accessToken).toBe(atNewToken)
     expect(result.refreshToken).toBe('rt-new')
-    expect(result.accessTokenExpiresAt).toBeGreaterThan(Date.now())
+    expect(result.accessTokenExpiresAt).toBe(2_000_000_000_000)
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     const headers = new Headers(init.headers)
     expect(headers.get('cookie')).toBe('refresh_token=rt-old')
@@ -102,7 +107,7 @@ describe('upstreamRefresh', () => {
       fakeResponse({
         ok: true,
         status: 200,
-        body: { accessToken: 'at' },
+        body: { accessToken: atToken },
         setCookieHeaders: ['refresh_token=rt; Path=/; HttpOnly'],
       })
     )
@@ -163,7 +168,7 @@ describe('upstreamRefresh', () => {
         fakeResponse({
           ok: true,
           status: 200,
-          body: { accessToken: 'at-new' },
+          body: { accessToken: atNewToken },
           setCookieHeaders: [],
         })
       )

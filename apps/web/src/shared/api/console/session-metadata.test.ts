@@ -6,7 +6,11 @@ import { afterEach, expect, it, vi } from 'vitest'
 
 import { fakeVaultEntry } from '@/shared/api/bff/dal.testkit'
 
+import { testAccessToken } from '../bff/access-token.testkit'
+
 import { getConsoleSessionEntry } from './session'
+
+const rotatedToken = testAccessToken('rotated', 2_000_000_000_000)
 
 vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({ cookies: vi.fn(), headers: vi.fn() }))
@@ -62,7 +66,7 @@ it('console helper refresh supplies current visitor headers with vault-derived c
   )
   const fetchMock = vi.fn(
     async (_url: string | URL | Request, _init?: RequestInit) =>
-      new Response(JSON.stringify({ accessToken: 'rotated' }), {
+      new Response(JSON.stringify({ accessToken: rotatedToken }), {
         headers: { 'set-cookie': 'refresh_token=next; Path=/' },
       })
   )

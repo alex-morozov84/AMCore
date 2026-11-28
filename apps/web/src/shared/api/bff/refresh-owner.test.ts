@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { testAccessToken } from './access-token.testkit'
 import { ContextRequestError } from './context-errors'
 import { activeRefreshOwners, ensureFreshSession } from './ensure-fresh-session'
 import {
@@ -15,6 +16,8 @@ import {
 import type { UpstreamRefreshFn, VaultEntry, VaultLock } from './session-vault.types'
 import { FakeVaultStore, freshRefresh, makeEntry } from './test-fakes'
 import { FailingRenewalLock, SimpleLock } from './test-lock-fakes'
+
+const at2Token = testAccessToken('at-2', 2_000_000_000_000)
 
 // The refresh owner under fake time: every case asserts the vault, the backend call count, the
 // lock and the owner registry, not just the thrown error.
@@ -101,7 +104,7 @@ describe('refresh owner', () => {
       // The owner is still running and holds the only backend call.
       expect(activeRefreshOwners()).toBe(1)
       upstream.resolve({
-        accessToken: 'at-2',
+        accessToken: at2Token,
         accessTokenExpiresAt: Date.now() + 60_000,
         refreshToken: 'rt-2',
       })

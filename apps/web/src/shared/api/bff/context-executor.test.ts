@@ -223,7 +223,7 @@ describe('typed context executor', () => {
     expect(deps.fetch).not.toHaveBeenCalled()
   })
   it('makes native 0 switch / 1 PATCH / 0 refresh and reuses one captured vault read', async () => {
-    const { deps, expected, get } = fixture()
+    const { deps, entry, expected, get } = fixture()
     const result = await executeContextOperation(
       operation,
       {
@@ -246,7 +246,7 @@ describe('typed context executor', () => {
     expect(url).toBe('http://api.test/api/v1/context-rehearsal/workspaces/org-a')
     expect(init!.method).toBe('PATCH')
     const headers = init!.headers as Headers
-    expect(headers.get('authorization')).toBe('Bearer at-1')
+    expect(headers.get('authorization')).toBe(`Bearer ${entry.accessToken}`)
     expect(headers.get('x-amcore-organization-id')).toBe('org-a')
     for (const stripped of ['cookie', 'x-forwarded-for', 'x-amcore-context-session'])
       expect(headers.has(stripped)).toBe(false)
@@ -285,9 +285,10 @@ describe('typed context executor', () => {
     )
     expect(deps.upstreamRefresh).toHaveBeenCalledTimes(1)
     expect(deps.fetch).toHaveBeenCalledTimes(1)
+    const rotated = await vi.mocked(deps.upstreamRefresh).mock.results[0]!.value
     expect(
       (vi.mocked(deps.fetch!).mock.calls[0]![1]!.headers as Headers).get('authorization')
-    ).toBe('Bearer at-2')
+    ).toBe(`Bearer ${rotated.accessToken}`)
   })
 
   it('rejects malformed target before cookie/vault/refresh/domain', async () => {

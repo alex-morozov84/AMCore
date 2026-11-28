@@ -6,9 +6,9 @@ import type { UserResponse } from '@amcore/shared'
 
 import { createBrowserBindingVerifier } from '@/shared/api/bff/browser-binding.server'
 import { ensureFreshSession } from '@/shared/api/bff/ensure-fresh-session'
+import { readAccessTokenExpiry } from '@/shared/api/bff/issued-access-token'
 import type { VaultEntry } from '@/shared/api/bff/session-vault.types'
 import { createUpstreamRefresh } from '@/shared/api/bff/upstream-refresh'
-import { ACCESS_TOKEN_LIFETIME_MS } from '@/shared/api/bff/vault-constants'
 
 import { CONSOLE_SESSION_COOKIE_NAME } from './session-cookie'
 import { redisConsoleVaultLock } from './session-lock'
@@ -38,11 +38,13 @@ export async function mintConsoleSession({
   refreshToken,
   user,
 }: ConsoleSessionParams): Promise<string> {
+  const accessTokenExpiresAt = readAccessTokenExpiry(accessToken)
+  if (accessTokenExpiresAt === null) throw new TypeError('API access token has no usable expiry')
   const sessionId = randomBytes(32).toString('base64url')
   await redisConsoleVaultStore.create(sessionId, {
     accessToken,
     refreshToken,
-    accessTokenExpiresAt: Date.now() + ACCESS_TOKEN_LIFETIME_MS,
+    accessTokenExpiresAt,
     userSnapshot: user,
     audience: CONSOLE_AUDIENCE,
   })

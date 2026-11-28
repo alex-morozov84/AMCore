@@ -5,11 +5,11 @@ import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 import { browserSessionHeaders } from './browser-binding.server'
 import { ContextRequestError } from './context-errors'
 import { UpstreamRotationUnprovenError } from './errors'
+import { readAccessTokenExpiry } from './issued-access-token'
 import type { ProductWebContext } from './product-web-context.server'
 import { sessionMetadataHeaders } from './session-metadata-headers'
 import type { UpstreamRefreshFn } from './session-vault.types'
 import { extractCookieValue } from './set-cookie'
-import { ACCESS_TOKEN_LIFETIME_MS } from './vault-constants'
 
 import 'server-only'
 
@@ -70,12 +70,16 @@ export function createUpstreamRefresh(
 
     // From here on the backend has rotated the token: a reply that cannot be read is a rotation
     // that was not published, not a request that never produced an effect.
-    let data: { accessToken: string }
+    let accessToken: string
+    let accessTokenExpiresAt: number
     try {
       const body: unknown = await response.json()
       if (!body || typeof (body as { accessToken?: unknown }).accessToken !== 'string')
         throw new TypeError('Upstream refresh reply has no access token')
-      data = body as { accessToken: string }
+      accessToken = (body as { accessToken: string }).accessToken
+      const expiry = readAccessTokenExpiry(accessToken)
+      if (expiry === null) throw new TypeError('Upstream access token has no usable expiry')
+      accessTokenExpiresAt = expiry
     } catch (cause) {
       throw new UpstreamRotationUnprovenError(cause)
     }
@@ -87,8 +91,8 @@ export function createUpstreamRefresh(
     }
 
     return {
-      accessToken: data.accessToken,
-      accessTokenExpiresAt: Date.now() + ACCESS_TOKEN_LIFETIME_MS,
+      accessToken,
+      accessTokenExpiresAt,
       refreshToken: rotatedRefreshToken,
     }
   }

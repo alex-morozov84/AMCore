@@ -2,12 +2,17 @@
 import { AMCORE_CLIENT_IP_HEADER } from '@amcore/shared'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { testAccessToken } from './access-token.testkit'
 import { ensureFreshSession } from './ensure-fresh-session'
 import { proxyOAuthCallback } from './oauth-provider-proxy'
 import { sessionMetadataHeaders } from './session-metadata-headers'
 import { browserTestHeaders, FakeVaultStore, makeBrowserEntry } from './test-fakes'
 import { callUpstreamAuth } from './upstream-auth'
 import { createUpstreamRefresh } from './upstream-refresh'
+
+const winnerAccessToken = testAccessToken('winner-access', 2_000_000_000_000)
+
+const newAccessToken = testAccessToken('new-access', 2_000_000_000_000)
 
 vi.mock('server-only', () => ({}))
 vi.mock('./dal', () => ({ getOptionalSessionEntry: vi.fn() }))
@@ -95,7 +100,7 @@ describe('Session metadata transport boundary', () => {
   it('refresh captures headers per request, uses vault credential and retains abort signal', async () => {
     const fetchMock = vi.fn(
       async (_url: string | URL | Request, _init?: RequestInit) =>
-        new Response(JSON.stringify({ accessToken: 'new-access' }), {
+        new Response(JSON.stringify({ accessToken: newAccessToken }), {
           headers: { 'set-cookie': 'refresh_token=next; Path=/' },
         })
     )
@@ -175,12 +180,12 @@ describe('Session metadata transport boundary', () => {
       upstreamRefresh: createUpstreamRefresh(waitingHeaders),
     })
     finish(
-      new Response(JSON.stringify({ accessToken: 'winner-access' }), {
+      new Response(JSON.stringify({ accessToken: winnerAccessToken }), {
         headers: { 'set-cookie': 'refresh_token=winner-refresh; Path=/' },
       })
     )
     const [first, second] = await Promise.all([winner, waiter])
-    expect(first.accessToken).toBe('winner-access')
+    expect(first.accessToken).toBe(winnerAccessToken)
     expect(second).toEqual(first)
     expect(fetchMock).toHaveBeenCalledTimes(1)
     assertMetadata(fetchMock.mock.calls[0]![1] as RequestInit)

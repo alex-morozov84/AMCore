@@ -60,7 +60,7 @@ describe('handleGetSessions', () => {
 
   it('forwards to the backend with both Bearer and refresh_token Cookie, preserving the query string', async () => {
     mockSessionCookie('sess-1')
-    vi.mocked(ensureFreshSession).mockResolvedValue(fakeVaultEntry())
+    vi.mocked(ensureFreshSession).mockResolvedValue({ ...fakeVaultEntry(), accessToken: 'at-1' })
     const fetchMock = vi
       .fn()
       .mockResolvedValue(

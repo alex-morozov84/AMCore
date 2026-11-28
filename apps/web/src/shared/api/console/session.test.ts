@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { testAccessToken } from '../bff/access-token.testkit'
+
 vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({
   cookies: vi.fn(),
@@ -16,6 +18,8 @@ import { cookies } from 'next/headers'
 
 import { CONSOLE_AUDIENCE, getCurrentConsoleSession, mintConsoleSession } from './session'
 import { redisConsoleVaultStore } from './session-vault-store'
+
+const accessTokenToken = testAccessToken('access-token', 2_000_000_000_000)
 
 const browser = {
   audience: 'console' as const,
@@ -43,15 +47,29 @@ beforeEach(() => {
 describe('console session vault', () => {
   it('stores an explicit console audience when minting', async () => {
     await mintConsoleSession({
-      accessToken: 'access-token',
+      accessToken: accessTokenToken,
       refreshToken: 'refresh-token',
       user: { id: 'user-1' } as never,
     })
 
     expect(redisConsoleVaultStore.create).toHaveBeenCalledWith(
       expect.any(String),
-      expect.objectContaining({ audience: CONSOLE_AUDIENCE })
+      expect.objectContaining({
+        audience: CONSOLE_AUDIENCE,
+        accessTokenExpiresAt: 2_000_000_000_000,
+      })
     )
+  })
+
+  it('refuses to create a Console entry without usable expiry', async () => {
+    await expect(
+      mintConsoleSession({
+        accessToken: 'opaque',
+        refreshToken: 'refresh-token',
+        user: { id: 'user-1' } as never,
+      })
+    ).rejects.toThrow()
+    expect(redisConsoleVaultStore.create).not.toHaveBeenCalled()
   })
 
   it('rejects a vault entry without the console audience', async () => {

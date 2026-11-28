@@ -50,9 +50,10 @@ test('host session helper preserves current UA on actual vault rotation; Session
     exec('redis', [
       'redis-cli',
       'EVAL',
-      "local v=cjson.decode(redis.call('GET',KEYS[1]));v.accessTokenExpiresAt=0;redis.call('SET',KEYS[1],cjson.encode(v),'KEEPTTL');return 1",
+      "local v=cjson.decode(redis.call('GET',KEYS[1]));v.accessToken=ARGV[1];redis.call('SET',KEYS[1],cjson.encode(v),'KEEPTTL');return 1",
       '1',
       key,
+      'unreadable-test-token',
     ])
   ).toBe('1')
   const targetId = guardedSql(`SELECT id FROM core.users WHERE "emailCanonical" = :'email';`, {

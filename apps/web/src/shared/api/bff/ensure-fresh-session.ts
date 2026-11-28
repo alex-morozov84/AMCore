@@ -1,5 +1,6 @@
 import type { VerifyBindingOptions } from './browser-binding.server'
 import { SessionNotFoundError, SessionStageTimeoutError } from './errors'
+import { isAccessTokenFresh } from './issued-access-token'
 import { OWNER_TIMING, type OwnerTiming, runRefreshOwner } from './refresh-owner'
 import { hasSessionAudience, type SessionAudience } from './session-audience'
 import type {
@@ -12,8 +13,6 @@ import type {
 
 import 'server-only'
 
-/** Refresh proactively before the access token actually expires. */
-const REFRESH_SAFETY_MARGIN_MS = 30 * 1000
 /** The caller never waits longer than this for admission, including a refresh already running. */
 export const CALLER_STAGE_MS = 3000
 /** The binding probe never waits longer than this, even with plenty of the stage left. */
@@ -29,10 +28,6 @@ export interface EnsureFreshSessionDeps<TRecord extends VaultRecord = VaultRecor
   now?: () => number
   /** Test overrides: the caller stage, the owner budgets and the monotonic clock. */
   timing?: { stageMs?: number; owner?: Partial<OwnerTiming>; clock?: () => number }
-}
-
-function isFresh(entry: VaultEntry, now: number): boolean {
-  return entry.accessTokenExpiresAt > now + REFRESH_SAFETY_MARGIN_MS
 }
 
 /**
@@ -116,7 +111,7 @@ export async function ensureFreshSession<TRecord extends VaultRecord = VaultReco
         signal: stage.signal,
       })
     )
-    if (isFresh(entry, now())) return entry
+    if (isAccessTokenFresh(entry.accessToken, now())) return entry
 
     return await within('refresh owner', () => joinOwner(sessionId, deps, now, clock))
   } finally {

@@ -6,10 +6,13 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 import { stubProductOrigins } from '@/test/product-origins'
 
+import { testAccessToken } from './access-token.testkit'
 import { proxyToBackend } from './authenticated-proxy'
 import { getOptionalSessionEntry } from './dal'
 import { handleGetSessions } from './sessions-handler'
 import { browserTestHeaders, makeBrowserEntry } from './test-fakes'
+
+const rotatedToken = testAccessToken('rotated', 2_000_000_000_000)
 
 vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({ cookies: vi.fn(), headers: vi.fn() }))
@@ -66,7 +69,7 @@ it.each(['product DAL', 'authenticated proxy', 'own sessions'])(
     vi.mocked(headers).mockResolvedValue(source as never)
     const fetchMock = vi.fn(async (url: string | URL | Request, _init?: RequestInit) =>
       String(url).endsWith('/auth/refresh')
-        ? new Response(JSON.stringify({ accessToken: 'rotated' }), {
+        ? new Response(JSON.stringify({ accessToken: rotatedToken }), {
             headers: { 'set-cookie': 'refresh_token=next; Path=/' },
           })
         : new Response('{}')

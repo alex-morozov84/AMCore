@@ -41,7 +41,7 @@ describe('handleDeleteSession', () => {
 
   it('forwards DELETE to the backend with the target session id and both auth headers', async () => {
     mockSessionCookie('sess-1')
-    vi.mocked(ensureFreshSession).mockResolvedValue(fakeVaultEntry())
+    vi.mocked(ensureFreshSession).mockResolvedValue({ ...fakeVaultEntry(), accessToken: 'at-1' })
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
     vi.stubGlobal('fetch', fetchMock)
 
@@ -69,7 +69,7 @@ describe('handleDeleteOtherSessions', () => {
 
   it('forwards DELETE /auth/sessions (no id) with both auth headers', async () => {
     mockSessionCookie('sess-1')
-    vi.mocked(ensureFreshSession).mockResolvedValue(fakeVaultEntry())
+    vi.mocked(ensureFreshSession).mockResolvedValue({ ...fakeVaultEntry(), accessToken: 'at-1' })
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
     vi.stubGlobal('fetch', fetchMock)
 

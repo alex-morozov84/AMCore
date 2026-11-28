@@ -13,6 +13,7 @@ import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 
 export interface VaultEntry {
   version: number
+  accessToken: string
   accessTokenExpiresAt: number
   refreshToken: string
   userSnapshot: { id: string }
@@ -47,7 +48,7 @@ export async function readEntry(cookie: string): Promise<VaultEntry | null> {
   return raw ? (JSON.parse(raw) as VaultEntry) : null
 }
 
-/** Rewrites only this test-created entry, keeping its TTL; used to age the access token or replay a stale refresh token. */
+/** Rewrites only this test-created entry, keeping its TTL; used to prepare a stale access token or replay an old refresh token. */
 export async function rewriteEntry(
   cookie: string,
   change: (entry: VaultEntry) => VaultEntry
@@ -66,7 +67,7 @@ export async function rewriteEntry(
 
 export const ageAccessToken = (entry: VaultEntry): VaultEntry => ({
   ...entry,
-  accessTokenExpiresAt: Date.now() - 60_000,
+  accessToken: 'unreadable-test-token',
 })
 
 export function pauseRedis(ms: number): void {

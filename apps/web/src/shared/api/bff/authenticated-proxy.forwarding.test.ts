@@ -17,7 +17,7 @@ describe('proxyToBackend — request/response forwarding once authenticated', ()
   beforeEach(() => {
     vi.mocked(isTrustedOrigin).mockReturnValue(true)
     mockCookieStore('sess-1')
-    vi.mocked(ensureFreshSession).mockResolvedValue(makeBrowserEntry())
+    vi.mocked(ensureFreshSession).mockResolvedValue(makeBrowserEntry({ accessToken: 'at-1' }))
   })
 
   afterEach(() => {

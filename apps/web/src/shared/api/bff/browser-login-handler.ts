@@ -28,9 +28,9 @@ import {
   resumeInvitedBrowserPublication,
   retainInvitedMfaDeadline,
 } from './invited-browser-login'
+import { readAccessTokenExpiry } from './issued-access-token'
 import type { ProductWebContext } from './product-web-context.server'
 import { type VaultRecord } from './session-vault.types'
-import { ACCESS_TOKEN_LIFETIME_MS } from './vault-constants'
 
 import 'server-only'
 
@@ -281,6 +281,8 @@ export async function stageIssuedBrowserLogin(
     publication.browser!.audience !== context.audience
   )
     throw changedBrowserContext()
+  const accessTokenExpiresAt = readAccessTokenExpiry(credentials.accessToken)
+  if (accessTokenExpiresAt === null) throw unavailableBrowserContext()
   const staged: BrowserAuthPublication = {
     ...issuing,
     state: 'staged',
@@ -294,7 +296,7 @@ export async function stageIssuedBrowserLogin(
     audience: context.audience,
     accessToken: credentials.accessToken,
     refreshToken: upstream.refreshToken,
-    accessTokenExpiresAt: Date.now() + ACCESS_TOKEN_LIFETIME_MS,
+    accessTokenExpiresAt,
     userSnapshot: credentials.user,
     browser: {
       ...publication.browser!,
