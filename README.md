@@ -13,7 +13,7 @@ AMCore is a backend-first application starter for SaaS products, internal tools 
 | Frontend         | Localized sign-in, organization administration, shared UI, themes and enforced import and styling rules.                                                                                                                                    |
 | Operations       | An optional [Operations Console](docs/operations-console/README.md) for platform operators, plus guides for deployment, monitoring and recovery. Product administration has its [own integration guide](docs/product-admin/integration.md). |
 
-**Creating a product?** Read [Create and update a product](docs/operations/updating-a-fork.md). Use the supported release listed in that guide. Use the checkout below for local evaluation.
+**Creating a product?** Follow [Create and update a product](docs/operations/updating-a-fork.md) to select and verify the latest supported release. Use the checkout below for local evaluation.
 
 ## Quick Start
 
