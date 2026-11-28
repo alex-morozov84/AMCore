@@ -414,7 +414,12 @@ export class AdminController {
   // OB-03: heavy DB sweep — narrow to 5/min for this handler. Same
   // per-handler-override pattern as above.
   @RateLimit(RATE_LIMIT_POLICIES.EXPENSIVE_ACTION)
-  @SchemaResponse({ type: CleanupResultDto, status: 200, description: 'Cleanup counts' })
+  @SchemaResponse({
+    type: CleanupResultDto,
+    status: 200,
+    description:
+      'Confirmed cleanup counts and failed record types. Failed types may have an unknown remainder.',
+  })
   runCleanup(@CurrentUser() actor: RequestPrincipal): Promise<CleanupResult> {
     return this.adminService.runCleanup(actor)
   }

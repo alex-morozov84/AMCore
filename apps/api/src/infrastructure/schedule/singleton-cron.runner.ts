@@ -3,15 +3,13 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { RedisLockService } from '../redis/index.js'
 
+import { errorCode } from './scheduled-job-error-code.js'
+
 export type SingletonRun<T> =
   | { status: 'ran'; value: T }
   | { status: 'failed'; error: unknown }
   | { status: 'contended' }
   | { status: 'lock_unavailable' }
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'unknown'
-}
 
 /**
  * Singleton-cron runner (EQS-05, generalized for ADR-041).
@@ -51,7 +49,7 @@ export class SingletonCronRunner {
       token = await this.lock.acquire(lockKey, ttlMs)
     } catch (error) {
       this.logger.error(
-        { event: `${name}_lock_failed`, error: errorMessage(error) },
+        { event: `${name}_lock_failed`, errorCode: errorCode(error) },
         `${name} skipped — lock acquisition failed`
       )
       return { status: 'lock_unavailable' }
@@ -68,14 +66,14 @@ export class SingletonCronRunner {
     try {
       return { status: 'ran', value: await task() }
     } catch (error) {
-      this.logger.error({ event: `${name}_failed`, error: errorMessage(error) }, `${name} failed`)
+      this.logger.error({ event: `${name}_failed`, errorCode: errorCode(error) }, `${name} failed`)
       return { status: 'failed', error }
     } finally {
       try {
         await this.lock.release(lockKey, token)
       } catch (error) {
         this.logger.error(
-          { event: `${name}_lock_release_failed`, error: errorMessage(error) },
+          { event: `${name}_lock_release_failed`, errorCode: errorCode(error) },
           `${name} lock release failed (TTL will expire it)`
         )
       }

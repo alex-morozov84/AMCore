@@ -34,6 +34,24 @@ describe('IdempotencyStoreService', () => {
     })
   })
 
+  it('replays an empty stored body and rejects an incomplete reply', async () => {
+    const redis = {
+      eval: jest
+        .fn()
+        .mockResolvedValueOnce(['replay', '200', '', '{}'])
+        .mockResolvedValueOnce(['replay', '200', '']),
+    }
+    const service = new IdempotencyStoreService(redis as never, logger)
+
+    await expect(service.reserve('orders', 'key1', 'fp1', 30_000)).resolves.toEqual({
+      kind: 'replay',
+      response: { status: 200, body: '', headers: {} },
+    })
+    await expect(service.reserve('orders', 'key1', 'fp1', 30_000)).resolves.toEqual({
+      kind: 'conflict',
+    })
+  })
+
   it('returns mismatch and conflict states from reserve', async () => {
     const redis = {
       eval: jest.fn().mockResolvedValueOnce(['mismatch']).mockResolvedValueOnce(['conflict']),

@@ -94,8 +94,8 @@ describe('CleanupService', () => {
 
       await service.runCleanup()
 
-      expect(retention.prune).toHaveBeenCalledWith('pending')
-      expect(retention.prune).toHaveBeenCalledWith('terminal')
+      expect(retention.prune).toHaveBeenCalledWith('pending', expect.any(Function))
+      expect(retention.prune).toHaveBeenCalledWith('terminal', expect.any(Function))
     })
 
     it('runs the token/key deletions in parallel', async () => {
@@ -147,10 +147,11 @@ describe('CleanupService', () => {
       expect(result.staleTerminalApiKeys).toBe(0)
       expect(result.failures).toEqual(['staleTerminalApiKeys'])
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.objectContaining({
+        {
           event: 'schedule.cleanup_partial_failure',
           recordType: 'staleTerminalApiKeys',
-        }),
+          errorCode: 'unexpected',
+        },
         expect.any(String)
       )
     })
