@@ -68,7 +68,8 @@ echo "{\"skewS\":$(json_s "$offset"),\"skewUncertaintyS\":$(json_s "$bound")}" >
 [ $((${offset#-} + bound)) -le 1000 ] ||
   die "clock offset to the host is ${offset} ± ${bound} ms, not provably within 1 s; synchronise time (NTP) or check the generator-host connection"
 
-srv sh scripts/load-test/server-stats.sh containers > "$DIR/containers.before"
+srv sh scripts/load-test/server-stats.sh containers > "$DIR/containers.before" ||
+  die "cannot capture the container inventory before the step"
 srv sh scripts/load-test/sampler.sh start "$REMOTE"
 # Generator CPU: "<epoch> idle=<percent>" every 5 s from vmstat's "id" column.
 (
@@ -93,7 +94,10 @@ GEN_PID=
 srv sh scripts/load-test/sampler.sh stop "$REMOTE" > /dev/null 2>&1
 srv cat "$REMOTE/sampler.exit" > "$DIR/sampler.exit" 2> /dev/null || echo 1 > "$DIR/sampler.exit"
 srv cat "$REMOTE/samples.txt" > "$DIR/samples.txt"
-srv sh scripts/load-test/server-stats.sh containers > "$DIR/containers.after"
+if ! srv sh scripts/load-test/server-stats.sh containers > "$DIR/containers.after"; then
+  # Even a complete-looking reply from a failed SSH command is unusable.
+  : > "$DIR/containers.after"
+fi
 mv "$LT_WORK/$OUT/$NAME.summary.json" "$DIR/summary.json" 2> /dev/null
 mv "$LT_WORK/$OUT/$NAME.window.json" "$DIR/window.json" 2> /dev/null
 set -e

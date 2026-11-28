@@ -138,3 +138,24 @@ test('a failing log source or a broken archive makes the step invalid (FH2-1)', 
     assert.match(res.reasons.join(';'), reason, mode)
   }
 })
+
+test('an incomplete starting inventory stops the step before load', () => {
+  const world = stubWorld()
+  world.stub({ routes: ROUTES, inventory: 'missing-service' })
+  const r = sh(world, 'run-step.sh', ['r5-1', '5', '3'])
+  assert.notEqual(r.status, 0)
+  assert.match(r.stderr, /container inventory does not match the configured project/)
+  assert.equal(existsSync(join(world.dir, 'window-start')), false)
+})
+
+test('an incomplete or failed final inventory makes the step invalid', () => {
+  for (const inventory of ['inspect-failed', 'inspect-partial']) {
+    const world = stubWorld()
+    world.stub({ routes: ROUTES, inventory })
+    const r = sh(world, 'run-step.sh', ['r5-1', '5', '3'])
+    assert.equal(r.status, 0, r.stderr)
+    const res = result(world, 'out', 'r5-1')
+    assert.equal(res.class, 'invalid measurement', inventory)
+    assert.match(res.reasons.join(';'), /container list before and after/, inventory)
+  }
+})
