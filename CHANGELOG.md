@@ -14,6 +14,7 @@ versions they name. For current source-update instructions, see
 
 ### Fixed
 
+- Replay completed idempotent responses with an empty stored body.
 - Scheduled job failure logs use bounded error codes without exception text.
 - Invitation cleanup reports confirmed deletions when a later transaction fails.
 
