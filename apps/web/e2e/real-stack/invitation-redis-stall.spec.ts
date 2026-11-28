@@ -6,19 +6,14 @@ import { activeTarget } from '../support/managed-target.mjs'
 import { uniqueEmail } from './helpers'
 import { inviteRecipient, membershipCount } from './invitation-recipient.helpers'
 import { resetInvitationRegistrationIpBudget } from './invitation-registration-budget.helpers'
-import { pauseRedis } from './redis-outage-support'
+import { pauseRedis, waitForRedisAfterPause } from './redis-outage-support'
 
-// Characterization, not a 3 s promise: the invitation record store stays on the web server's shared
-// Redis connection (only the session vault, its lock and the refresh moved to the supervised one).
-// A link opened while Redis stalls therefore waits for the stall to end and then opens the flow.
-// Asserted: the flow opens within an upper bound and no membership exists. Not asserted: the
-// invitation's consumed state or anything during the pause. Numbers are for this fault class here.
 test.beforeEach(() => resetInvitationRegistrationIpBudget())
 
 const STALL_MS = 8000
 const MARGIN_MS = 7000
 
-test('an invitation link opened during a Redis stall waits for Redis, then opens the flow with no membership', async ({
+test('an invitation link is temporarily unavailable during a Redis stall and opens after recovery', async ({
   page,
 }) => {
   test.setTimeout(120_000)
@@ -35,8 +30,16 @@ test('an invitation link opened during a Redis stall waits for Redis, then opens
   pauseRedis(STALL_MS)
   const started = performance.now()
   await page.goto(link, { timeout: STALL_MS + MARGIN_MS })
-  const elapsed = performance.now() - started
-  expect(elapsed).toBeLessThan(STALL_MS + MARGIN_MS)
+  expect(performance.now() - started).toBeLessThan(STALL_MS)
+  const unavailable = new URL(
+    localizedFrontendUrl(target.origins.product, DEFAULT_LOCALE, 'invite/unusable')
+  )
+  unavailable.searchParams.set('reason', 'unavailable')
+  await expect(page).toHaveURL(unavailable.href)
+  expect(membershipCount(email, org.id)).toBe('0')
+
+  await waitForRedisAfterPause(STALL_MS + MARGIN_MS)
+  await page.goto(link)
   await expect(page).toHaveURL(
     (url) =>
       url.origin === target.origins.product &&
