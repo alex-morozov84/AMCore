@@ -1,3 +1,4 @@
+import { type CatalogueLocale, DEFAULT_LOCALE, localePathPrefix } from '@amcore/shared'
 import { type Browser, expect } from '@playwright/test'
 
 import type messages from '../../messages/en.json'
@@ -13,9 +14,14 @@ export async function acceptAdministrator(
   email: string,
   organization: string,
   messages: Messages,
-  origin?: string
+  origin?: string,
+  registrationLocale?: CatalogueLocale
 ): Promise<string> {
-  const context = await browser.newContext({ ignoreHTTPSErrors: true, serviceWorkers: 'block' })
+  const context = await browser.newContext({
+    ignoreHTTPSErrors: true,
+    locale: DEFAULT_LOCALE,
+    serviceWorkers: 'block',
+  })
   try {
     const page = await context.newPage()
     const failures: Array<{ action: string; status: number; errorCode?: string }> = []
@@ -30,6 +36,14 @@ export async function acceptAdministrator(
       })
     })
     await openProvisioningMail(page, email, 'invite/accept', origin)
+    if (registrationLocale && registrationLocale !== DEFAULT_LOCALE) {
+      const formUrl = new URL(page.url())
+      const defaultPrefix = localePathPrefix(DEFAULT_LOCALE)
+      expect(formUrl.pathname.startsWith(`${defaultPrefix}/`)).toBe(true)
+      formUrl.pathname =
+        localePathPrefix(registrationLocale) + formUrl.pathname.slice(defaultPrefix.length)
+      await page.goto(formUrl.href)
+    }
     const consent = messages.invitationRecipient
     await expect(page.getByRole('heading', { name: consent.signInTitle })).toBeVisible()
     await page.getByRole('tab', { name: messages.auth.register, exact: true }).click()
@@ -49,8 +63,18 @@ export async function acceptAdministrator(
         id: userId,
       }).trim()
     ).toBe('0')
+    if (registrationLocale)
+      expect(
+        guardedSql(`SELECT locale FROM core.users WHERE id = :'id';`, { id: userId }).trim()
+      ).toBe(registrationLocale)
     const verification = await context.newPage()
-    await openProvisioningMail(verification, email, 'verify-email', origin)
+    const expectedMail = registrationLocale
+      ? {
+          pathname: `${localePathPrefix(registrationLocale)}/verify-email`,
+          phrase: registrationLocale === 'ru' ? 'Подтвердите ваш email' : 'Verify your email',
+        }
+      : undefined
+    await openProvisioningMail(verification, email, 'verify-email', origin, expectedMail)
     await expect(
       verification.getByText(messages.auth.verifyEmailSuccess, { exact: true })
     ).toBeVisible()

@@ -1,4 +1,9 @@
-import type { InvitationFlowAuthResponse, UserResponse } from '@amcore/shared'
+import {
+  type CatalogueLocale,
+  DEFAULT_LOCALE,
+  type InvitationFlowAuthResponse,
+  type UserResponse,
+} from '@amcore/shared'
 import { describe, expect, it, vi } from 'vitest'
 
 import { createInvitationCredentialAdapters } from './credential-adapters'
@@ -11,9 +16,10 @@ const response: InvitationFlowAuthResponse = {
   handoff: { attemptId: 'b'.repeat(22) },
 }
 const credentials = { email: 'invited@example.test', password: '<test-password>' }
-function setup() {
+function setup(registrationLocale?: CatalogueLocale) {
   const continuation = {
     binding,
+    registrationLocale,
     isCurrent: () => true,
     onMfaRequired: vi.fn(),
     onHandoff: vi.fn(),
@@ -97,15 +103,15 @@ describe('invitation credential handoff adapter', () => {
     expect(state.continuation.onFailure).toHaveBeenCalledWith(failure)
   })
 
-  it('uses only continuation authority to select the invited registration email', async () => {
-    const state = setup()
+  it('uses the continuation for the invited address and the page language for registration', async () => {
+    const state = setup(DEFAULT_LOCALE)
     await state.adapters.register.submit({
       ...credentials,
       email: 'different@example.test',
       name: 'Example',
     })
     expect(state.transport.register).toHaveBeenCalledWith(
-      { binding, name: 'Example', password: credentials.password, locale: undefined },
+      { binding, name: 'Example', password: credentials.password, locale: DEFAULT_LOCALE },
       expect.any(AbortSignal)
     )
     expect(state.transport.login).not.toHaveBeenCalled()

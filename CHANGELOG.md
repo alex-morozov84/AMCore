@@ -14,6 +14,7 @@ versions they name. For current source-update instructions, see
 
 ### Fixed
 
+- Save the invitation registration page language in the new profile.
 - Local development images prepare the pnpm executable during the build so
   preview services can start without downloading it.
 - Bound waits for shared web Redis records and let operators retry an unconfirmed Console sign-out.
