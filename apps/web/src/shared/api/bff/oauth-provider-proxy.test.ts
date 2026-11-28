@@ -1,7 +1,10 @@
 // @vitest-environment node
 import { NextResponse } from 'next/server'
+import { DEFAULT_LOCALE, localizedFrontendUrl, productAdminPath } from '@amcore/shared'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { prepareBrowserAuthAttempt } from './browser-bootstrap-handler'
+import { SessionVaultUnavailableError } from './errors'
 import { proxyOAuthAuthorize, proxyOAuthCallback } from './oauth-provider-proxy'
 import { type ProductWebContext } from './product-web-context.server'
 
@@ -74,6 +77,30 @@ describe('proxyOAuthAuthorize', () => {
     expect(response.headers.getSetCookie()).toEqual(
       expect.arrayContaining([expect.stringContaining('amcore_browser_context=')])
     )
+  })
+
+  it('redirects an admin OAuth start to login if Redis is unavailable', async () => {
+    vi.mocked(prepareBrowserAuthAttempt).mockRejectedValueOnce(
+      new SessionVaultUnavailableError(undefined)
+    )
+    const provider = vi.fn()
+    vi.stubGlobal('fetch', provider)
+    const origin = 'https://example.test'
+    const loginPath = productAdminPath('/login')
+    const request = new Request(
+      `${origin}/api/product-admin/auth/oauth/google?locale=${DEFAULT_LOCALE}`
+    )
+    const response = await proxyOAuthAuthorize(request, 'google', {
+      ...context,
+      frontend: 'admin',
+      origin,
+      loginPath,
+    })
+    const expected = new URL(localizedFrontendUrl(origin, DEFAULT_LOCALE, loginPath))
+    expected.searchParams.set('oauthError', 'OAUTH_PROVIDER_ERROR')
+    expect(response.status).toBe(303)
+    expect(response.headers.get('location')).toBe(expected.href)
+    expect(provider).not.toHaveBeenCalled()
   })
 
   it('preserves the query string on the upstream URL', async () => {
