@@ -98,7 +98,18 @@ Console offers no retry for that receipt.
 
 ## Token rotation
 
-Every time you call `POST /auth/refresh`, the old refresh token is **immediately revoked** and a new one is issued:
+If the refresh transaction exceeds its execution deadline, the API returns
+`503 REFRESH_TRANSACTION_TIMEOUT` without issuing new credentials. The web app
+keeps the session and does not automatically retry the refresh.
+
+Web API handlers that use `authFailureResponse`, including the authenticated proxy,
+return the same error code if they receive it before their own deadline. If
+their deadline expires first, they return `503 SERVICE_UNAVAILABLE`. Server-side
+calls through `resolveAuthHeader` report authentication as unavailable even if
+they receive the specific timeout before their deadline.
+
+When `POST /auth/refresh` successfully rotates a token, the API revokes the
+old refresh token and issues a new one.
 
 ```
 Day 1:  Login → refresh_token = "abc123..."
@@ -137,11 +148,12 @@ A new `refresh_token` cookie is set with the rotated token.
 
 **Errors:**
 
-| Code              | HTTP | When                                                                                                 |
-| ----------------- | ---- | ---------------------------------------------------------------------------------------------------- |
-| `TOKEN_INVALID`   | 401  | Present token not found, reused or expired                                                           |
-| `UNAUTHORIZED`    | 401  | Refresh cookie missing                                                                               |
-| `SESSION_CHANGED` | 409  | Internal family/account/browser authority changed; do not refresh again or select another credential |
+| Code                          | HTTP | When                                                                                                 |
+| ----------------------------- | ---- | ---------------------------------------------------------------------------------------------------- |
+| `TOKEN_INVALID`               | 401  | Present token not found, reused or expired                                                           |
+| `UNAUTHORIZED`                | 401  | Refresh cookie missing                                                                               |
+| `SESSION_CHANGED`             | 409  | Internal family/account/browser authority changed; do not refresh again or select another credential |
+| `REFRESH_TRANSACTION_TIMEOUT` | 503  | The rotation transaction exceeded its execution deadline. The API issued no new credentials.         |
 
 ---
 

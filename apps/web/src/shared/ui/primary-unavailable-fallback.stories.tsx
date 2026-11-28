@@ -11,17 +11,12 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-// Every `reason` renders the same generic copy today (a deliberate choice -
-// see the component's own doc comment) - one story per reason still exists
-// so a future per-reason copy change is caught by a real assertion, not
-// only by code review.
-
 export const RateLimited: Story = {
-  args: { reason: 'rate-limited' },
+  args: { reason: 'rate-limited', retryAfterMs: 7000 },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     await expect(
-      canvas.getByText('This is temporarily unavailable. Please try again.')
+      canvas.getByText('Too many requests. The server asks you to wait 7 seconds.')
     ).toBeInTheDocument()
   },
 }

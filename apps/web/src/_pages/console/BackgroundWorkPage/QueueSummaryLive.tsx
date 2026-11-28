@@ -37,7 +37,7 @@ export function QueueSummaryLive({
 }: {
   sourceSelection?: ConsoleSourceSelection
   initialWork?: WorkSummary[]
-  workUnavailable?: PrimaryUnavailableFallbackProps['reason']
+  workUnavailable?: Pick<PrimaryUnavailableFallbackProps, 'reason' | 'retryAfterMs'>
   initial: AdminQueuesResponse
   initialUpdatedAt: number
   /** A page load of the queue board just failed (`?board=unavailable`): a one-shot, historical marker. */
@@ -97,7 +97,8 @@ export function QueueSummaryLive({
       )}
       {workUnavailable && !summary.workRefreshed && (
         <PrimaryUnavailableFallback
-          reason={workUnavailable}
+          reason={workUnavailable.reason}
+          retryAfterMs={workUnavailable.retryAfterMs}
           onRetry={() => void summary.refresh()}
         />
       )}

@@ -19,11 +19,12 @@ const catalogues = { en, ru } as const
 function renderFallback(
   reason: 'rate-limited' | 'timeout' | 'network' | 'upstream' = 'upstream',
   locale: keyof typeof catalogues = 'en',
-  onRetry?: () => void
+  onRetry?: () => void,
+  retryAfterMs?: number
 ) {
   return render(
     <NextIntlClientProvider locale={locale} messages={catalogues[locale]}>
-      <PrimaryUnavailableFallback reason={reason} onRetry={onRetry} />
+      <PrimaryUnavailableFallback reason={reason} onRetry={onRetry} retryAfterMs={retryAfterMs} />
     </NextIntlClientProvider>
   )
 }
@@ -51,7 +52,7 @@ describe('PrimaryUnavailableFallback', () => {
     expect(screen.getByRole('button', { name: 'Повторить' })).toBeInTheDocument()
   })
 
-  it.each(['rate-limited', 'timeout', 'network', 'upstream'] as const)(
+  it.each(['timeout', 'network', 'upstream'] as const)(
     'maps %s to approved generic copy without exposing the raw reason',
     (reason) => {
       const { container } = renderFallback(reason)
@@ -62,6 +63,16 @@ describe('PrimaryUnavailableFallback', () => {
       expect(container.innerHTML).not.toContain(reason)
     }
   )
+
+  it.each([
+    ['en', 7000, 'Too many requests. The server asks you to wait 7 seconds.'],
+    ['ru', 7000, 'Слишком много запросов. Сервер просит подождать 7 секунд.'],
+    ['ru', undefined, 'Слишком много запросов.'],
+    ['ru', 0, 'Слишком много запросов.'],
+  ] as const)('shows the rate limit in %s with delay %s', (locale, delay, message) => {
+    renderFallback('rate-limited', locale, undefined, delay)
+    expect(screen.getByText(message)).toBeInTheDocument()
+  })
 
   it('calls router.refresh() when retry is clicked, not any other recovery mechanism', async () => {
     const user = userEvent.setup()

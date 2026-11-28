@@ -11,10 +11,12 @@ import { resolveTrustedWebPeers } from '../src/common/utils/trusted-web-peer'
 import { LoginRateLimiterService } from '../src/core/auth/login-rate-limiter.service'
 import { mfaCredential } from '../src/core/auth/mfa/mfa-secrets.js'
 import { SessionService } from '../src/core/auth/session.service'
+import { sessionCoordinationLockKey } from '../src/core/auth/session-lock-key'
 import { TokenService } from '../src/core/auth/token.service'
 import { TokenManagerService } from '../src/core/auth/token-manager.service'
 import { EnvService } from '../src/env/env.service'
-import type { PrismaService } from '../src/prisma'
+import { Prisma } from '../src/generated/prisma/client'
+import { acquireXactLock, type PrismaService } from '../src/prisma'
 
 import { readEnvelope, seedEnvelope } from './fixtures/counter-envelope'
 import {
@@ -25,6 +27,7 @@ import {
   setupE2ETest,
   teardownE2ETest,
 } from './helpers'
+import { deferred } from './helpers/organization-members-race'
 
 /**
  * Extract refresh token from response cookies
@@ -601,6 +604,84 @@ describe('Auth (e2e)', () => {
       const newRefreshToken = extractRefreshToken(response)
       expect(newRefreshToken).toBeDefined()
       expect(newRefreshToken).not.toBe(refreshToken) // Token rotated
+    })
+
+    it('preserves the original session after refresh transaction expiry', async () => {
+      const session = await prisma.session.findFirstOrThrow()
+      const familyWhere = { familyId: session.familyId }
+      const familyBefore = await prisma.session.findMany({ where: familyWhere })
+      const key = sessionCoordinationLockKey(session.userId)
+      const acquired = deferred()
+      const release = deferred()
+      const transactions = jest.spyOn(prisma, '$transaction')
+      const holder = prisma.$transaction(
+        async (tx) => {
+          await acquireXactLock(tx, key)
+          acquired.resolve()
+          await release.promise
+        },
+        { timeout: 15_000 }
+      )
+      let pending: Promise<Response> | undefined
+      const observed = transactions.mock.results
+      try {
+        await Promise.race([acquired.promise, holder])
+        pending = agent.post('/auth/refresh').then((response) => response)
+        const deadline = Date.now() + 3_000
+        let waiting = false
+        while (Date.now() < deadline && !waiting) {
+          const [row] = await prisma.$queryRaw<Array<{ waiting: boolean }>>`
+            SELECT EXISTS (
+              SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND NOT granted
+                AND classid = ((hashtextextended(${key}, 0) >> 32) & 4294967295)::oid
+                AND objid = (hashtextextended(${key}, 0) & 4294967295)::oid
+                AND objsubid = 1
+            ) AS waiting
+          `
+          waiting = row?.waiting === true
+          if (!waiting) await new Promise((resolve) => setTimeout(resolve, 10))
+        }
+        expect(waiting).toBe(true)
+        await new Promise((resolve) => setTimeout(resolve, 5_100))
+      } finally {
+        release.resolve()
+        try {
+          await holder
+          await Promise.allSettled(pending ? [pending] : [])
+        } finally {
+          transactions.mockRestore()
+        }
+      }
+
+      const outcomes = await Promise.allSettled(observed.map(({ value }) => value))
+      const rejection = outcomes.find((outcome) => outcome.status === 'rejected')
+      expect(rejection?.reason).toBeInstanceOf(Prisma.PrismaClientKnownRequestError)
+      expect(rejection?.reason).toMatchObject({
+        code: 'P2028',
+        meta: { operation: expect.any(String), timeout: 5_000, timeTaken: expect.any(Number) },
+      })
+      const response = await pending
+      expect(response?.status).toBe(503)
+      expect(response?.body).toMatchObject({ errorCode: AuthErrorCode.REFRESH_TRANSACTION_TIMEOUT })
+      expect(response?.body).not.toHaveProperty('accessToken')
+      expect(response?.headers['set-cookie']).toBeUndefined()
+      expect(await prisma.session.findMany({ where: familyWhere })).toEqual(familyBefore)
+      await agent.post('/auth/refresh').set('Cookie', `refresh_token=${refreshToken}`).expect(200)
+    })
+
+    it('keeps an unrelated P2028 on the existing server error path', async () => {
+      const transaction = jest.spyOn(prisma, '$transaction').mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError('Transaction already closed', {
+          code: 'P2028',
+          clientVersion: '7.10.1',
+        })
+      )
+      try {
+        const response = await agent.post('/auth/refresh')
+        expect(response.status).toBe(500)
+      } finally {
+        transaction.mockRestore()
+      }
     })
 
     it('should return 401 for invalid refresh token', async () => {

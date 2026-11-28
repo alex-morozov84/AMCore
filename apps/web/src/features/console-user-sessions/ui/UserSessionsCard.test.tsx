@@ -21,6 +21,8 @@ vi.mock('@/i18n/navigation', () => ({
   }),
 }))
 
+import { ApiRequestError } from '@/shared/api/http-client'
+
 import { useRevokeAllSessions } from '../model/use-revoke-all-sessions'
 import { useUserSessions } from '../model/use-user-sessions'
 
@@ -32,7 +34,13 @@ vi.mock('@/shared/ui/console-step-up-dialog', () => ({ ConsoleStepUpDialog: () =
 vi.mock('./SessionRowMenu', () => ({ SessionRowMenu: () => null }))
 
 const messages = {
-  common: { cancel: 'Cancel', retry: 'Retry', temporarilyUnavailable: 'Temporarily unavailable.' },
+  common: {
+    cancel: 'Cancel',
+    retry: 'Retry',
+    temporarilyUnavailable: 'Temporarily unavailable.',
+    rateLimitReason: 'Too many requests.',
+    rateLimitWait: 'The server asks you to wait {seconds} seconds.',
+  },
   console: {
     userSessionsHeading: 'Sessions ({count} total)',
     userSessionsRefresh: 'Refresh',
@@ -114,11 +122,20 @@ describe('UserSessionsCard', () => {
     expect(container.querySelector('[aria-busy="true"]')).toBeInTheDocument()
   })
 
-  it('shows the retryable error fallback and calls refetch (not router.refresh) on retry', async () => {
+  it.each([
+    [new Error('Network failure'), 'Temporarily unavailable.'],
+    [new ApiRequestError(503, undefined, 7), 'Temporarily unavailable.'],
+    [new ApiRequestError(429, undefined), 'Too many requests.'],
+    [
+      new ApiRequestError(429, undefined, 7),
+      'Too many requests. The server asks you to wait 7 seconds.',
+    ],
+  ] as const)('shows the failure and refetches on retry (%s)', async (error, message) => {
     const user = userEvent.setup()
-    mockSessions({ isError: true })
+    mockSessions({ isError: true, error })
     renderCard()
 
+    expect(within(screen.getByRole('alert')).getByText(message, { exact: true })).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Retry' }))
 
     expect(refetch).toHaveBeenCalledTimes(1)

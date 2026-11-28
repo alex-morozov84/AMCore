@@ -389,7 +389,7 @@ export class AuthController {
   })
   @ApiServiceUnavailableResponse({
     description:
-      'SERVICE_UNAVAILABLE for frontend placement or unavailable MFA refresh authority. DATABASE_POOL_TIMEOUT when the database pool is exhausted.',
+      'SERVICE_UNAVAILABLE for frontend placement or unavailable MFA refresh authority. REFRESH_TRANSACTION_TIMEOUT when the rotation transaction expires. DATABASE_POOL_TIMEOUT when the database pool is exhausted.',
     headers: { 'Retry-After': POOL_TIMEOUT_HEADER },
     content: {
       'application/json': { schema: { $ref: '#/components/schemas/HttpExceptionResponse' } },

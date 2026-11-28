@@ -5,6 +5,7 @@ import { useFormatter, useTranslations } from 'next-intl'
 import type { AdminSession } from '@amcore/shared'
 import { RefreshCw } from 'lucide-react'
 
+import { getErrorStatus, getRetryAfterMs } from '@/shared/api/errors'
 import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
@@ -51,7 +52,7 @@ export function UserSessionsCard({ userId, targetEmail, isSelf }: UserSessionsCa
   const tSessions = useTranslations('sessions')
   const tCommon = useTranslations('common')
   const format = useFormatter()
-  const { data, isPending, isFetching, isError, refetch, page, setPage, pageSize } =
+  const { data, isPending, isFetching, isError, error, refetch, page, setPage, pageSize } =
     useUserSessions(userId)
   const [revokeAllOpen, setRevokeAllOpen] = useState(false)
   const { confirm, isSubmitting, stepUp, isSteppingUp, submitStepUp, closeStepUp } =
@@ -77,6 +78,7 @@ export function UserSessionsCard({ userId, targetEmail, isSelf }: UserSessionsCa
       restoreFocus.current = false
     }
   }, [rows, total, isFetching])
+  const rateLimited = getErrorStatus(error) === 429
   const hasAnyLocation = rows.some((row) => row.location !== null)
 
   return (
@@ -125,7 +127,11 @@ export function UserSessionsCard({ userId, targetEmail, isSelf }: UserSessionsCa
         )}
 
         {isError ? (
-          <PrimaryUnavailableFallback reason="network" onRetry={() => void refetch()} />
+          <PrimaryUnavailableFallback
+            reason={rateLimited ? 'rate-limited' : 'network'}
+            retryAfterMs={rateLimited ? getRetryAfterMs(error) : undefined}
+            onRetry={() => void refetch()}
+          />
         ) : isPending ? (
           <DetailRelationRowsSkeleton />
         ) : rows.length === 0 ? (

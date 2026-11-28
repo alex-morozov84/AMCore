@@ -40,7 +40,7 @@ export async function IntegrationsPage({
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{t('description')}</p>
       </header>
       {outcome.status === 'unavailable' ? (
-        <PrimaryUnavailableFallback reason={outcome.reason} />
+        <PrimaryUnavailableFallback reason={outcome.reason} retryAfterMs={outcome.retryAfterMs} />
       ) : (
         <IntegrationsLive
           key={outcome.data.readAt}

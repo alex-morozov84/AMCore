@@ -24,7 +24,9 @@ export async function ApiKeyResults({
   const t = await getTranslations('console.apiKeys')
   const outcome = resolvePrimary(await fetchConsoleApiKeys(query), { source: 'console-api-keys' })
   if (outcome.status === 'unavailable')
-    return <PrimaryUnavailableFallback reason={outcome.reason} />
+    return (
+      <PrimaryUnavailableFallback reason={outcome.reason} retryAfterMs={outcome.retryAfterMs} />
+    )
   const state = keyDiscoveryState(query)
   const href = buildDiscoveryHref(baseHref, state)
   const pages = Math.max(1, Math.ceil(outcome.data.total / query.limit))
