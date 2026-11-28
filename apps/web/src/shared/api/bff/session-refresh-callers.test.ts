@@ -10,7 +10,7 @@ import { testAccessToken } from './access-token.testkit'
 import { proxyToBackend } from './authenticated-proxy'
 import { getOptionalSessionEntry } from './dal'
 import { handleGetSessions } from './sessions-handler'
-import { browserTestHeaders, makeBrowserEntry } from './test-fakes'
+import { browserTestHeaders, makeBrowserEntry } from './test-fakes.testkit'
 
 const rotatedToken = testAccessToken('rotated', 2_000_000_000_000)
 

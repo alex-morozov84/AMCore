@@ -5,7 +5,7 @@ import { testAccessToken } from './access-token.testkit'
 import { ensureFreshSession } from './ensure-fresh-session'
 import { SessionLockTimeoutError } from './errors'
 import type { UpstreamRefreshFn } from './session-vault.types'
-import { FakeVaultStore, freshRefresh, makeEntry } from './test-fakes'
+import { FakeVaultStore, freshRefresh, makeEntry } from './test-fakes.testkit'
 import { QueuedFakeLock, SimpleLock, TtlAwareFakeLock } from './test-lock-fakes'
 
 const atMineToken = testAccessToken('at-mine', 2_000_000_000_000)

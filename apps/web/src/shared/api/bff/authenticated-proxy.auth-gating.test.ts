@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { proxyToBackend } from './authenticated-proxy'
-import { makeRequest, mockCookieStore } from './authenticated-proxy.test-helpers'
+import { makeRequest, mockCookieStore } from './authenticated-proxy.test-helpers.testkit'
 import { ensureFreshSession } from './ensure-fresh-session'
 import { SessionNotFoundError, SessionVaultUnavailableError } from './errors'
 import { isTrustedOrigin } from './origin-guard'

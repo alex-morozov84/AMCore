@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 import { vi } from 'vitest'
 
-import { browserTestHeaders } from './test-fakes'
+import { browserTestHeaders } from './test-fakes.testkit'
 
 export function mockCookieStore(sessionId: string | undefined) {
   vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-proxy-test-key-at-least-32-characters>')

@@ -3,6 +3,7 @@ import type { UserResponse } from '@amcore/shared'
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { testAccessToken } from './access-token.testkit'
 import { revokeBackendSession } from './backend-session-revocation'
 import { handleCredentialAuth } from './credential-auth-handler'
 import { SessionVaultUnavailableError } from './errors'
@@ -72,11 +73,13 @@ const register = () =>
 
 const vaultKeys = async () => (await redis()).keys('web:session:v1:*')
 
+const issuedAccessToken = testAccessToken('registration')
+
 beforeEach(() => {
   vi.mocked(callUpstreamRegister).mockResolvedValue({
     outcome: 'created',
     user,
-    accessToken: '<test-access>',
+    accessToken: issuedAccessToken,
     refreshToken: '<test-refresh>',
   })
   vi.mocked(retireFlowsForOrdinaryAuth).mockResolvedValue(undefined as never)
@@ -134,7 +137,7 @@ describe('registration under real Redis memory pressure', () => {
     expect(response.status).toBe(201)
     const sessionId = response.cookies.get('amcore_session')?.value
     expect(sessionId).toBeTruthy()
-    expect(await redisVaultStore.get(sessionId!)).toMatchObject({ accessToken: '<test-access>' })
+    expect(await redisVaultStore.get(sessionId!)).toMatchObject({ accessToken: issuedAccessToken })
   })
 
   it('classifies an applied write with a lost reply as created and leaves only an expiring entry', async () => {
@@ -183,6 +186,6 @@ describe('registration under real Redis memory pressure', () => {
 
     expect(response.status).toBe(503)
     expect(text).not.toContain('<test-refresh>')
-    expect(text).not.toContain('<test-access>')
+    expect(text).not.toContain(issuedAccessToken)
   })
 })

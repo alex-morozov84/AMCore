@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ContextRequestError } from './context-errors'
 import { getCurrentVaultSession } from './current-session'
-import { FakeVaultStore, makeEntry } from './test-fakes'
+import { FakeVaultStore, makeEntry } from './test-fakes.testkit'
 
 vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({

@@ -14,7 +14,7 @@ import {
   UpstreamRotationUnprovenError,
 } from './errors'
 import type { UpstreamRefreshFn, VaultEntry, VaultLock } from './session-vault.types'
-import { FakeVaultStore, freshRefresh, makeEntry } from './test-fakes'
+import { FakeVaultStore, freshRefresh, makeEntry } from './test-fakes.testkit'
 import { FailingRenewalLock, SimpleLock } from './test-lock-fakes'
 
 const at2Token = testAccessToken('at-2', 2_000_000_000_000)

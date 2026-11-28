@@ -6,7 +6,7 @@ import { testAccessToken } from './access-token.testkit'
 import { ensureFreshSession } from './ensure-fresh-session'
 import { proxyOAuthCallback } from './oauth-provider-proxy'
 import { sessionMetadataHeaders } from './session-metadata-headers'
-import { browserTestHeaders, FakeVaultStore, makeBrowserEntry } from './test-fakes'
+import { browserTestHeaders, FakeVaultStore, makeBrowserEntry } from './test-fakes.testkit'
 import { callUpstreamAuth } from './upstream-auth'
 import { createUpstreamRefresh } from './upstream-refresh'
 

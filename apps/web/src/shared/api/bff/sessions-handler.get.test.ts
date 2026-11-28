@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ensureFreshSession } from './ensure-fresh-session'
 import { SessionNotFoundError, SessionVaultUnavailableError } from './errors'
 import { handleGetSessions } from './sessions-handler'
-import { fakeVaultEntry, mockSessionCookie } from './sessions-handler.test-helpers'
-import { browserTestHeaders } from './test-fakes'
+import { fakeVaultEntry, mockSessionCookie } from './sessions-handler.test-helpers.testkit'
+import { browserTestHeaders } from './test-fakes.testkit'
 
 vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({ cookies: vi.fn(), headers: vi.fn(async () => new Headers()) }))

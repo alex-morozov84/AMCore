@@ -7,7 +7,7 @@ import {
   browserSessionHeaders,
   createBrowserBindingVerifier,
 } from './browser-binding.server'
-import { makeEntry } from './test-fakes'
+import { makeEntry } from './test-fakes.testkit'
 
 vi.mock('server-only', () => ({}))
 

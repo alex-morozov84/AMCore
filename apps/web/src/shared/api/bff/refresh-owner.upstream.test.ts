@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { testAccessToken } from './access-token.testkit'
 import { ensureFreshSession } from './ensure-fresh-session'
 import { UpstreamRotationUnprovenError } from './errors'
-import { FakeVaultStore, makeBrowserEntry } from './test-fakes'
+import { FakeVaultStore, makeBrowserEntry } from './test-fakes.testkit'
 import { SimpleLock } from './test-lock-fakes'
 import { createUpstreamRefresh } from './upstream-refresh'
 

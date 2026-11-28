@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createBrowserBindingVerifier } from './browser-binding.server'
 import { ensureFreshSession } from './ensure-fresh-session'
 import { SessionStageTimeoutError } from './errors'
-import { FakeVaultStore, makeBrowserEntry, makeEntry } from './test-fakes'
+import { FakeVaultStore, makeBrowserEntry, makeEntry } from './test-fakes.testkit'
 import { SimpleLock } from './test-lock-fakes'
 
 vi.mock('server-only', () => ({}))

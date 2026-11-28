@@ -6,7 +6,7 @@ import { fetchBackendResponse } from '@/shared/api/backend-transport'
 
 import { type ContextExecutorDeps, executeContextOperation } from './context-executor'
 import { contextSessionBinding } from './context-session'
-import { FakeVaultStore, freshRefresh, makeEntry } from './test-fakes'
+import { FakeVaultStore, freshRefresh, makeEntry } from './test-fakes.testkit'
 import { SimpleLock } from './test-lock-fakes'
 
 vi.mock('server-only', () => ({}))

@@ -9,7 +9,7 @@ import {
   SessionVaultUnavailableError,
 } from './errors'
 import type { VaultStore } from './session-vault.types'
-import { FakeVaultStore, freshRefresh, makeEntry } from './test-fakes'
+import { FakeVaultStore, freshRefresh, makeEntry } from './test-fakes.testkit'
 import { NeverAcquiresLock, SimpleLock } from './test-lock-fakes'
 
 // `server-only` resolves via a bundler `react-server` export condition that

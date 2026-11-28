@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { withinContextDeadline } from './context-deadline'
 import { executeContextOperation } from './context-executor'
 import { contextSessionBinding } from './context-session'
-import { browserTestHeaders, FakeVaultStore, makeBrowserEntry } from './test-fakes'
+import { browserTestHeaders, FakeVaultStore, makeBrowserEntry } from './test-fakes.testkit'
 import { SimpleLock } from './test-lock-fakes'
 
 beforeEach(() =>

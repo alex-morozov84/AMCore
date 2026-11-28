@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { testAccessToken } from './access-token.testkit'
 import { mintSession } from './mint-session'
-import { FakeVaultStore } from './test-fakes'
+import { FakeVaultStore } from './test-fakes.testkit'
 
 const at2Token = testAccessToken('at-2', 2_000_000_000_000)
 
