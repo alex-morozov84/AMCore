@@ -20,6 +20,7 @@ versions they name. For current source-update instructions, see
 - Scheduled job failure logs use bounded error codes without exception text.
 - Invitation cleanup reports confirmed deletions when a later transaction fails.
 - Load-test measurements now reject failed or incomplete container snapshots.
+- The fork update example checks the release commit SHA before creating the update branch.
 
 ## [0.12.1] - 2026-11-28
 
