@@ -124,8 +124,10 @@ its place until Redis replies or the connection closes.
 If an invitation sign-in response is lost, sign in from the ordinary sign-in page with the same
 account. Then open the original invitation link again. If an MFA start response is lost, open the
 verification step again from the same session. The new start counts toward the existing limit.
-For an unconfirmed Console logout, use **Retry sign-out** to check the same receipt and, if it
-has no result, repeat logout for the original session.
+For an unconfirmed Console logout, use **Retry sign-out** when the button is
+available. The Console checks the same receipt and can retry for the original
+session. A warning by itself means the result is unconfirmed and there is no
+retry for that receipt.
 
 **What a request sees.** Session admission has one absolute budget of 3 s: vault read, the
 browser-binding check and, when a refresh is needed, waiting for the refresh. Nothing starts once the

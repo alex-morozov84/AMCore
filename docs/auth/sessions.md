@@ -88,9 +88,11 @@ takes effect on the next request even when the stored access token is still
 within its normal lifetime. Confirmed Console logout ends the selected session.
 The stale cookie no longer grants access.
 
-If the Console shows **Sign-out was not confirmed**, select **Retry sign-out**.
-The Console checks the original logout receipt and can repeat logout only for
-the session that started it. A later session keeps its own access.
+If the Console shows **Sign-out was not confirmed**, use **Retry sign-out** when
+the button is available. The Console checks the original receipt and can retry
+only for the session that started it. A later session keeps its own access.
+If the message appears by itself, the result is still unconfirmed and the
+Console offers no retry for that receipt.
 
 ---
 

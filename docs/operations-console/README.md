@@ -49,8 +49,9 @@ The sign-in address depends on how the Console was configured:
   **Sign out** in the Console to end only its session. Console OAuth sign-in
   is not supported.
 
-If **Sign-out was not confirmed** appears, select **Retry sign-out**. The Console
-checks the original logout receipt and session before repeating the request.
+If **Sign-out was not confirmed** appears with **Retry sign-out**, select the
+button to retry for the original session. If the warning appears by itself,
+the result is still unconfirmed and there is no retry for that receipt.
 See [sessions](../auth/sessions.md#operations-console-host-mode).
 
 The protected Console shows a not-found response if access is absent or denied.
