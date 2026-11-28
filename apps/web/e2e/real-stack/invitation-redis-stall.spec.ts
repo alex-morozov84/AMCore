@@ -13,7 +13,8 @@ test.beforeEach(() => resetInvitationRegistrationIpBudget())
 const STALL_MS = 8000
 const MARGIN_MS = 7000
 
-test('an invitation link is temporarily unavailable during a Redis stall and opens after recovery', async ({
+// CI uses the title as the case ID. The current contract is refusal, then an explicit retry.
+test('an invitation link opened during a Redis stall waits for Redis, then opens the flow with no membership', async ({
   page,
 }) => {
   test.setTimeout(120_000)

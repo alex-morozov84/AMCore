@@ -60,7 +60,8 @@ for (const provider of ['apple', 'google', 'github'] as const) {
 }
 
 const STALL_MS = 8000
-test('google path administration start is temporarily unavailable during a Redis stall and succeeds after recovery', async ({
+// CI uses the title as the case ID. The current contract is refusal, then an explicit retry.
+test('google path administration started during a Redis stall waits for Redis, then signs in', async ({
   browser,
 }) => {
   test.setTimeout(180_000)
