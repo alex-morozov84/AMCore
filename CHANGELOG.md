@@ -14,6 +14,9 @@ versions they name. For current source-update instructions, see
 
 ### Fixed
 
+- Explain rate limits and show the server’s wait when available. The own API
+  keys page lets users retry the session check from the page.
+
 - Replay completed idempotent responses with an empty stored body.
 - Refresh transaction timeouts return a distinct temporary error and preserve the session.
 - Web sessions refresh access tokens according to their API-issued expiry.

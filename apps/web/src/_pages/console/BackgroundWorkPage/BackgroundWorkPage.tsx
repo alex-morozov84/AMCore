@@ -57,11 +57,11 @@ export async function BackgroundWorkPage({
       </header>
       {outcome.status === 'unavailable' ? (
         <>
-          <PrimaryUnavailableFallback reason={outcome.reason} />
+          <PrimaryUnavailableFallback reason={outcome.reason} retryAfterMs={outcome.retryAfterMs} />
           {work.status === 'available' ? (
             <BackgroundWorkControls initial={work.data} sourceSelection={request.selection} />
           ) : (
-            <PrimaryUnavailableFallback reason={work.reason} />
+            <PrimaryUnavailableFallback reason={work.reason} retryAfterMs={work.retryAfterMs} />
           )}
         </>
       ) : (
@@ -69,7 +69,7 @@ export async function BackgroundWorkPage({
           key={outcome.data.checkedAt}
           initial={outcome.data}
           initialWork={work.status === 'available' ? work.data : []}
-          workUnavailable={work.status === 'unavailable' ? work.reason : undefined}
+          workUnavailable={work.status === 'unavailable' ? work : undefined}
           initialUpdatedAt={Date.parse(outcome.data.checkedAt)}
           boardOpenFailed={boardOpenFailed}
           sourceSelection={request.selection}

@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 
 import { ClientErrorCode } from './error-codes'
 import { getCorrelationId, getDiagnosticMessage, resolveErrorCode } from './errors'
+import { ApiRequestError } from './http-client'
 
 export interface ApiErrorView {
   /** The machine-readable code the message was resolved from. */
@@ -32,6 +33,7 @@ export interface ApiErrorView {
  */
 export function useApiError() {
   const t = useTranslations('errors')
+  const common = useTranslations('common')
 
   return useCallback(
     (error: unknown): ApiErrorView => {
@@ -52,13 +54,27 @@ export function useApiError() {
         )
       }
 
+      const rateLimited = error instanceof ApiRequestError && error.status === 429
+      const seconds = rateLimited ? error.retryAfterSeconds : undefined
+      const hasSpecificMessage =
+        hasMessage && code !== ClientErrorCode.UNKNOWN_ERROR && code !== 'SERVICE_UNAVAILABLE'
+      const message =
+        rateLimited && !hasSpecificMessage
+          ? common('rateLimitReason')
+          : hasMessage
+            ? t(key)
+            : t(ClientErrorCode.UNKNOWN_ERROR)
+
       return {
         code,
-        message: hasMessage ? t(key) : t(ClientErrorCode.UNKNOWN_ERROR),
+        message:
+          seconds !== undefined && seconds > 0 && Number.isFinite(seconds)
+            ? `${message} ${common('rateLimitWait', { seconds })}`
+            : message,
         correlationId,
         isUnknown: !hasMessage,
       }
     },
-    [t]
+    [common, t]
   )
 }

@@ -54,7 +54,7 @@ export async function ScheduledJobsPage({
         </p>
       </header>
       {outcome.status === 'unavailable' ? (
-        <PrimaryUnavailableFallback reason={outcome.reason} />
+        <PrimaryUnavailableFallback reason={outcome.reason} retryAfterMs={outcome.retryAfterMs} />
       ) : (
         <ScheduledJobsLive
           key={outcome.data.checkedAt}

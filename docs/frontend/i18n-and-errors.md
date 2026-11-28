@@ -155,6 +155,9 @@ needs the same enum entry and catalogue entries; the BFF builds the response, no
 Step 3 is not optional: `src/shared/api/error-messages.test.ts` derives its
 expectations from those enums, so a code without a translation fails the required tests.
 
+The shared error view explains HTTP 429 and includes the server’s positive
+`Retry-After` delay when available.
+
 Render failures with `<ApiErrorAlert error={error} />`, or call `useApiError()`
 for `{ code, message, correlationId, isUnknown }`.
 

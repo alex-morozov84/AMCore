@@ -1,7 +1,7 @@
 import { NextIntlClientProvider } from 'next-intl'
 import { AuthErrorCode } from '@amcore/shared'
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 
 import en from '../../../messages/en.json'
 import ru from '../../../messages/ru.json'
@@ -92,4 +92,59 @@ describe('ApiErrorAlert', () => {
     expect(screen.getByText('Something went wrong. Please try again.')).toBeInTheDocument()
     expect(screen.queryByText(/boom/)).not.toBeInTheDocument()
   })
+})
+
+function showRateLimit(error: ApiRequestError) {
+  renderAlert(error)
+  return screen.getByRole('alert')
+}
+
+it.each([undefined, 0, NaN])('explains a bare 429 without a usable delay (%s)', (delay) => {
+  expect(showRateLimit(new ApiRequestError(429, undefined, delay)).textContent).toBe(
+    'Too many requests.'
+  )
+})
+
+it('shows the duration and preserves the support reference for an unknown 429 code', () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  try {
+    const alert = showRateLimit(
+      new ApiRequestError(
+        429,
+        {
+          statusCode: 429,
+          timestamp: '2026-01-01T00:00:00Z',
+          path: '/api/test',
+          method: 'POST',
+          message: 'Raw backend prose',
+          errorCode: 'FUTURE_CODE',
+          correlationId: 'test-ref',
+        },
+        7
+      )
+    )
+    expect(alert).toHaveTextContent('Too many requests. The server asks you to wait 7 seconds.')
+    expect(alert).toHaveTextContent('test-ref')
+    expect(alert).not.toHaveTextContent('Raw backend prose')
+  } finally {
+    warn.mockRestore()
+  }
+})
+
+it('keeps a specific 429 message with the duration and omits the duration on 503', () => {
+  const body = {
+    statusCode: 429,
+    timestamp: '2026-01-01T00:00:00Z',
+    path: '/api/test',
+    method: 'POST',
+    message: 'Raw backend prose',
+    errorCode: 'INTEGRATION_PROBE_COOLDOWN',
+  }
+  const alert = showRateLimit(new ApiRequestError(429, body, 7))
+  expect(alert).toHaveTextContent(en.errors.INTEGRATION_PROBE_COOLDOWN)
+  expect(alert).toHaveTextContent('7 seconds')
+
+  cleanup()
+  const other = showRateLimit(new ApiRequestError(503, { ...body, statusCode: 503 }, 7))
+  expect(other).not.toHaveTextContent('7 seconds')
 })
