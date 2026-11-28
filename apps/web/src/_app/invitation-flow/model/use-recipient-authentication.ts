@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AuthErrorCode,
+  type CatalogueLocale,
   frontendAuthPath,
   type InvitationFlowBinding,
   type UserResponse,
@@ -23,7 +24,8 @@ const changed = () => new ClientStateError(ClientErrorCode.AUTH_CONTINUATION_CHA
 export function useRecipientAuthentication(
   initial: InvitationFlowBinding,
   initialUser: UserResponse | null,
-  actionBase: '/auth' | '/product-admin/auth' = '/auth'
+  actionBase: '/auth' | '/product-admin/auth' = '/auth',
+  registrationLocale?: CatalogueLocale
 ) {
   const router = useRouteProgressRouter()
   const [binding, setBinding] = useState(initial)
@@ -84,6 +86,7 @@ export function useRecipientAuthentication(
     let captured: number | undefined
     return createInvitationCredentialAdapters({
       binding,
+      registrationLocale,
       onMfaRequired: (flowBinding) =>
         router.replace(
           `${frontendAuthPath(actionBase === '/auth' ? 'site' : 'admin', '/mfa')}?flow=${encodeURIComponent(flowBinding)}`
@@ -148,7 +151,7 @@ export function useRecipientAuthentication(
         }
       },
     })
-  }, [binding, actionBase, router])
+  }, [binding, actionBase, registrationLocale, router])
   async function recover() {
     if (busy || !lifecycle.current.active) return
     const captured = lifecycle.current.epoch

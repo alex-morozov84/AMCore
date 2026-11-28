@@ -1,8 +1,8 @@
-import { DEFAULT_LOCALE } from '@amcore/shared'
+import { DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { acceptAdministrator } from '../organization-provisioning/recipient'
-import { messages, productPath } from '../shared/product-settings'
+import { messages, messagesForLocale, productPath } from '../shared/product-settings'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 import { proveSetupMailbox, SETUP_PASSWORD, setupCommand } from '../support/organization-setup'
 
@@ -54,12 +54,15 @@ test('closed signup still admits invited registration and real email proof befor
       .getByRole('button', { name: messages.organizationInvitations.invite, exact: true })
       .click()
     await expect(dialog).not.toBeVisible()
+    const registrationLocale =
+      SERVED_LOCALES.find((locale) => locale !== DEFAULT_LOCALE) ?? DEFAULT_LOCALE
     const userId = await acceptAdministrator(
       browser,
       recipient,
       'Staff invitation proof',
-      messages,
-      staff
+      messagesForLocale(registrationLocale),
+      staff,
+      registrationLocale
     )
     expect(
       guardedSql(

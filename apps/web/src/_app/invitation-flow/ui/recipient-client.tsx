@@ -1,8 +1,12 @@
 'use client'
 
 import { type ReactNode, useEffect, useState } from 'react'
-import { useTranslations } from 'next-intl'
-import type { InvitationFlowBinding, UserResponse } from '@amcore/shared'
+import { useLocale, useTranslations } from 'next-intl'
+import {
+  coerceSupportedLocale,
+  type InvitationFlowBinding,
+  type UserResponse,
+} from '@amcore/shared'
 
 import { RecipientAuth, RecipientSkeleton, RecipientStatus } from '@/_pages/invitation-recipient'
 import {
@@ -39,7 +43,8 @@ export function RecipientClient({
 }) {
   const t = useTranslations('invitationRecipient')
   const router = useRouteProgressRouter()
-  const auth = useRecipientAuthentication(initial, user, placement.actionBase ?? '/auth')
+  const locale = coerceSupportedLocale(useLocale())
+  const auth = useRecipientAuthentication(initial, user, placement.actionBase ?? '/auth', locale)
   const [terminal, setTerminal] = useState<{
     descriptor: InvitationAcceptDescriptor
     organization: string
