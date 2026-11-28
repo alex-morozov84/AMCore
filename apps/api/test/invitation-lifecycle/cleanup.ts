@@ -34,6 +34,54 @@ export function registerCleanupProofs(getFixture: () => InvitationProofFixture):
     expect(await truth(invite.id)).toEqual(fresh)
   })
 
+  it('preserves confirmed invitation deletions when a later candidate rolls back', async () => {
+    const { context, prisma, orgId, roleId } = getFixture()
+    const role = await invitationSeedRole(prisma, roleId)
+    for (const label of ['first', 'second']) {
+      await prisma.orgInvite.create({
+        data: {
+          organizationId: orgId,
+          email: `${label}-cleanup@example.test`,
+          emailCanonical: `${label}-cleanup@example.test`,
+          tokenHash: `fake-${label}-cleanup-hash`,
+          ...role,
+          expiresAt: new Date(0),
+        },
+      })
+    }
+    const [first, second] = await prisma.orgInvite.findMany({
+      where: { organizationId: orgId },
+      orderBy: { id: 'asc' },
+    })
+    await prisma.orgInvite.update({
+      where: { id: second!.id },
+      data: { emailCanonical: 'blocked-cleanup@example.test' },
+    })
+
+    const cleanup = context.app.get(CleanupService)
+    await prisma.$executeRaw`CREATE FUNCTION core.reject_test_invitation_cleanup()
+      RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN RAISE EXCEPTION 'controlled invitation cleanup failure'; END $$`
+    try {
+      await prisma.$executeRaw`CREATE TRIGGER reject_test_invitation_cleanup
+        BEFORE DELETE ON core.org_invites FOR EACH ROW
+        WHEN (OLD."emailCanonical" = 'blocked-cleanup@example.test')
+        EXECUTE FUNCTION core.reject_test_invitation_cleanup()`
+      const result = await cleanup.runCleanup()
+      expect(result.expiredPendingInvites).toBe(1)
+      expect(result.failures).toEqual(['expiredPendingInvites'])
+      expect(await prisma.orgInvite.findUnique({ where: { id: first!.id } })).toBeNull()
+      expect(await prisma.orgInvite.findUnique({ where: { id: second!.id } })).not.toBeNull()
+    } finally {
+      await prisma.$executeRaw`DROP TRIGGER IF EXISTS reject_test_invitation_cleanup ON core.org_invites`
+      await prisma.$executeRaw`DROP FUNCTION core.reject_test_invitation_cleanup()`
+    }
+
+    const retried = await cleanup.runCleanup()
+    expect(retried.expiredPendingInvites).toBe(1)
+    expect(retried.failures).toEqual([])
+  })
+
   it('R13 expired pending remains recoverable for thirty days', async () => {
     const { context, prisma, pending, truth } = getFixture()
     const { invite } = await pending()

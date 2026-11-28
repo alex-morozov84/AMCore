@@ -7,6 +7,7 @@ import { PrismaService } from '../../prisma/index.js'
 
 import { ScheduledJobExecutor } from './scheduled-job.executor.js'
 import { ScheduledJob } from './scheduled-job.js'
+import { errorCode } from './scheduled-job-error-code.js'
 import { bucketOutcome } from './scheduled-job-outcome.js'
 import { CLEANUP_JOB } from './scheduled-jobs.catalogue.js'
 
@@ -83,7 +84,7 @@ export class CleanupService {
   /**
    * Run every cleanup task independently (EQS-04). Tasks are isolated via
    * `Promise.allSettled`: a single failing delete does not abort the others and
-   * never throws — the failed type's count stays 0, it is added to `failures`,
+   * never throws. The failed type keeps its confirmed count, is added to `failures`,
    * and a stable error event is logged. Each delete is its own idempotent
    * statement, so partial success is correct (no transaction needed). Even an
    * all-failed run returns a structured `CleanupResult`, not an exception.
@@ -91,7 +92,10 @@ export class CleanupService {
   async runCleanup(): Promise<CleanupResult> {
     const now = new Date()
 
-    const tasks: { field: CleanupRecordType; run: () => Promise<{ count: number }> }[] = [
+    const tasks: {
+      field: CleanupRecordType
+      run: (reportCommittedCount: (count: number) => void) => Promise<{ count: number }>
+    }[] = [
       { field: 'expiredSupportMailAttempts', run: () => this.pruneSupportMailAttempts() },
       {
         field: 'expiredSessions',
@@ -112,15 +116,13 @@ export class CleanupService {
       },
       {
         field: 'expiredPendingInvites',
-        run: () => this.invitationRetention.prune('pending'),
+        run: (report) => this.invitationRetention.prune('pending', report),
       },
       {
         field: 'staleTerminalInvites',
-        run: () => this.invitationRetention.prune('terminal'),
+        run: (report) => this.invitationRetention.prune('terminal', report),
       },
     ]
-
-    const settled = await Promise.allSettled(tasks.map((task) => task.run()))
 
     const result: CleanupResult = {
       expiredSessions: 0,
@@ -133,6 +135,10 @@ export class CleanupService {
       failures: [],
     }
 
+    const settled = await Promise.allSettled(
+      tasks.map(({ field, run }) => run((count) => (result[field] = count)))
+    )
+
     settled.forEach((outcome, index) => {
       const { field } = tasks[index]!
       if (outcome.status === 'fulfilled') {
@@ -143,7 +149,7 @@ export class CleanupService {
           {
             event: 'schedule.cleanup_partial_failure',
             recordType: field,
-            error: outcome.reason instanceof Error ? outcome.reason.message : 'unknown',
+            errorCode: errorCode(outcome.reason),
           },
           'Cleanup task failed'
         )
