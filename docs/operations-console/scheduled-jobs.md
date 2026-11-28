@@ -103,8 +103,9 @@ and result recording, using the job name and observation times. Refresh after th
 investigation; do not assume the job stopped or start recovery based on this state alone.
 
 1. **Overdue, last result Failed or Partly done.** The job ran without full
-   success. Some work may already have committed. A zero cleanup counter for a
-   failed bucket does not prove that no rows changed. Read the note and history,
+   success. Some work may already have committed. For a failed invitation cleanup bucket,
+   the count shows confirmed deletions. The rest of the outcome may be unknown.
+   Read the note and history,
    then search the worker logs around the run time.
 2. **Overdue without a recent full success.** No success was recorded
    in time. This does not prove the job did not run. Check, in this order: that a

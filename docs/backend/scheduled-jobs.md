@@ -116,15 +116,13 @@ The optional `summary` is always `{ counts, codes }`, never a bare object of num
   counters, with the redaction the logger already applies. Never copy the message, an email
   address or row content into a log field of your own.
 
-The built-in cleanup and singleton-runner log paths currently copy exception
-messages into custom fields. Do not copy those fields into new jobs. Use bounded
-safe events/codes and counters; treat existing logs as potentially sensitive.
-The reporting result does not sanitize a separate log call.
+The built-in cleanup and singleton runner log stable failure events and bounded
+error codes. The cleanup event identifies the failed record type.
 
-Built-in invitation cleanup can commit some deletions before its bucket throws.
-The current cleanup result then marks the bucket failed but leaves its counter
-at zero. Treat that zero as incomplete observation, not proof of no deletions.
-New jobs must preserve known progress and distinguish an unknown remainder.
+Invitation cleanup reports confirmed deletions even when a later transaction
+fails. The failed bucket remains in the failure list. Its count includes only
+transactions that the database acknowledged, so a failed bucket can have an
+unknown remainder.
 
 ```ts
 // A frequent job: finished its pass, checked 12 items. Nothing failed.

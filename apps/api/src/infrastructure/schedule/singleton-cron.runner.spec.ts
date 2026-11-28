@@ -59,7 +59,7 @@ describe('SingletonCronRunner', () => {
     expect(task).not.toHaveBeenCalled()
     expect(lock.release).not.toHaveBeenCalled()
     expect(logger.error).toHaveBeenCalledWith(
-      expect.objectContaining({ event: 'job.test_lock_failed' }),
+      { event: 'job.test_lock_failed', errorCode: 'unexpected' },
       expect.any(String)
     )
   })
@@ -73,7 +73,7 @@ describe('SingletonCronRunner', () => {
     })
 
     expect(logger.error).toHaveBeenCalledWith(
-      expect.objectContaining({ event: 'job.test_failed' }),
+      { event: 'job.test_failed', errorCode: 'unexpected' },
       expect.any(String)
     )
     expect(lock.release).toHaveBeenCalledWith('lock:test', 'lock-token')
@@ -87,7 +87,7 @@ describe('SingletonCronRunner', () => {
 
     expect(task).toHaveBeenCalled()
     expect(logger.error).toHaveBeenCalledWith(
-      expect.objectContaining({ event: 'job.test_lock_release_failed' }),
+      { event: 'job.test_lock_release_failed', errorCode: 'unexpected' },
       expect.any(String)
     )
   })

@@ -15,6 +15,22 @@ versions they name. For current source-update instructions, see
 ### Fixed
 
 - Replay completed idempotent responses with an empty stored body.
+- Scheduled job failure logs use bounded error codes without exception text.
+- Invitation cleanup reports confirmed deletions when a later transaction fails.
+
+## [0.12.1] - 2026-11-28
+
+### Fixed
+
+- New products can find the latest supported release and verify its source commit
+  through the [fork guide](docs/operations/updating-a-fork.md).
+
+### Changed
+
+- Update Next.js to 16.4.6 with the fragment-navigation patch, refresh the Node 24
+  API and web image pins, and update pnpm to 12.24.0.
+- API and web Redis clients now apply their default five-second queue timeout
+  to transactions and pipeline batches before dispatch.
 
 ## [0.12.0] - 2026-11-27
 
@@ -43,11 +59,6 @@ See [Create and update a product from AMCore](docs/operations/updating-a-fork.md
 - Add repository task skills for backend modules, authorization, authentication
   integration, admin placement, audit events, deployment, recovery, secret rotation
   and MFA operations.
-
-### Changed
-
-- Update Next.js to 16.4.6 with the fragment-navigation patch, refresh the Node 24
-  API and web image pins, and update pnpm to 12.24.0.
 
 ### Fixed
 
@@ -2925,7 +2936,8 @@ production-readiness work and the platform foundation built so far.
 
 ---
 
-[unreleased]: https://github.com/alex-morozov84/AMCore/compare/v0.12.0...HEAD
+[unreleased]: https://github.com/alex-morozov84/AMCore/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/alex-morozov84/AMCore/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/alex-morozov84/AMCore/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/alex-morozov84/AMCore/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/alex-morozov84/AMCore/compare/v0.10.0...v0.10.1

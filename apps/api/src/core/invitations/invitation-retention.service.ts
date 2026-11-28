@@ -21,7 +21,10 @@ export class InvitationRetentionService {
     private readonly jobs: ScheduledJobExecutor
   ) {}
 
-  async prune(kind: 'pending' | 'terminal'): Promise<{ count: number }> {
+  async prune(
+    kind: 'pending' | 'terminal',
+    onCommittedCount?: (count: number) => void
+  ): Promise<{ count: number }> {
     const candidates = await this.prisma.$queryRaw<{ id: string; organizationId: string }[]>`
       SELECT id, "organizationId" FROM core.org_invites WHERE
         (${kind} = 'pending' AND "acceptedAt" IS NULL AND "revokedAt" IS NULL AND
@@ -30,7 +33,7 @@ export class InvitationRetentionService {
           "revokedAt" <= (clock_timestamp() AT TIME ZONE 'UTC') - INTERVAL '30 days'))
       ORDER BY "organizationId", id LIMIT 1000`
     let count = 0
-    for (const candidate of candidates)
+    for (const candidate of candidates) {
       count += await invitationTransaction(this.prisma, async (tx) => {
         const exists = await tx.organization.findUnique({
           where: { id: candidate.organizationId },
@@ -75,6 +78,8 @@ export class InvitationRetentionService {
         await tx.orgInvite.delete({ where: { id: invite.id } })
         return 1
       })
+      onCommittedCount?.(count)
+    }
     return { count }
   }
 
