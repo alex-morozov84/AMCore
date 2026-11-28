@@ -41,6 +41,18 @@ Claude Code reads it via the `@AGENTS.md` import in `CLAUDE.md`.
 hooks _declare_ the intended policy; GitHub-side enforcement is external repository state applied
 separately (see [`docs/operations/ci-security.md` → What a fork inherits](docs/operations/ci-security.md#what-a-fork-inherits-and-what-it-doesnt)).
 
+## Before running checks
+
+Choose the smallest check that exercises the changed behavior. If setup stops a
+check before it reaches that behavior, tell the owner which step failed and what
+remains unchecked. Diagnose that step separately. Before another full run,
+state what changed and why the failed step can now succeed. Continue with
+authorized checks. Keep the required final delivery and CI checks.
+
+Follow the [verification plan](docs/frontend/testing.md#verification-plan-not-retries)
+for full runs and the [long-running checks guide](docs/frontend/testing.md#observable-long-running-checks)
+for a live terminal, sandboxed web builds and interrupted runs.
+
 ## What this is
 
 **AMCore** is a production-oriented application starter for secure, modular
@@ -303,17 +315,6 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
   — the only lane that proves auth/BFF/cookies/Redis/App Router end to end)
   are the two Playwright entry points; see that guide for which layer a given
   change belongs in.
-- **Verification plan, not retries.** Before running checks, map each changed
-  risk to the smallest test that proves it; run cheap checks first and each
-  Docker/full-browser check once per unchanged review iteration, only after its
-  covered diff is settled. Re-run a passed check when its covered behavior
-  changes. This avoids redundant review-time reruns; it never replaces a
-  required final-delivery or CI gate at its designated workflow stage. A
-  sandbox, lock, or transport failure is **no verdict**: diagnose the
-  prerequisite, not the whole suite. Long checks use a live persistent PTY,
-  never background/log redirection; in a sandbox, `pnpm --filter web build`
-  always uses the user-approved elevated path. Details:
-  `docs/frontend/testing.md#observable-long-running-checks`.
 - **Browser accessibility scans:** use `expectNoAxeViolations()` from
   `apps/web/e2e/shared/axe.ts`; it waits for fonts and finite visual transitions.
   Assert the intended loaded/open state first; the helper also waits for

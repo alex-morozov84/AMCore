@@ -289,7 +289,8 @@ Inspect existing cases first. A passing test is not automatically needed; remove
 a repeated case only with a named replacement, relevant fault proof and explicit
 lost coverage. Do not infer execution from a filename.
 Use the [backend conventions](docs/backend/architecture-and-conventions.md),
-[frontend taxonomy](docs/frontend/testing.md) and [CI gate map](docs/operations/ci-security.md#current-gates).
+[frontend taxonomy](docs/frontend/testing.md), [verification and retry guidance](docs/frontend/testing.md#verification-plan-not-retries)
+and [CI gate map](docs/operations/ci-security.md#current-gates).
 
 ## Before Submitting a PR
 
