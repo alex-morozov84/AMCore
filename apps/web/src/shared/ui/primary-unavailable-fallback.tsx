@@ -9,23 +9,8 @@ import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-pr
 import { Alert, AlertDescription } from './alert'
 import { Button } from './button'
 
-const MESSAGE_KEYS = {
-  'rate-limited': 'temporarilyUnavailable',
-  timeout: 'temporarilyUnavailable',
-  network: 'temporarilyUnavailable',
-  upstream: 'temporarilyUnavailable',
-} as const satisfies Record<UnavailableReason, 'temporarilyUnavailable'>
-
 export interface PrimaryUnavailableFallbackProps {
-  /** Accepted for a stable call-site contract and possible future per-reason
-   *  copy; every `reason` renders the same generic message today (a
-   *  deliberate choice, not an oversight - see
-   *  `docs/frontend/server-rendered-resilience.md`). Never rendered as raw
-   *  text to the user. */
   reason: UnavailableReason
-  /** Accepted for the same forward-compat reason as `reason`. Not rendered:
-   *  this starter ships no automatic retry (FINAL PLAN §8), so a countdown
-   *  built on it is a downstream product decision, not a default. */
   retryAfterMs?: number
   /**
    * Overrides the default `router.refresh()` retry action. `router.refresh()`
@@ -50,15 +35,29 @@ export interface PrimaryUnavailableFallbackProps {
  * not `catchError`'s `retry()`, since there is no error boundary in this
  * path to recover from.
  */
-export function PrimaryUnavailableFallback({ reason, onRetry }: PrimaryUnavailableFallbackProps) {
+export function PrimaryUnavailableFallback({
+  reason,
+  retryAfterMs,
+  onRetry,
+}: PrimaryUnavailableFallbackProps) {
   const t = useTranslations('common')
   const router = useRouteProgressRouter()
+
+  const rateLimited = reason === 'rate-limited'
+  const message = rateLimited ? t('rateLimitReason') : t('temporarilyUnavailable')
+  const wait =
+    rateLimited && retryAfterMs !== undefined && retryAfterMs > 0 && Number.isFinite(retryAfterMs)
+      ? t('rateLimitWait', { seconds: Math.ceil(retryAfterMs / 1000) })
+      : undefined
 
   return (
     <Alert variant="destructive">
       <AlertTriangle aria-hidden="true" />
       <AlertDescription className="gap-3">
-        <span>{t(MESSAGE_KEYS[reason])}</span>
+        <span>
+          {message}
+          {wait && ` ${wait}`}
+        </span>
         <Button size="sm" onClick={onRetry ?? (() => router.refresh())}>
           <RefreshCw className="size-4" />
           {t('retry')}

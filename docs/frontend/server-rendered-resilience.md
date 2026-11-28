@@ -59,13 +59,15 @@ if (outcome.status === 'not-found') notFound()
 
 const product = resolvePrimary(outcome, { source: 'product-detail' })
 if (product.status === 'unavailable') {
-  return <PrimaryUnavailableFallback reason={product.reason} />
+  return <PrimaryUnavailableFallback reason={product.reason} retryAfterMs={product.retryAfterMs} />
 }
 return <ProductDetail data={product.data} />
 ```
 
-`PrimaryUnavailableFallback` maps the closed reason union to translated copy;
-it never renders the raw reason, retry delay, or an exception. Its button calls
+`PrimaryUnavailableFallback` shows a translated rate-limit message for
+`rate-limited`. Pass `retryAfterMs` to show the server’s wait in whole seconds
+when it is positive. Other reasons use the general unavailable message.
+The button calls
 `router.refresh()` through `useRouteProgressRouter()` (a deliberate pass-through
 that does not start the bar), requesting a new Server Component payload without
 resetting unaffected client state.

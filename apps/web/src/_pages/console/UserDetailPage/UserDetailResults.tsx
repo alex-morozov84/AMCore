@@ -46,7 +46,9 @@ export async function UserDetailResults({
   ])
   if (outcome.status === 'not-found') return <p role="alert">{t('notFoundUser')}</p>
   if (outcome.status === 'unavailable')
-    return <PrimaryUnavailableFallback reason={outcome.reason} />
+    return (
+      <PrimaryUnavailableFallback reason={outcome.reason} retryAfterMs={outcome.retryAfterMs} />
+    )
   const { user, loginDiagnostics, memberships, membershipCount } = outcome.data
   const totalPages = Math.max(1, Math.ceil(memberships.total / memberships.limit))
   const base = getConsoleUserDetailHref(id)

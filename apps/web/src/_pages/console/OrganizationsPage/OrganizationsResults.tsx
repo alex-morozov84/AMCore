@@ -42,7 +42,9 @@ export async function OrganizationsResults({
     { source: 'console-organizations' }
   )
   if (outcome.status === 'unavailable')
-    return <PrimaryUnavailableFallback reason={outcome.reason} />
+    return (
+      <PrimaryUnavailableFallback reason={outcome.reason} retryAfterMs={outcome.retryAfterMs} />
+    )
   return (
     <>
       {/* `aria-live`: the count is the one piece of this page a screen-reader

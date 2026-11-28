@@ -214,8 +214,7 @@ This starter's default instead:
   up to a maximum of 30 seconds.** For example, `Retry-After: 60` gives a
   30-second delay. Without a parsed delay, Query uses exponential backoff.
 - `<ApiErrorAlert>`/`useApiError()` already localize `RATE_LIMIT_EXCEEDED`
-  in both catalogues — nothing else to wire up for a query that exhausts
-  its retries and surfaces the error to a component.
+  and show the server’s positive wait when a surfaced 429 carries it.
 
 A Route Handler or API-proxy request that cannot be admitted because the session vault is
 slow or unreachable answers `503` with `errorCode` `SERVICE_UNAVAILABLE` and keeps the session;

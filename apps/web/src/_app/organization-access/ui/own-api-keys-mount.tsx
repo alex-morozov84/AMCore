@@ -1,4 +1,5 @@
 import { headers } from 'next/headers'
+import { getTranslations } from 'next-intl/server'
 import { OWN_KEY_QUERY_BYTES, ownKeyQuerySchema } from '@amcore/shared'
 
 import { OwnApiKeysPage } from '@/_pages/own-api-keys'
@@ -11,6 +12,8 @@ import {
   SessionNotFoundError,
   SessionRefreshUnsafeError,
 } from '@/shared/api/bff/errors'
+import { PageTitle } from '@/shared/ui/page-title'
+import { PrimaryUnavailableFallback } from '@/shared/ui/primary-unavailable-fallback'
 
 import { type OrganizationAccessPlacement, organizationAccessPlacement } from '../model/placement'
 
@@ -18,13 +21,16 @@ import 'server-only'
 
 export async function OwnApiKeysMount({
   searchParams,
+  requireAccess,
   placement = organizationAccessPlacement,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
+  requireAccess: () => Promise<void>
   placement?: OrganizationAccessPlacement
 }) {
   let admission
   try {
+    await requireAccess()
     admission = await readOwnApiKeyAdmission(await headers())
   } catch (error) {
     if (
@@ -34,6 +40,20 @@ export async function OwnApiKeysMount({
       (error instanceof ContextRequestError && error.status === 401)
     )
       return redirectToLogin(placement.loginHref ?? '/login')
+    if (error instanceof ContextRequestError && error.status === 429) {
+      const t = await getTranslations('ownApiKeys')
+      return (
+        <section className="space-y-6">
+          <PageTitle>{t('title')}</PageTitle>
+          <PrimaryUnavailableFallback
+            reason="rate-limited"
+            retryAfterMs={
+              error.retryAfterSeconds === undefined ? undefined : error.retryAfterSeconds * 1000
+            }
+          />
+        </section>
+      )
+    }
     throw error
   }
   const search = await searchParams

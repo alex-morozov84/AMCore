@@ -35,7 +35,9 @@ export async function OrganizationDetailResults({
   const outcome = await fetchConsoleOrganizationDetail(id, page, search)
   if (outcome.status === 'not-found') return <p role="alert">{t('notFoundOrganization')}</p>
   if (outcome.status === 'unavailable')
-    return <PrimaryUnavailableFallback reason={outcome.reason} />
+    return (
+      <PrimaryUnavailableFallback reason={outcome.reason} retryAfterMs={outcome.retryAfterMs} />
+    )
   const { organization, memberCount, members } = outcome.data
   const totalPages = Math.max(1, Math.ceil(members.total / members.limit))
   const base = getConsoleOrganizationDetailHref(id)

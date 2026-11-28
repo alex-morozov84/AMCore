@@ -39,7 +39,8 @@ export async function AuditResults({ baseHref, query, copy }: AuditResultsProps)
     }
     throw error
   }
-  if (result.status === 'unavailable') return <PrimaryUnavailableFallback reason={result.reason} />
+  if (result.status === 'unavailable')
+    return <PrimaryUnavailableFallback reason={result.reason} retryAfterMs={result.retryAfterMs} />
   if (result.status === 'not-found') return <PrimaryUnavailableFallback reason="upstream" />
   const data = result.data
   const fixedQuery = { ...query, from: data.from, to: data.to }
