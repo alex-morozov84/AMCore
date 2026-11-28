@@ -932,14 +932,21 @@ with an application failure.
 
 Before running a suite, write down which changed risk it proves and choose the
 smallest appropriate layer from [Which layer should I add a test at?](#which-layer-should-i-add-a-test-at).
-Run cheap static/unit checks first. Run a Docker-backed or full-browser check
-once per unchanged review iteration, only after the code it covers is settled;
-a passing result remains valid until that behavior changes. This review-time
-execution discipline does not waive repository-required final-delivery or CI
-gates: run those at the workflow stage that owns them even when an earlier
-targeted check passed. Do not restart a broad suite after a sandbox, lock, or
-transport failure — it has no verdict. Diagnose and repair the failed
-prerequisite, then make one observable run of the affected check.
+Run cheap static and unit checks first. If the stand is still getting ready, use
+a focused component test for an interim result on a form change. Before accepting
+the change, verify the affected interaction in a running app. Use the Watch
+stand if it already serves the changed version. Run a
+Docker-backed or full-browser check once per unchanged review iteration, after
+the changes it covers are settled. A passing result remains valid until that
+behavior changes. Run required final delivery and CI checks at their usual stage.
+
+If setup fails, keep the first error. Tell the owner which step failed and which
+product behavior the run never reached. For example, if account preparation
+fails, inspect its output and verify that step on its own when possible.
+Before repeating the full check, report what changed and what evidence shows
+the prerequisite is ready. If the cause remains unknown, continue the narrow
+diagnosis. Follow [observable long-running checks](#observable-long-running-checks)
+when the terminal connection breaks or cleanup is still running.
 
 ## Commands
 
