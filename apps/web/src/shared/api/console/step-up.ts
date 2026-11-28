@@ -10,6 +10,7 @@ import {
   startSourceReauthentication,
 } from '@/shared/api/bff/mfa-source-operation'
 import { forwardRequestHeaders } from '@/shared/api/bff/proxy-headers'
+import { withRedisRequestDeadline } from '@/shared/api/bff/redis-deadline'
 
 import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 
@@ -47,6 +48,14 @@ export async function handleConsoleStepUp(request: Request): Promise<Response> {
     })
   }
 
+  return withRedisRequestDeadline(request.signal, 10000, () => stepUp(request, parsed, proof))
+}
+
+async function stepUp(
+  request: Request,
+  parsed: ReturnType<typeof stepUpSchema.safeParse>,
+  proof: ReturnType<typeof mfaStepUpCommandSchema.safeParse>
+): Promise<Response> {
   const resolved = await resolveConsoleAccessToken(request)
   if ('failure' in resolved) return resolved.failure
 

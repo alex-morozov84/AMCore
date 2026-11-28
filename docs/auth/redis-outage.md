@@ -114,13 +114,20 @@ connection of their own, replaced by the same triggers as the API's authenticati
 session vault store, the session lock factory and the refresh. The lock factory is also used by the
 invitation owner lease, so that lease runs on the supervised connection too: a held lease still
 answers "busy", an unreachable connection is a temporary failure, and acquisition waits at most 3 s.
-Every other web-server Redis record store (invitation, MFA and OAuth attempt records, Console return
-entries) stays on the shared connection. The 3 s admission budget does not cover them. An invitation page or a sign-in
-start can therefore wait longer than 3 s even when the owner lease is bounded.
-Do not apply the vault-admission budget to the whole page or to all MFA/OAuth
-record work. A callback's API state step has its own bound, but an unavailable
-shared store elsewhere can delay the surrounding flow. After an uncertain
-callback result, start sign-in again rather than replaying its one-use work.
+Invitation, MFA and OAuth attempt records and Console return entries use the shared connection.
+Each store access has up to 1 s for connection and commands, within the time remaining in its
+handler. The server checks both times before sending each command. It can stop waiting for an
+in-flight command, which Redis can still execute. The shared connection holds up to 512
+unsettled operations, including requests waiting for the connection. An in-flight command occupies
+its place until Redis replies or the connection closes.
+
+If an invitation sign-in response is lost, sign in from the ordinary sign-in page with the same
+account. Then open the original invitation link again. If an MFA start response is lost, open the
+verification step again from the same session. The new start counts toward the existing limit.
+For an unconfirmed Console logout, use **Retry sign-out** when the button is
+available. The Console checks the same receipt and can retry for the original
+session. A warning by itself means the result is unconfirmed and there is no
+retry for that receipt.
 
 **What a request sees.** Session admission has one absolute budget of 3 s: vault read, the
 browser-binding check and, when a refresh is needed, waiting for the refresh. Nothing starts once the

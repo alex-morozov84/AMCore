@@ -17,6 +17,11 @@ import { AccountSecurityClient } from '../../account-security/ui/client'
 import { SignInAgainClient } from '../../account-security/ui/sign-in-again-client'
 import { ConsoleAccountSecurityClient } from '../ui/client'
 
+const notify = vi.hoisted(() => ({
+  close: vi.fn(),
+  add: vi.fn<(value: { title: string; actionProps?: { onClick: () => void } }) => void>(),
+}))
+vi.mock('@/shared/ui/toast', () => ({ toast: notify }))
 const route = vi.hoisted(() => ({ mode: 'path', push: vi.fn(), replace: vi.fn(), flow: '' }))
 vi.mock('@/shared/lib/admin-console-topology', () => ({
   ADMIN_CONSOLE_CONFIG: {
@@ -121,7 +126,7 @@ function setup(mode: 'path' | 'host', operator: string) {
         })
       }
       if (url.endsWith('/sign-in-entry')) return json({ returnEntryId: crypto.randomUUID() })
-      if (url.endsWith('/logout')) return json({ outcome: 'signed_out' })
+      if (url.endsWith('/logout')) return json({ state: 'logged_out' })
       throw new Error(`Unexpected diagnostic request: ${url}`)
     })
   )
@@ -266,18 +271,37 @@ for (const fail of [false, true]) {
     await waitFor(() => expect(f.getCount()).toBe(1))
     const original = f.client.getQueryCache().find({ queryKey: key, exact: true })
     initial.unmount()
+    notify.add.mockClear()
     if (fail) {
+      let lost = true
       const dispatch = vi.mocked(fetch).getMockImplementation()!
-      vi.mocked(fetch).mockImplementation((url, init) =>
-        String(url).endsWith('/logout')
-          ? Promise.reject(new TypeError('controlled lost logout response'))
-          : dispatch(url, init)
-      )
+      vi.mocked(fetch).mockImplementation((url, init) => {
+        if (lost && String(url).endsWith('/logout')) {
+          lost = false
+          return Promise.reject(new TypeError('controlled lost logout response'))
+        }
+        return dispatch(url, init)
+      })
     }
     const exit = render(<ConsoleLogoutButton contextSession={'a'.repeat(64)} />, {
       wrapper: f.wrapper,
     })
     fireEvent.click(screen.getByRole('button', { name: en.console.signOut }))
+    if (fail) {
+      await waitFor(() =>
+        expect(notify.add).toHaveBeenCalledWith(
+          expect.objectContaining({
+            title: en.console.logoutUnconfirmed,
+          })
+        )
+      )
+      expect(route.replace).not.toHaveBeenCalled()
+      await act(async () => notify.add.mock.lastCall?.[0].actionProps?.onClick())
+      const logout = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('/logout'))
+      await waitFor(() => expect(route.replace).toHaveBeenCalled())
+      expect(logout).toHaveLength(2)
+      expect(logout[1]![1]?.body).toEqual(logout[0]![1]?.body)
+    }
     await waitFor(() => expect(route.replace).toHaveBeenCalled())
     expect(f.client.getQueryCache().find({ queryKey: key })).toBeUndefined()
     exit.unmount()

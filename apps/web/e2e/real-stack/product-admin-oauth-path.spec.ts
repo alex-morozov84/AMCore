@@ -7,7 +7,7 @@ import { productPath } from '../shared/product-settings'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
 import { logoutViaApi, registerViaUi, uniqueEmail } from './helpers'
-import { pauseRedis, sessionRows, sleep } from './redis-outage-support'
+import { pauseRedis, sessionRows, sleep, waitForRedisAfterPause } from './redis-outage-support'
 
 test.use({ trace: 'off', screenshot: 'off', video: 'off' })
 
@@ -59,12 +59,8 @@ for (const provider of ['apple', 'google', 'github'] as const) {
   })
 }
 
-// Characterization, not a 3 s promise: the web server keeps OAuth attempt records on its shared Redis
-// connection (only the session vault, its lock and the refresh moved to the supervised one). A flow
-// started while Redis stalls waits for the stall to end and then signs in. The test asserts the
-// final sign-in within an upper bound, not the absence of a session while it waits.
-// Numbers are for this fault class on this machine.
 const STALL_MS = 8000
+// CI uses the title as the case ID. The current contract is refusal, then an explicit retry.
 test('google path administration started during a Redis stall waits for Redis, then signs in', async ({
   browser,
 }) => {
@@ -79,19 +75,32 @@ test('google path administration started during a Redis stall waits for Redis, t
     const page = await context.newPage()
     const email = uniqueEmail('path-stall')
     await registerViaUi(page, email)
+    const userId = guardedSql("SELECT id FROM core.users WHERE email = :'email';", { email })
     expect((await logoutViaApi(context.request, product)).status()).toBe(200)
+    const rowsBefore = sessionRows(userId)
     const seen = await getBrowserFixture(context, product, email, 'google', 'admin')
     const start = `${product}/api/product-admin/auth/oauth/google?locale=${DEFAULT_LOCALE}`
 
     pauseRedis(STALL_MS)
     const started = performance.now()
-    await page.goto(start, { timeout: STALL_MS + 15_000 })
+    const refused = await context.request.get(start, { maxRedirects: 0, timeout: STALL_MS + 7000 })
+    expect(refused.status()).toBe(303)
+    expect(performance.now() - started).toBeLessThan(STALL_MS)
+    const location = new URL(refused.headers().location!, product)
+    expect(location.origin).toBe(product)
+    expect(location.pathname).toBe(productPath(productAdminPath('/login')))
+    expect(location.searchParams.get('oauthError')).toBe('OAUTH_PROVIDER_ERROR')
+    expect(sessionRows(userId)).toBe(rowsBefore)
+
+    await waitForRedisAfterPause(STALL_MS + 7000)
+    expect(sessionRows(userId)).toBe(rowsBefore)
+    expect((await context.request.get(`${product}/api/auth/me`)).status()).toBe(401)
+    await page.goto(start)
     await page.waitForURL(
       (url) =>
         url.origin === product && url.pathname === productPath(productAdminPath('/organizations')),
       { timeout: STALL_MS + 15_000 }
     )
-    expect(performance.now() - started).toBeLessThan(STALL_MS + 15_000)
     expect(seen()).toBe(true)
     const me = await context.request.get(`${product}/api/auth/me`)
     expect(me.status()).toBe(200)

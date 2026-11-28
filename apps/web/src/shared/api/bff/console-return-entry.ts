@@ -18,7 +18,7 @@ import {
 import { readContextJson } from './context-body-budget'
 import { settingsSource } from './mfa-settings-handler'
 import type { ProductWebContext } from './product-web-context.server'
-import { getWebRedisClient } from './redis-client'
+import { sharedRedis } from './shared-redis'
 
 import 'server-only'
 
@@ -78,7 +78,7 @@ export function canonicalConsoleReturn(raw: string): string {
 }
 
 export async function loadReturnEntry(request: Request, context: ProductWebContext, id: string) {
-  const raw = await (await getWebRedisClient()).get(key(id, context))
+  const raw = await sharedRedis().get(key(id, context))
   if (!raw) return null
   const record = returnEntrySchema.parse(JSON.parse(raw))
   const anchor = readBrowserAnchor(request.headers, context.audience)
@@ -98,9 +98,7 @@ export async function saveReturnEntry(
   changes: Partial<ConsoleReturnEntry>
 ) {
   const next = returnEntrySchema.parse({ ...current, ...changes, version: current.version + 1 })
-  const saved = await (
-    await getWebRedisClient()
-  ).eval(
+  const saved = await sharedRedis().eval(
     `
     local raw = redis.call('GET', KEYS[1])
     if not raw or cjson.decode(raw).version ~= tonumber(ARGV[1]) then return 0 end
@@ -181,9 +179,7 @@ export async function createConsoleReturnEntry(request: Request, context: Produc
     attemptId: randomUUID(),
     pendingHandle: randomBytes(32).toString('base64url'),
   }
-  const saved = await (
-    await getWebRedisClient()
-  ).set(key(record.id, context), JSON.stringify(record), {
+  const saved = await sharedRedis().set(key(record.id, context), JSON.stringify(record), {
     condition: 'NX',
     expiration: { type: 'PXAT', value: record.expiresAt },
   })
@@ -198,8 +194,12 @@ export async function logoutConsoleReturnEntry(request: Request, context: Produc
     .parse(await readContextJson(request.body, 2048))
   let record = await loadReturnEntry(request, context, returnEntryId)
   if (!record) throw changedBrowserContext()
-  let outcome
-  if (record.phase === 'prepared') {
+  let dispatched = false
+  let outcome =
+    record.phase === 'prepared'
+      ? undefined
+      : await callLogoutReceipt(request, context, record, 'logout-result')
+  if (!outcome || (outcome.state === 'not_found' && record.phase === 'logout_dispatched')) {
     const source = await settingsSource(request, context)
     if (
       source.sourceFingerprint !== record.sourceFingerprint ||
@@ -207,20 +207,23 @@ export async function logoutConsoleReturnEntry(request: Request, context: Produc
       request.headers.get('x-amcore-context-session') !== record.sourceIntent
     )
       throw changedBrowserContext()
-    record = await saveReturnEntry(context, record, { phase: 'logout_dispatched' })
+    if (record.phase === 'prepared')
+      record = await saveReturnEntry(context, record, { phase: 'logout_dispatched' })
     outcome = await callLogoutReceipt(request, context, record, 'logout-with-receipt', {
       refreshToken: source.entry.refreshToken,
     })
-    await context.store
-      .delete(readBrowserCapability(request.headers, context.cookieName)!)
-      .catch(() => undefined)
-  } else outcome = await callLogoutReceipt(request, context, record, 'logout-result')
+    dispatched = true
+  }
   if (
     outcome.beforeGeneration !== record.browser.generation ||
     outcome.contextId !== record.browser.contextId ||
     outcome.audience !== context.audience
   )
     throw changedBrowserContext()
+  if (dispatched && outcome.state === 'logged_out')
+    await context.store
+      .delete(readBrowserCapability(request.headers, context.cookieName)!)
+      .catch(() => undefined)
   record = await saveReturnEntry(context, record, {
     outcome,
     phase: outcome.state === 'logged_out' ? 'logout_confirmed' : 'superseded',

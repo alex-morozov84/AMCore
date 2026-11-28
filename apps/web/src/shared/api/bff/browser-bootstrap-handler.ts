@@ -26,6 +26,7 @@ import { readContextJson } from './context-body-budget'
 import { ContextRequestError } from './context-errors'
 import { currentFlowView } from './mfa-flow-view'
 import { isProductMutationTrusted, type ProductWebContext } from './product-web-context.server'
+import { withRedisRequestDeadline } from './redis-deadline'
 import { sessionMetadataHeaders } from './session-metadata-headers'
 
 import 'server-only'
@@ -36,7 +37,7 @@ export async function handleBrowserBootstrap(
   context: ProductWebContext
 ): Promise<NextResponse> {
   try {
-    return await bootstrap(request, context)
+    return await withRedisRequestDeadline(request.signal, 10000, () => bootstrap(request, context))
   } catch (error) {
     if (!(error instanceof ContextRequestError) || error.errorCode !== 'AUTH_CONTEXT_CHANGED')
       throw error

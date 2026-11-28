@@ -25,14 +25,18 @@ function makeRequest(
   })
 }
 
+function mockRedis(evaluate: ReturnType<typeof vi.fn>) {
+  vi.mocked(getWebRedisClient).mockResolvedValue({
+    isReady: true,
+    withCommandOptions: () => ({ eval: evaluate }),
+  } as never)
+}
+
 describe('handleCspReport', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(resolveTrustedClientIp).mockReturnValue(null)
-    vi.mocked(getWebRedisClient).mockResolvedValue({
-      incr: vi.fn().mockResolvedValue(1),
-      expire: vi.fn(),
-    } as never)
+    mockRedis(vi.fn().mockResolvedValue(1))
   })
 
   it('accepts a well-formed legacy csp-report and responds 204', async () => {
@@ -80,15 +84,18 @@ describe('handleCspReport', () => {
 
   it('is rate-limited after the window is exceeded for the same client key', async () => {
     vi.mocked(resolveTrustedClientIp).mockReturnValue('203.0.113.7')
-    const incr = vi.fn().mockResolvedValue(21)
-    vi.mocked(getWebRedisClient).mockResolvedValue({ incr, expire: vi.fn() } as never)
+    const evaluate = vi.fn().mockResolvedValue(21)
+    mockRedis(evaluate)
 
     const request = makeRequest(JSON.stringify({ 'csp-report': {} }), 'application/csp-report')
 
     const response = await handleCspReport(request)
 
     expect(response.status).toBe(204)
-    expect(incr).toHaveBeenCalledWith(expect.stringContaining('203.0.113.7'))
+    expect(evaluate).toHaveBeenCalledWith(expect.any(String), {
+      keys: ['csp-report-rate-limit:203.0.113.7'],
+      arguments: ['10'],
+    })
   })
 
   it('still accepts the report if Redis itself is unreachable (fails open)', async () => {
@@ -105,7 +112,8 @@ describe('handleCspReport', () => {
     // against the standalone server before this test was added (a stuck
     // curl request). A mocked promise that never resolves stands in for
     // that here.
-    vi.mocked(getWebRedisClient).mockReturnValue(new Promise(() => {}))
+    const connection = Promise.withResolvers<Awaited<ReturnType<typeof getWebRedisClient>>>()
+    vi.mocked(getWebRedisClient).mockReturnValue(connection.promise)
 
     const request = makeRequest(JSON.stringify({ 'csp-report': {} }), 'application/csp-report')
 
@@ -114,17 +122,50 @@ describe('handleCspReport', () => {
 
     expect(response.status).toBe(204)
     expect(Date.now() - start).toBeLessThan(2000)
+    connection.reject(new Error('fixture connection closed'))
+    await Promise.resolve()
   })
 
   it('falls back to a shared bucket key when no trusted client IP is configured', async () => {
     vi.mocked(resolveTrustedClientIp).mockReturnValue(null)
-    const incr = vi.fn().mockResolvedValue(1)
-    vi.mocked(getWebRedisClient).mockResolvedValue({ incr, expire: vi.fn() } as never)
+    const evaluate = vi.fn().mockResolvedValue(1)
+    mockRedis(evaluate)
 
     await handleCspReport(
       makeRequest(JSON.stringify({ 'csp-report': {} }), 'application/csp-report')
     )
 
-    expect(incr).toHaveBeenCalledWith(expect.stringContaining('unattributed'))
+    expect(evaluate).toHaveBeenCalledWith(expect.any(String), {
+      keys: ['csp-report-rate-limit:unattributed'],
+      arguments: ['10'],
+    })
+  })
+
+  it('holds the eight CSP slots until Redis settles even after the reports time out', async () => {
+    const pending = Promise.withResolvers<number>()
+    const evaluate = vi.fn().mockReturnValue(pending.promise)
+    mockRedis(evaluate)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const report = () =>
+      makeRequest(
+        JSON.stringify({ 'csp-report': { 'violated-directive': 'script-src' } }),
+        'application/csp-report'
+      )
+    try {
+      const first = await Promise.all(Array.from({ length: 8 }, () => handleCspReport(report())))
+      expect(first.every(({ status }) => status === 204)).toBe(true)
+      expect(evaluate).toHaveBeenCalledTimes(8)
+      expect(warn).toHaveBeenCalledTimes(8)
+      expect((await handleCspReport(report())).status).toBe(204)
+      expect(evaluate).toHaveBeenCalledTimes(8)
+      expect(warn).toHaveBeenCalledTimes(8)
+      pending.resolve(1)
+      await pending.promise
+      expect((await handleCspReport(report())).status).toBe(204)
+      expect(evaluate).toHaveBeenCalledTimes(9)
+    } finally {
+      pending.resolve(1)
+      warn.mockRestore()
+    }
   })
 })

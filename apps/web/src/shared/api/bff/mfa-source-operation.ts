@@ -15,7 +15,7 @@ import { parseRetryAfterSeconds } from '../retry-after'
 import { changedBrowserContext, unavailableBrowserContext } from './browser-binding.server'
 import { readContextJson } from './context-body-budget'
 import { ContextRequestError } from './context-errors'
-import { getWebRedisClient } from './redis-client'
+import { sharedRedis } from './shared-redis'
 
 import 'server-only'
 
@@ -95,9 +95,7 @@ export async function startSourceReauthentication(
     completionId: randomUUID(),
     expiresAt,
   })
-  const saved = await (
-    await getWebRedisClient()
-  ).set(key(flowBinding), JSON.stringify(record), {
+  const saved = await sharedRedis().set(key(flowBinding), JSON.stringify(record), {
     condition: 'NX',
     expiration: { type: 'PXAT', value: Date.parse(expiresAt) },
   })
@@ -111,7 +109,7 @@ export async function completeSourceReauthentication(
   source: MfaSourceSession,
   command: MfaStepUpCommand
 ): Promise<void | MfaStepUpPending> {
-  const raw = await (await getWebRedisClient()).get(key(command.flowBinding))
+  const raw = await sharedRedis().get(key(command.flowBinding))
   const record = raw ? recordSchema.safeParse(JSON.parse(raw)) : null
   if (
     !record?.success ||

@@ -14,6 +14,7 @@ versions they name. For current source-update instructions, see
 
 ### Fixed
 
+- Bound waits for shared web Redis records and let operators retry an unconfirmed Console sign-out.
 - Explain rate limits and show the server’s wait when available. The own API
   keys page lets users retry the session check from the page.
 

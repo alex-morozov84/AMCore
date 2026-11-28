@@ -14,7 +14,7 @@ import {
 } from './invitation-surface'
 import { type InvitationOwnerRecord, invitationOwnerRecordSchema } from './invitation-vault-record'
 import type { ProductWebContext } from './product-web-context.server'
-import { getWebRedisClient } from './redis-client'
+import { sharedRedis } from './shared-redis'
 
 import 'server-only'
 
@@ -68,9 +68,7 @@ export async function reserveInvitationOAuthCarrier(
   if (parsed.ownerHash !== ownerHash || parsed.status !== 'reserved') throw invitationFlowChanged()
   return withInvitationStorage(
     async () =>
-      (await (
-        await getWebRedisClient()
-      ).eval(RESERVE, {
+      (await sharedRedis().eval(RESERVE, {
         keys: [
           invitationOwnerKey(ownerHash, context),
           invitationOAuthCarrierKey(parsed.attemptId, context),
@@ -84,7 +82,7 @@ export async function readInvitationOAuthCarrier(
   context?: ProductWebContext
 ): Promise<InvitationOAuthCarrier | null> {
   return withInvitationStorage(async () => {
-    const raw = await (await getWebRedisClient()).get(invitationOAuthCarrierKey(attemptId, context))
+    const raw = await sharedRedis().get(invitationOAuthCarrierKey(attemptId, context))
     if (!raw) return null
     const carrier = invitationOAuthCarrierSchema.parse(JSON.parse(raw))
     assertInvitationSurface(carrier, context)
@@ -105,9 +103,7 @@ export async function startInvitationOAuthCarrier(
   assertInvitationSurface(carrier, context)
   return withInvitationStorage(
     async () =>
-      (await (
-        await getWebRedisClient()
-      ).eval(
+      (await sharedRedis().eval(
         `
     local ownerRaw = redis.call('GET', KEYS[1])
     local carrierRaw = redis.call('GET', KEYS[2])

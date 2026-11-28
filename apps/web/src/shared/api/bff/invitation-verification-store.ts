@@ -8,7 +8,7 @@ import { invitationOwnerKey } from './invitation-owner-store'
 import { withInvitationStorage } from './invitation-storage'
 import { invitationNamespace } from './invitation-surface'
 import type { ProductWebContext } from './product-web-context.server'
-import { getWebRedisClient } from './redis-client'
+import { sharedRedis } from './shared-redis'
 
 import 'server-only'
 
@@ -37,9 +37,7 @@ export async function createInvitationVerificationSelector(
     throw invitationFlowChanged()
   const id = randomBytes(16).toString('base64url')
   await withInvitationStorage(async () => {
-    const saved = await (
-      await getWebRedisClient()
-    ).set(key(id, context), JSON.stringify(record), {
+    const saved = await sharedRedis().set(key(id, context), JSON.stringify(record), {
       condition: 'NX',
       expiration: { type: 'PXAT', value: record.expiresAt },
     })
@@ -55,7 +53,7 @@ export async function readInvitationVerificationSelector(
   context?: ProductWebContext
 ) {
   return withInvitationStorage(async () => {
-    const raw = await (await getWebRedisClient()).get(key(id, context))
+    const raw = await sharedRedis().get(key(id, context))
     if (!raw) return null
     const record = selectorSchema.parse(JSON.parse(raw))
     return record.ownerHash === ownerHash &&
@@ -76,9 +74,7 @@ export async function consumeInvitationVerificationSelector(
 ) {
   return withInvitationStorage(
     async () =>
-      (await (
-        await getWebRedisClient()
-      ).eval(
+      (await sharedRedis().eval(
         `
     local raw = redis.call('GET', KEYS[1])
     local ownerRaw = redis.call('GET', KEYS[2])

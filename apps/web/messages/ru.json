@@ -645,6 +645,8 @@
     "signIn": "Войти",
     "signingIn": "Выполняется вход…",
     "signOut": "Выйти",
+    "logoutUnconfirmed": "Выход не подтверждён",
+    "retryLogout": "Повторить выход",
     "signingOut": "Выполняется выход…",
     "apiKeys": {
       "title": "API-ключи",

@@ -1,3 +1,5 @@
+import { withRedisRequestDeadline } from './redis-deadline'
+
 import 'server-only'
 
 /** Bounds waiting, including Redis/refresh and response parsing; shared refresh may finish CAS. */
@@ -14,7 +16,10 @@ export async function withinContextDeadline<T>(
     signal.addEventListener('abort', onAbort, { once: true })
   })
   try {
-    return await Promise.race([work(signal), aborted])
+    return await Promise.race([
+      withRedisRequestDeadline(signal, deadlineMs, () => work(signal)),
+      aborted,
+    ])
   } finally {
     signal.removeEventListener('abort', onAbort!)
   }

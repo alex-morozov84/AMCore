@@ -4,6 +4,7 @@ import { apiErrorResponse, zodValidationErrors } from '@/shared/api/bff/api-erro
 import { authFailureResponse } from '@/shared/api/bff/auth-failure-response'
 import { handleBrowserPassword } from '@/shared/api/bff/browser-login-handler'
 import { readContextJson } from '@/shared/api/bff/context-body-budget'
+import { withRedisRequestDeadline } from '@/shared/api/bff/redis-deadline'
 
 import { consoleBrowserContext } from './browser-context'
 import { isTrustedConsoleOrigin } from './origin-guard'
@@ -32,7 +33,9 @@ export async function handleConsoleLogin(request: Request): Promise<Response> {
         message: 'Validation failed',
         errors: zodValidationErrors(parsed.error),
       })
-    return await handleBrowserPassword(request, context, parsed.data)
+    return await withRedisRequestDeadline(request.signal, 10000, () =>
+      handleBrowserPassword(request, context, parsed.data)
+    )
   } catch (error) {
     return authFailureResponse(request, error)
   }

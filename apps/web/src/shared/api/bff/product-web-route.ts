@@ -7,6 +7,7 @@ import {
   type ProductWebContext,
   resolveProductWebContext,
 } from './product-web-context.server'
+import { withRedisRequestDeadline } from './redis-deadline'
 
 import 'server-only'
 
@@ -34,7 +35,11 @@ export async function productWebRoute(
       !isProductMutationTrusted(request, context)
     )
       throw new ContextRequestError(403, 'AUTH_ORIGIN_REJECTED')
-    return privateResponse(await work(context))
+    const response =
+      kind === 'site-auth' || kind === 'admin-auth'
+        ? await withRedisRequestDeadline(request.signal, 10000, () => work(context))
+        : await work(context)
+    return privateResponse(response)
   } catch (error) {
     if (error instanceof ContextRequestError) {
       const response = apiErrorResponse(request, {

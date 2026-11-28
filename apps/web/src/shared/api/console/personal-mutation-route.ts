@@ -5,6 +5,7 @@ import {
   type ProductWebContext,
 } from '@/shared/api/bff/product-web-context.server'
 import { productWebRoute } from '@/shared/api/bff/product-web-route'
+import { withRedisRequestDeadline } from '@/shared/api/bff/redis-deadline'
 import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
 
 import { consoleBrowserContext } from './browser-context'
@@ -25,7 +26,9 @@ export async function consolePersonalMutation(
   let response: Response
   try {
     if (!isTrustedConsoleOrigin(request)) throw new ContextRequestError(403, 'AUTH_ORIGIN_REJECTED')
-    response = await operation(consoleBrowserContext(request))
+    response = await withRedisRequestDeadline(request.signal, 10000, () =>
+      operation(consoleBrowserContext(request))
+    )
   } catch (error) {
     response = authFailureResponse(request, error)
   }

@@ -74,6 +74,13 @@ export function pauseRedis(ms: number): void {
   guardedExec('redis', 'redis-cli', 'CLIENT', 'PAUSE', String(ms), 'ALL')
 }
 
+export async function waitForRedisAfterPause(timeoutMs: number): Promise<void> {
+  await withVault(async (client) => {
+    const signal = AbortSignal.timeout(timeoutMs)
+    expect(await client.withCommandOptions({ abortSignal: signal }).ping()).toBe('PONG')
+  })
+}
+
 export async function signedIn(context: BrowserContext, origin: string): Promise<string> {
   const email = uniqueEmail('redis-outage')
   const registration = await browserCredentialRequest(context.request, '/api/auth/register', {
