@@ -75,8 +75,7 @@ in that case. The reporter can also be rerun with
 `node scripts/code-size-report.mjs` while the change is staged.
 
 `pnpm init:product` initializes a downstream fork's identity, brand assets and theme.
-For a new product, select and verify the supported release in the
-[fork update guide](docs/operations/updating-a-fork.md#initialize-once-from-the-supported-source-tag) before running the command.
+For a new product, follow the [fork update guide](docs/operations/updating-a-fork.md) to select and verify the latest supported release before running the command.
 See [`docs/frontend/brand-theme-and-tokens.md` → Configure a new product](docs/frontend/brand-theme-and-tokens.md#configure-a-new-product).
 
 ### API-specific test commands
@@ -352,7 +351,7 @@ Manual release procedure (until release automation is adopted):
    section and update the comparison links at the bottom.
 4. Open a `chore: release vX.Y.Z` PR into `main`; merge it with Squash after CI.
 5. Tag that exact `main` commit with annotated tag `vX.Y.Z`, push it, then create
-   the matching GitHub Release.
+   the matching GitHub Release. Include the tag and full commit SHA in the release notes so products can verify their starting point.
 
 Release tags are immutable: never move, overwrite, or delete an existing `v*`
 tag. If you are working as an AMCore maintainer in a confirmed maintainer
