@@ -12,6 +12,10 @@ versions they name. For current source-update instructions, see
 
 ## [Unreleased]
 
+### Fixed
+
+- Load-test measurements now reject failed or incomplete container snapshots.
+
 ## [0.12.1] - 2026-11-28
 
 ### Fixed
