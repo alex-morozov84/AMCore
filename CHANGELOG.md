@@ -12,6 +12,11 @@ versions they name. For current source-update instructions, see
 
 ## [Unreleased]
 
+### Fixed
+
+- Scheduled job failure logs use bounded error codes without exception text.
+- Invitation cleanup reports confirmed deletions when a later transaction fails.
+
 ## [0.12.1] - 2026-11-28
 
 ### Fixed
