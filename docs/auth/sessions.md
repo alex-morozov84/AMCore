@@ -92,6 +92,13 @@ entry and cookie.
 
 ## Token rotation
 
+If the refresh transaction exceeds its execution deadline, the API returns
+`503 REFRESH_TRANSACTION_TIMEOUT` without issuing credentials. The web app
+preserves the session. A web request that receives the API response before
+its own deadline returns the same error code. If the web deadline expires first,
+the request returns a general temporary error. The client does not automatically
+replay the request.
+
 Every time you call `POST /auth/refresh`, the old refresh token is **immediately revoked** and a new one is issued:
 
 ```

@@ -5,7 +5,7 @@ import { PinoLogger } from 'nestjs-pino'
 import { AuthErrorCode, type CatalogueLocale, type SessionsListResponse } from '@amcore/shared'
 
 import { AppException, NotFoundException } from '../../common/exceptions/index.js'
-import type { Prisma, Session, User } from '../../generated/prisma/client.js'
+import { Prisma, type Session, type User } from '../../generated/prisma/client.js'
 import { GeoIpService } from '../../infrastructure/geoip/geoip.service.js'
 import { acquireXactLock, PrismaService } from '../../prisma/index.js'
 import {
@@ -202,7 +202,7 @@ export class SessionService {
     const hashedToken = this.tokenService.hashRefreshToken(refreshToken)
     const expiresAt = this.tokenService.getRefreshTokenExpiration()
 
-    const outcome = await this.prisma.$transaction(async (tx) => {
+    const rotation = this.prisma.$transaction(async (tx) => {
       const lookup = await tx.session.findUnique({
         where: { refreshToken: oldHashedToken },
         select: { id: true, userId: true, familyId: true },
@@ -356,6 +356,23 @@ export class SessionService {
         ? await issueFamilyAccessToken(tx, this.tokenService, accessClaims)
         : undefined
       return { sessionId: created.id, accessClaims, accessToken }
+    })
+
+    const outcome = await rotation.catch((error: unknown) => {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2028' &&
+        typeof error.meta?.operation === 'string' &&
+        typeof error.meta.timeout === 'number' &&
+        typeof error.meta.timeTaken === 'number'
+      ) {
+        throw new AppException(
+          'Session refresh temporarily unavailable',
+          HttpStatus.SERVICE_UNAVAILABLE,
+          AuthErrorCode.REFRESH_TRANSACTION_TIMEOUT
+        )
+      }
+      throw error
     })
 
     if (outcome.error) throw outcome.error

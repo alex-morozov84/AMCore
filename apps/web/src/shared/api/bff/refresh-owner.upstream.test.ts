@@ -54,6 +54,19 @@ describe('owner with the real upstream adapter', () => {
   })
 
   it.each([
+    ['REFRESH_TRANSACTION_TIMEOUT', { status: 503, errorCode: 'REFRESH_TRANSACTION_TIMEOUT' }],
+    ['SERVICE_UNAVAILABLE', { code: 'network' }],
+  ])('preserves the entry for HTTP 503 %s', async (errorCode, expected) => {
+    const send = vi.fn().mockResolvedValue(Response.json({ errorCode }, { status: 503 }))
+    vi.stubGlobal('fetch', send)
+    const before = await store.get('s1')
+
+    await expect(run()).rejects.toMatchObject(expected)
+    expect(send).toHaveBeenCalledOnce()
+    expect(await store.get('s1')).toEqual(before)
+  })
+
+  it.each([
     [
       'an unreadable body',
       withCookie({ json: async () => Promise.reject(new SyntaxError('bad')) }),
