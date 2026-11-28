@@ -76,8 +76,8 @@ RUN groupadd --system --gid 1001 nodejs && \
     mkdir -p /data/geoip /app/uploads && \
     chown -R nestjs:nodejs /app/apps/api /app/packages/shared /data/geoip /app/uploads
 USER nestjs
-RUN corepack install
 WORKDIR /app/apps/api
+RUN corepack install && pnpm --version
 CMD ["sh", "-c", "pnpm --filter @amcore/shared build && exec pnpm --filter api exec nest start --watch --no-shell"]
 
 FROM source AS build

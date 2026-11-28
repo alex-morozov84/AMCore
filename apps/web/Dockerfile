@@ -54,7 +54,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 FROM source AS development
 RUN chown -R node:node /app/apps/web /app/packages/shared
 USER node
-RUN corepack install
+RUN corepack install && pnpm --version
 CMD ["sh", "-c", "pnpm --filter @amcore/shared build && exec pnpm --filter web exec next dev --hostname 0.0.0.0 --port 3000"]
 
 FROM source AS build
