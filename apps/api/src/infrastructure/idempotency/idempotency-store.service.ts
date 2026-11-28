@@ -18,6 +18,9 @@ end
 local decoded = cjson.decode(current)
 if decoded.state == "completed" then
   if decoded.fingerprint == ARGV[2] then
+    if type(decoded.status) ~= "number" or type(decoded.body) ~= "string" or type(decoded.headers) ~= "table" then
+      return {"conflict"}
+    end
     return {"replay", tostring(decoded.status), decoded.body, cjson.encode(decoded.headers)}
   end
   return {"mismatch"}

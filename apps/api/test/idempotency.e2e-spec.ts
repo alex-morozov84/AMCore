@@ -6,6 +6,8 @@ import { AuthType } from '@amcore/shared'
 
 import { Auth } from '../src/core/auth/decorators/auth.decorator'
 import { Idempotent } from '../src/infrastructure/idempotency'
+import { IDEMPOTENCY_KEY_PREFIX } from '../src/infrastructure/idempotency/idempotency.constants'
+import { IdempotencyStoreService } from '../src/infrastructure/idempotency/idempotency-store.service'
 import type { PrismaService } from '../src/prisma'
 
 import { cleanDatabase, cleanOrgData, type E2ETestContext, teardownE2ETest } from './helpers'
@@ -79,6 +81,25 @@ describe('HTTP idempotency (e2e)', () => {
     await send().expect(200, '').expect('Idempotency-Replayed', 'true')
     expect(service.emptyExecutions).toBe(1)
   })
+
+  it.each(['headers', 'status', 'body'] as const)(
+    'keeps an incomplete Redis record without %s in conflict',
+    async (field) => {
+      const scope = 'sample-empty'
+      const key = 'idem-incomplete'
+      const record = { state: 'completed', fingerprint: 'fp', status: 200, body: '', headers: {} }
+      await context.cache.connection.set(
+        `${IDEMPOTENCY_KEY_PREFIX}${scope}:${key}`,
+        JSON.stringify({ ...record, [field]: undefined })
+      )
+
+      await expect(
+        app.get(IdempotencyStoreService).reserve(scope, key, 'fp', 30_000)
+      ).resolves.toEqual({
+        kind: 'conflict',
+      })
+    }
+  )
 
   it('supports first call, replay, mismatch, and in-flight conflict', async () => {
     const key = 'idem-order-1'
