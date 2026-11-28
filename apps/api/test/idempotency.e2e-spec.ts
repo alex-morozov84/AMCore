@@ -14,6 +14,7 @@ import { setupIdempotencyTestApp } from './idempotency-test-app'
 @Injectable()
 class SampleIdempotencyService {
   private executions = 0
+  emptyExecutions = 0
 
   async create(body: {
     amount: number
@@ -28,6 +29,15 @@ class SampleIdempotencyService {
 @Controller('idempotency/sample')
 class SampleIdempotencyController {
   constructor(private readonly service: SampleIdempotencyService) {}
+
+  @Post('empty')
+  @HttpCode(200)
+  @Auth(AuthType.None)
+  @Idempotent({ scope: 'sample-empty' })
+  createEmpty(): string {
+    this.service.emptyExecutions += 1
+    return ''
+  }
 
   @Post('orders')
   @HttpCode(201)
@@ -56,6 +66,18 @@ describe('HTTP idempotency (e2e)', () => {
   beforeEach(async () => {
     await cleanOrgData(prisma)
     await cleanDatabase(prisma, context.cache, context.throttlerStorage)
+  })
+
+  it('replays the original empty HTTP response without executing the handler again', async () => {
+    const service = app.get(SampleIdempotencyService)
+    const send = () =>
+      request(app.getHttpServer())
+        .post('/idempotency/sample/empty')
+        .set('Idempotency-Key', 'idem-empty-1')
+
+    await send().expect(200, '')
+    await send().expect(200, '').expect('Idempotency-Replayed', 'true')
+    expect(service.emptyExecutions).toBe(1)
   })
 
   it('supports first call, replay, mismatch, and in-flight conflict', async () => {

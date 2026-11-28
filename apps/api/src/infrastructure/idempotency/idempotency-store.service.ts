@@ -99,7 +99,7 @@ function mapReserveReply(
 ): IdempotencyReserveResult {
   const [kind, first, second, third] = reply
   if (kind === 'started' && first) return { kind, storageKey, ownerToken: first }
-  if (kind === 'replay' && first && second && third) {
+  if (kind === 'replay' && first && typeof second === 'string' && third) {
     return { kind, response: { status: Number(first), body: second, headers: JSON.parse(third) } }
   }
   return kind === 'mismatch' ? { kind } : { kind: 'conflict' }

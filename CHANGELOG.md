@@ -12,6 +12,10 @@ versions they name. For current source-update instructions, see
 
 ## [Unreleased]
 
+### Fixed
+
+- Replay completed idempotent responses with an empty stored body.
+
 ## [0.12.0] - 2026-11-27
 
 This is the first supported AMCore release for starting products and updating forks.
