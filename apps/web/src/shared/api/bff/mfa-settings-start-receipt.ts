@@ -18,7 +18,7 @@ import {
 } from './browser-binding.server'
 import { ContextRequestError } from './context-errors'
 import type { ProductWebContext } from './product-web-context.server'
-import { getWebRedisClient } from './redis-client'
+import { sharedRedis } from './shared-redis'
 
 import 'server-only'
 
@@ -57,9 +57,7 @@ function key(fingerprint: string, operationId: string, purpose: string) {
 }
 async function transition(name: string, current: Receipt, changes: Partial<Receipt>) {
   const next = receiptSchema.parse({ ...current, ...changes, version: current.version + 1 })
-  const result = await (
-    await getWebRedisClient()
-  ).eval(
+  const result = await sharedRedis().eval(
     `
     local raw = redis.call('GET', KEYS[1])
     if not raw or cjson.decode(raw).version ~= tonumber(ARGV[1]) then return 0 end
@@ -111,7 +109,7 @@ export async function settingsStartReceipt(
 ) {
   const purpose = command.action === 'start_replacement' ? 'replace_factor' : 'rotate_codes'
   const name = key(source.sourceFingerprint, command.operationId, purpose)
-  const redis = await getWebRedisClient()
+  const redis = sharedRedis()
   let raw = await redis.get(name)
   if (!raw && !resolveOnly) {
     const record: Receipt = {

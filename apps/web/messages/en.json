@@ -642,6 +642,8 @@
     "signIn": "Sign in",
     "signingIn": "Signing in…",
     "signOut": "Sign out",
+    "logoutUnconfirmed": "Sign-out was not confirmed",
+    "retryLogout": "Retry sign-out",
     "signingOut": "Signing out…",
     "apiKeys": {
       "title": "API keys",

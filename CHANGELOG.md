@@ -14,6 +14,8 @@ versions they name. For current source-update instructions, see
 
 ### Fixed
 
+- Bound waits for shared web Redis records and let operators retry an unconfirmed Console sign-out.
+
 - Replay completed idempotent responses with an empty stored body.
 - Web sessions refresh access tokens according to their API-issued expiry.
 - Scheduled job failure logs use bounded error codes without exception text.

@@ -6,6 +6,7 @@ import { commandPendingMfa, inspectPendingMfa } from './mfa-pending-handler'
 import { inspectMfaSettings, resolveMfaSettingsStart } from './mfa-settings-handler'
 import type { ProductWebContext } from './product-web-context.server'
 import { isProductMutationTrusted } from './product-web-context.server'
+import { withRedisRequestDeadline } from './redis-deadline'
 
 import 'server-only'
 
@@ -15,6 +16,12 @@ export async function handleAccountMfa(
   context: ProductWebContext,
   startStatus = false
 ) {
+  return withRedisRequestDeadline(request.signal, 10000, () =>
+    accountMfa(request, context, startStatus)
+  )
+}
+
+async function accountMfa(request: Request, context: ProductWebContext, startStatus: boolean) {
   if (request.method !== 'GET') {
     if (!isProductMutationTrusted(request, context))
       throw new ContextRequestError(403, 'AUTH_ORIGIN_REJECTED')

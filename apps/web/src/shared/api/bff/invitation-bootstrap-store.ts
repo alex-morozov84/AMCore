@@ -8,7 +8,7 @@ import { withInvitationStorage } from './invitation-storage'
 import { assertInvitationSurface, invitationNamespace } from './invitation-surface'
 import { type InvitationOwnerRecord, invitationOwnerRecordSchema } from './invitation-vault-record'
 import type { ProductWebContext } from './product-web-context.server'
-import { getWebRedisClient } from './redis-client'
+import { sharedRedis } from './shared-redis'
 
 import 'server-only'
 
@@ -69,9 +69,7 @@ export async function saveInvitationBootstrap(
     deadline: now + 60000,
   })
   await withInvitationStorage(async () => {
-    const result = await (
-      await getWebRedisClient()
-    ).set(pendingKey(id, context), JSON.stringify(pending), {
+    const result = await sharedRedis().set(pendingKey(id, context), JSON.stringify(pending), {
       condition: 'NX',
       expiration: { type: 'PXAT', value: pending.deadline },
     })
@@ -88,7 +86,7 @@ export async function readInvitationBootstrap(
   context?: ProductWebContext
 ): Promise<PendingBootstrap | null> {
   return withInvitationStorage(async () => {
-    const raw = await (await getWebRedisClient()).get(pendingKey(id, context))
+    const raw = await sharedRedis().get(pendingKey(id, context))
     if (!raw) return null
     const pending = pendingSchema.parse(JSON.parse(raw))
     return pending.ownerKey === invitationOwnerKey(currentOwnerHash, context) &&
@@ -111,9 +109,7 @@ export async function attachInvitationBootstrap(
   const parsed = invitationOwnerRecordSchema.parse({ ...next, version: expectedVersion + 1 })
   assertInvitationSurface(parsed, context)
   return withInvitationStorage(async () => {
-    const result = await (
-      await getWebRedisClient()
-    ).eval(ATTACH, {
+    const result = await sharedRedis().eval(ATTACH, {
       keys: [pendingKey(id, context), invitationOwnerKey(currentOwnerHash, context)],
       arguments: [
         String(expectedVersion),

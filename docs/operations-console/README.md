@@ -49,6 +49,10 @@ The sign-in address depends on how the Console was configured:
   **Sign out** in the Console to end only its session. Console OAuth sign-in
   is not supported.
 
+If **Sign-out was not confirmed** appears, select **Retry sign-out**. The Console
+checks the original logout receipt and session before repeating the request.
+See [sessions](../auth/sessions.md#operations-console-host-mode).
+
 The protected Console shows a not-found response if access is absent or denied.
 If its access check explicitly reports a service outage, it shows an
 unavailable state instead. A `SUPER_ADMIN` demotion takes effect on the next
