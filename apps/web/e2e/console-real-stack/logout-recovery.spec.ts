@@ -34,45 +34,42 @@ test('retries an unconfirmed logout for the same Console session', async ({ brow
     )
     expect((await page.request.get('/api/access')).status()).toBe(204)
 
+    const interrupted = Promise.withResolvers<string>()
     await page.route(
       '**/api/auth/logout',
       async (route) => {
         const { returnEntryId } = route.request().postDataJSON() as { returnEntryId: string }
-        const keys = guardedExec(
-          'redis',
-          'redis-cli',
-          '--scan',
-          '--pattern',
-          `*:console-return:v1:${returnEntryId}`
-        )
-          .trim()
-          .split('\n')
-        expect(keys).toHaveLength(1)
-        expect(keys[0]).toContain(':console-return:v1:')
-        expect(
-          guardedExec(
-            'redis',
-            'redis-cli',
-            'EVAL',
-            `
-        local record = cjson.decode(redis.call('GET', KEYS[1]))
-        if record.phase ~= 'prepared' then return 0 end
-        record.phase = 'logout_dispatched'
-        redis.call('SET', KEYS[1], cjson.encode(record), 'KEEPTTL')
-        return 1
-      `,
-            '1',
-            keys[0]!
-          ).trim()
-        ).toBe('1')
         await route.abort('failed')
+        interrupted.resolve(returnEntryId)
       },
       { times: 1 }
     )
     await page.getByRole('button').filter({ hasText: email }).click()
     await page.getByRole('menuitem', { name: messages.auth.logout, exact: true }).click()
-    await expect(page.getByText(messages.console.logoutUnconfirmed, { exact: true })).toBeVisible()
-    // The application accepts a POST for the same receipt even when the first API dispatch did not happen.
+    await expect(page.getByText(messages.console.logoutUnconfirmed, { exact: true })).toBeVisible({
+      timeout: 15000,
+    })
+    const id = await interrupted.promise
+    const key = `web:console-session:v1:console-return:v1:${id}`
+    // Reproduce loss between advancing the receipt and sending the backend request.
+    expect(
+      guardedExec(
+        'redis',
+        'redis-cli',
+        'EVAL',
+        `
+        local raw = redis.call('GET', KEYS[1])
+        if not raw then return 0 end
+        local record = cjson.decode(raw)
+        if record.phase ~= 'prepared' then return 0 end
+        record.phase = 'logout_dispatched'
+        redis.call('SET', KEYS[1], cjson.encode(record), 'KEEPTTL')
+        return 1
+      `,
+        '1',
+        key
+      ).trim()
+    ).toBe('1')
     expect((await page.request.get('/api/access')).status()).toBe(204)
     await page.getByRole('button', { name: messages.console.retryLogout, exact: true }).click()
     await expect(page).toHaveURL(

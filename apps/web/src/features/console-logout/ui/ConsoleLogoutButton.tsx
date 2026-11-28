@@ -65,12 +65,22 @@ export function ConsoleLogoutButton({
     onError: (error) => {
       queries.clear()
       const status = getErrorStatus(error)
+      const canRetry = !status || ![401, 403, 409].includes(status)
+      const id = `console-sign-out:${entryId.current}`
       toast.add({
+        id,
         type: 'warning',
         title: t('logoutUnconfirmed'),
-        ...(!status || ![401, 403, 409].includes(status)
-          ? { actionProps: { children: t('retryLogout'), onClick: () => mutate() } }
-          : {}),
+        ...(canRetry && {
+          timeout: 0,
+          actionProps: {
+            children: t('retryLogout'),
+            onClick: () => {
+              toast.close(id)
+              mutate()
+            },
+          },
+        }),
       })
     },
   })

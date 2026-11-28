@@ -18,6 +18,7 @@ import { SignInAgainClient } from '../../account-security/ui/sign-in-again-clien
 import { ConsoleAccountSecurityClient } from '../ui/client'
 
 const notify = vi.hoisted(() => ({
+  close: vi.fn(),
   add: vi.fn<(value: { title: string; actionProps?: { onClick: () => void } }) => void>(),
 }))
 vi.mock('@/shared/ui/toast', () => ({ toast: notify }))
