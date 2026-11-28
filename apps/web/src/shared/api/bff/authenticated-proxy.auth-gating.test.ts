@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { proxyToBackend } from './authenticated-proxy'
 import { makeRequest, mockCookieStore } from './authenticated-proxy.test-helpers.testkit'
+import { ContextRequestError } from './context-errors'
 import { ensureFreshSession } from './ensure-fresh-session'
 import { SessionNotFoundError, SessionVaultUnavailableError } from './errors'
 import { isTrustedOrigin } from './origin-guard'
@@ -131,15 +132,18 @@ describe('proxyToBackend — session/CSRF gating and auth-failure classification
     expect(response.status).toBe(401)
   })
 
-  it('maps a transient refresh failure (code: "network") to 503, not 401/logout', async () => {
+  it.each([
+    ['REFRESH_TRANSACTION_TIMEOUT', new ContextRequestError(503, 'REFRESH_TRANSACTION_TIMEOUT')],
+    ['SERVICE_UNAVAILABLE', Object.assign(new Error('backend 503'), { code: 'network' })],
+  ])('returns 503 %s without signing out', async (errorCode, error) => {
     mockCookieStore('sess-1')
-    vi.mocked(ensureFreshSession).mockRejectedValue(
-      Object.assign(new Error('backend 503'), { code: 'network' })
-    )
+    vi.mocked(ensureFreshSession).mockRejectedValue(error)
 
     const response = await proxyToBackend(makeRequest('users/me'), ['users', 'me'])
 
     expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toMatchObject({ errorCode })
+    expect(response.headers.get('set-cookie')).toBeNull()
   })
 
   it('maps an uncoded raw fetch-style exception to a controlled 503, not an unhandled crash', async () => {

@@ -69,6 +69,7 @@
     "STEP_UP_METHOD_UNAVAILABLE": "Password confirmation isn't available for this account.",
     "RESOURCE_ALREADY_EXISTS": "That already exists.",
     "API_KEY_ALREADY_EXISTS": "An API key with that name already exists.",
+    "REFRESH_TRANSACTION_TIMEOUT": "Session refresh timed out. Please try again.",
     "DATABASE_POOL_TIMEOUT": "The service is busy. Please try again in a moment.",
     "API_KEY_SCOPE_INVALID_FORMAT": "A scope must use the action:Subject format.",
     "API_KEY_SCOPE_UNKNOWN_ACTION": "Unknown scope action.",

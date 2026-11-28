@@ -42,6 +42,7 @@ export enum AuthErrorCode {
   OAUTH_PROVIDER_NOT_CONFIGURED = 'OAUTH_PROVIDER_NOT_CONFIGURED',
   OAUTH_ACCOUNT_ALREADY_LINKED = 'OAUTH_ACCOUNT_ALREADY_LINKED',
   OAUTH_TICKET_INVALID = 'OAUTH_TICKET_INVALID',
+  REFRESH_TRANSACTION_TIMEOUT = 'REFRESH_TRANSACTION_TIMEOUT',
   // OB-06b / ADR-037 step-up. STEP_UP_REQUIRED is returned with 403 on a
   // @RequireFreshAuth route (or /auth/step-up) when the session's recent-auth
   // is missing/stale; the client re-verifies via POST /auth/step-up.

@@ -215,12 +215,15 @@ confirm Actions enablement and Dependabot state during the first actual run.
 1. Start on clean, current product `main`. Verify remotes, CLI default and the target tag/SHA.
    Read root `CHANGELOG.md` and all intervening upstream release instructions, including mandatory intermediate steps.
    Record the starting product commit and a rollback/data plan before changing source.
-2. Fetch upstream tags with the namespaced refspec above. Inspect the selected source notes directly:
+2. Fetch upstream tags with the namespaced refspec above. Copy the target tag and full commit SHA from the published release notes. Replace both placeholders below. The example checks the commit SHA before creating the update branch.
 
    ```sh
    TARGET_TAG='vX.Y.Z'
+   TARGET_SHA='<full commit SHA from the release notes>'
+   actual_sha=$(git rev-parse --verify "refs/tags/amcore/$TARGET_TAG^{commit}") &&
+   { test "$actual_sha" = "$TARGET_SHA" ||
+     { echo 'Target tag does not match the release commit SHA.' >&2; false; }; } &&
    git show "refs/tags/amcore/$TARGET_TAG:CHANGELOG.md" &&
-   git rev-parse "refs/tags/amcore/$TARGET_TAG^{commit}" &&
    git merge-base HEAD "refs/tags/amcore/$TARGET_TAG^{commit}" &&
    git switch -c update/amcore-example &&
    git merge --no-ff --no-commit "refs/tags/amcore/$TARGET_TAG^{commit}"

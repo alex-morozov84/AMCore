@@ -18,10 +18,12 @@ versions they name. For current source-update instructions, see
   keys page lets users retry the session check from the page.
 
 - Replay completed idempotent responses with an empty stored body.
+- Refresh transaction timeouts return a distinct temporary error and preserve the session.
 - Web sessions refresh access tokens according to their API-issued expiry.
 - Scheduled job failure logs use bounded error codes without exception text.
 - Invitation cleanup reports confirmed deletions when a later transaction fails.
 - Load-test measurements now reject failed or incomplete container snapshots.
+- The fork update example checks the release commit SHA before creating the update branch.
 
 ## [0.12.1] - 2026-11-28
 
