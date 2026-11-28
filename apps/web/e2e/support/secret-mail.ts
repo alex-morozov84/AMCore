@@ -10,7 +10,8 @@ export async function openSecretMail(
   page: Page,
   email: string,
   route: 'invite/accept' | 'verify-email' | 'reset-password',
-  selectedOrigin?: string
+  selectedOrigin?: string,
+  expected?: { pathname: string; phrase: string }
 ) {
   const m = activeTarget()
   const origin = selectedOrigin ?? m.origins.product
@@ -41,7 +42,7 @@ export async function openSecretMail(
           )
           const value = JSON.parse(raw)
           content = `${value.text}\n${value.html}`
-          return true
+          return !expected || content.includes(expected.phrase)
         } catch {
           return false
         }
@@ -56,7 +57,9 @@ export async function openSecretMail(
       .find(
         (candidate) =>
           candidate.origin === origin &&
-          candidate.pathname.endsWith(`/${route}`) &&
+          (expected
+            ? candidate.pathname === expected.pathname
+            : candidate.pathname.endsWith(`/${route}`)) &&
           candidate.searchParams.size === 1 &&
           candidate.searchParams.has('token')
       )

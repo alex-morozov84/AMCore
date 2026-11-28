@@ -1,4 +1,5 @@
 import type {
+  CatalogueLocale,
   InvitationFlowAuthResponse,
   InvitationFlowBinding,
   LoginInput,
@@ -13,6 +14,7 @@ import type { CredentialFormAdapter } from '@/shared/lib/credential-form-adapter
 
 interface Continuation {
   binding: InvitationFlowBinding
+  registrationLocale?: CatalogueLocale
   isCurrent(): boolean
   onMfaRequired?(flowBinding: string): void | Promise<void>
   onStart?(): void
@@ -100,7 +102,7 @@ export function createInvitationCredentialAdapters(
           binding: continuation.binding,
           password: input.password,
           name: input.name,
-          locale: input.locale,
+          locale: continuation.registrationLocale ?? input.locale,
         },
         signal
       )

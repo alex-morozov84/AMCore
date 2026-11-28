@@ -14,6 +14,8 @@ versions they name. For current source-update instructions, see
 
 ### Fixed
 
+- Save the invitation registration page language in the new profile.
+
 - Explain rate limits and show the server’s wait when available. The own API
   keys page lets users retry the session check from the page.
 

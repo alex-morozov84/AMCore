@@ -2,13 +2,19 @@ import { createHash, randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { localePathPrefix, localizedFrontendUrl, SERVED_LOCALES } from '@amcore/shared'
+import {
+  DEFAULT_LOCALE,
+  localePathPrefix,
+  localizedFrontendUrl,
+  SERVED_LOCALES,
+} from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
+import { isProductHome, messagesForLocale } from '../shared/product-settings'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
-import { TEST_PASSWORD, uniqueEmail } from './helpers'
+import { logoutViaApi, TEST_PASSWORD, uniqueEmail } from './helpers'
 import {
   accountCount,
   inviteRecipient,
@@ -17,6 +23,8 @@ import {
   restoreRedisAccess,
 } from './invitation-recipient.helpers'
 import { resetInvitationRegistrationIpBudget } from './invitation-registration-budget.helpers'
+
+test.use({ locale: DEFAULT_LOCALE })
 
 test.beforeEach(() => resetInvitationRegistrationIpBudget())
 
@@ -89,6 +97,11 @@ for (const locale of SERVED_LOCALES) {
       await registration.getByRole('button', { name: catalogue.auth.register, exact: true }).click()
       await expect(page.getByRole('heading', { name: t.verifyTitle })).toBeVisible()
       expect(membershipCount(email, org.id)).toBe('0')
+      expect(
+        guardedSql(`SELECT locale FROM core.users WHERE "emailCanonical" = :'email';`, {
+          email,
+        }).trim()
+      ).toBe(locale)
       // Own valid token fixture exercises the real verification API; no inbox arrival claim.
       const verificationToken = randomBytes(32).toString('hex')
       const verificationHash = createHash('sha256').update(verificationToken).digest('hex')
@@ -150,6 +163,18 @@ for (const locale of SERVED_LOCALES) {
       }
       expect(membershipCount(email, org.id)).toBe('1')
       expect(errors).toEqual([])
+      if (!loseResponse) {
+        const loginLocale = SERVED_LOCALES.find((value) => value !== locale) ?? locale
+        const loginCatalogue = messagesForLocale(loginLocale).auth
+        await logoutViaApi(context.request, target.origins.product)
+        await page.goto(localizedFrontendUrl(target.origins.product, loginLocale, 'login'))
+        await page.getByRole('textbox', { name: loginCatalogue.email, exact: true }).fill(email)
+        await page.getByLabel(loginCatalogue.password, { exact: true }).fill(TEST_PASSWORD)
+        await page.getByRole('button', { name: loginCatalogue.login, exact: true }).click()
+        await expect(page).toHaveURL(
+          (url) => url.origin === target.origins.product && isProductHome(url, locale)
+        )
+      }
     })
   }
 }

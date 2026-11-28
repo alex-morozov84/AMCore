@@ -232,6 +232,10 @@ Unknown outcomes retain the same operation ID and complete command.
 Before browser login or registration, the typed client completes `POST auth-context`
 and sends its returned `attemptId` as `X-AMCore-Login-Attempt`. Preserve that attempt
 and its cookies; do not invent another attempt to recover an unknown credential result.
+The web invitation form sends the current page language as `locale`. The new
+profile stores that language and uses it for the verification email and later
+portal sign-in.
+
 A login `202` is not a published session or an invitation acknowledgment. Use the
 existing MFA browser flow to complete required proofs and exact combined publication;
 keep backend tokens and restricted continuation secrets in the BFF. A changed
